@@ -1,0 +1,23 @@
+namespace Energon {
+  entity Agent = {
+    agent_id: String,
+    org_id: String,
+    role_id: String,
+    project_id: String
+  };
+
+  entity Memory = {
+    org_id: String,
+    scope: String,
+    project_id: String,
+    role_id: String,
+    owner_agent_id: String,
+    user_id: String,
+    session_id: String
+  };
+
+  action "read_memory" appliesTo {
+    principal: Agent,
+    resource: Memory
+  };
+}

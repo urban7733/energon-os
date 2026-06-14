@@ -1,0 +1,9 @@
+/target
+/node_modules
+/apps/web/node_modules
+/apps/web/.next
+/.env
+/.env.local
+/.DS_Store
+/data
+*.log

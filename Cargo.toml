@@ -1,0 +1,25 @@
+[workspace]
+members = [
+    "crates/energon-api",
+    "crates/energon-core",
+    "crates/energon-db",
+    "crates/energon-worker",
+]
+resolver = "3"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+authors = ["Urban Herak"]
+
+[workspace.dependencies]
+axum = "0.8"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio", "tls-rustls-ring-webpki", "postgres"] }
+thiserror = "2"
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "net"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+

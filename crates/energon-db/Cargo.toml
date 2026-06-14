@@ -1,0 +1,11 @@
+[package]
+name = "energon-db"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[dependencies]
+energon-core = { path = "../energon-core" }
+sqlx.workspace = true
+thiserror.workspace = true
