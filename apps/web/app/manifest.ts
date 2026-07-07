@@ -1,14 +1,15 @@
 import type { MetadataRoute } from "next";
+import { site } from "../lib/site";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
     name: "Energon OS",
     short_name: "Energon",
-    description: "Permissioned memory infrastructure for AI agent swarms.",
+    description: site.description,
     start_url: "/",
     display: "standalone",
-    background_color: "#000000",
-    theme_color: "#000000",
+    background_color: "#0b0b0b",
+    theme_color: "#0b0b0b",
     icons: [
       {
         src: "/energonos.png",

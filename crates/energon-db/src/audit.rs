@@ -1,10 +1,10 @@
-use energon_core::{AuditRecord, ContextItem};
-use sqlx::{PgPool, Row};
+use energon_core::{AuditRecord, ContextItem, PromotionAuditRecord};
+use sqlx::{PgPool, Postgres, Row, Transaction};
 
 use crate::{
     DbError,
     errors::{i64_to_u128, usize_to_i32},
-    memory::scope_to_str,
+    memory::{scope_from_str, scope_to_str},
 };
 
 pub async fn insert_context_audit(
@@ -136,6 +136,90 @@ pub async fn get_context_audit(
             as usize,
         token_budget: i64_to_u128(token_budget.into(), "token_budget")? as usize,
         estimated_tokens: i64_to_u128(estimated_tokens.into(), "estimated_tokens")? as usize,
+        created_at_unix_ms: i64_to_u128(created_at_unix_ms, "created_at_unix_ms")?,
+    }))
+}
+
+pub async fn insert_promotion_audit_in_tx(
+    tx: &mut Transaction<'_, Postgres>,
+    audit: &PromotionAuditRecord,
+) -> Result<(), DbError> {
+    sqlx::query(
+        r#"
+        INSERT INTO memory_promotions (
+            promotion_id,
+            source_memory_id,
+            promoted_memory_id,
+            agent_id,
+            org_id,
+            target_scope,
+            reason,
+            created_at
+        )
+        VALUES (
+            $1,
+            $2,
+            $3,
+            $4,
+            $5,
+            $6,
+            $7,
+            to_timestamp($8::double precision / 1000.0)
+        )
+        "#,
+    )
+    .bind(&audit.promotion_id)
+    .bind(&audit.source_memory_id)
+    .bind(&audit.promoted_memory_id)
+    .bind(&audit.agent_id)
+    .bind(&audit.org_id)
+    .bind(scope_to_str(&audit.target_scope))
+    .bind(&audit.reason)
+    .bind(audit.created_at_unix_ms as f64)
+    .execute(&mut **tx)
+    .await?;
+
+    Ok(())
+}
+
+pub async fn get_promotion_audit(
+    pool: &PgPool,
+    promoted_memory_id: &str,
+) -> Result<Option<PromotionAuditRecord>, DbError> {
+    let row = sqlx::query(
+        r#"
+        SELECT
+            promotion_id,
+            source_memory_id,
+            promoted_memory_id,
+            agent_id,
+            org_id,
+            target_scope,
+            reason,
+            floor(extract(epoch from created_at) * 1000)::bigint AS created_at_unix_ms
+        FROM memory_promotions
+        WHERE promoted_memory_id = $1
+        "#,
+    )
+    .bind(promoted_memory_id)
+    .fetch_optional(pool)
+    .await?;
+
+    let Some(row) = row else {
+        return Ok(None);
+    };
+
+    let target_scope: String = row.try_get("target_scope")?;
+    let created_at_unix_ms: i64 = row.try_get("created_at_unix_ms")?;
+
+    Ok(Some(PromotionAuditRecord {
+        promotion_id: row.try_get("promotion_id")?,
+        source_memory_id: row.try_get("source_memory_id")?,
+        promoted_memory_id: row.try_get("promoted_memory_id")?,
+        agent_id: row.try_get("agent_id")?,
+        org_id: row.try_get("org_id")?,
+        target_scope: scope_from_str(&target_scope)?,
+        reason: row.try_get("reason")?,
         created_at_unix_ms: i64_to_u128(created_at_unix_ms, "created_at_unix_ms")?,
     }))
 }

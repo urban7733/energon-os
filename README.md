@@ -24,6 +24,79 @@ The product category is:
 Permissioned memory infrastructure for agent swarms.
 ```
 
+## Long-Term Company Goal
+
+The broader goal is a complete autonomous AI-native company: a company operated by
+specialized AI agents that can plan, coordinate, execute work, use tools, and
+compound institutional memory over time.
+
+Energon OS is the memory and context infrastructure for that larger system. It is
+not the autonomous company runtime. Agent execution, browser automation,
+workflow orchestration, payments, marketplaces, and company-operating agents
+belong in separate repositories and services. Those systems should call Energon
+through an API or SDK when they need permissioned memory and auditable context.
+
+The long-term autonomous-company roadmap includes crypto payments so agents can
+pay, settle, and purchase services autonomously. That payment execution layer
+should be built as a separate service or repository. Energon should integrate
+with it through clean APIs when payment-aware agents need memory, identity,
+permissions, or audit context.
+
+The first crypto payment boundary in this repo is an x402 API gate. When enabled,
+paid agent routes return `402 Payment Required` with payment instructions before
+memory or context is delivered. Real wallet custody, private keys, treasury
+automation, accounting, and broader payment orchestration stay outside this
+memory core.
+
+## API-First Product Model
+
+The primary users of Energon OS are agents, not humans clicking through a UI.
+The dashboard is an operator surface for setup, inspection, and audits. The core
+product surface is the API and future SDKs that autonomous agents call directly.
+
+The long-term scale goal is that billions of external agents can use Energon as
+their permissioned memory layer. Every design decision should preserve that
+shape:
+
+```txt
+Autonomous agents
+  -> Energon API/SDK
+  -> permissioned memory and context
+  -> audited context pack
+  -> autonomous agents
+```
+
+At that scale, the product must remain narrow and reliable: identify the agent,
+filter permissions before retrieval, return only allowed context, and record what
+influenced the output.
+
+## External Agent Data Boundary
+
+Energon OS does not own or manage the external agents' files, browsers, local
+working directories, raw tool outputs, or private runtime state. Those belong to
+the agent platforms, customer systems, or separate autonomous-company repos.
+
+For example, one group of agents might search the public internet for information
+about a person, another might verify sources, and another might coordinate a
+report. Their crawling, browsing, files, and raw notes stay outside Energon unless
+an agent explicitly writes selected memory through the API.
+
+Energon stores and controls:
+
+```txt
+agent identity
+organization/project/role/session relationships
+permissioned memory records
+private overlays
+shared context
+promotion audit trails
+context build audit trails
+optional source references or metadata
+```
+
+This keeps the product boundary clean: external agents do the work; Energon
+decides what memory they may share or receive for that work.
+
 ## Business Logic
 
 The central question Energon answers is:
@@ -67,6 +140,8 @@ Private memory never flows back into shared memory automatically. Promotion must
 ```txt
 agent_private -> shared
 ```
+
+Promotion requires a non-empty reason and records a promotion audit entry.
 
 Commercially, Energon can be sold as:
 
@@ -113,10 +188,12 @@ Endpoints:
 ```txt
 GET  /health
 POST /v1/admin/agents
+GET  /v1/billing/x402
 POST /v1/memory/write
 POST /v1/context/build
 POST /v1/memory/promote
 GET  /v1/audit/context/{request_id}
+GET  /v1/audit/promotion/{promoted_memory_id}
 ```
 
 Production agent requests use bearer API keys:
@@ -128,7 +205,7 @@ Authorization: Bearer eos_live_...
 Admin creates agents and receives the API key once:
 
 ```bash
-curl -X POST http://127.0.0.1:3000/v1/admin/agents \
+curl -X POST http://127.0.0.1:3001/v1/admin/agents \
   -H 'content-type: application/json' \
   -H "x-energon-admin-token: $ENERGON_ADMIN_TOKEN" \
   -d '{
@@ -161,6 +238,27 @@ export ENERGON_ADMIN_TOKEN=$(openssl rand -hex 32)
 cargo run -p energon-api
 ```
 
+For a fast in-memory local dashboard demo, run the API on port 3001:
+
+```bash
+bun run api:dev
+```
+
+Enable x402 payment challenges for paid API routes:
+
+```bash
+export ENERGON_X402_ENABLED=true
+export ENERGON_X402_PAY_TO=0xYourReceivingAddress
+export ENERGON_X402_NETWORK=eip155:84532
+export ENERGON_X402_ASSET=0x036CbD53842c5426634e7929541eC2318f3dCF7e
+export ENERGON_X402_FACILITATOR_URL=https://x402.org/facilitator
+```
+
+Use a public receiving address only. Never put a private key, seed phrase, or
+wallet backup into the repository or dashboard. For local UI testing without an
+onchain settlement, `ENERGON_X402_ACCEPT_UNVERIFIED=1` can bypass facilitator
+verification; do not use that flag in production.
+
 Run the embedding worker:
 
 ```bash
@@ -180,6 +278,7 @@ cargo test --workspace
 ```txt
 docs/architecture.md
 docs/api.md
+docs/crypto-payments.md
 docs/operations.md
 ```
 

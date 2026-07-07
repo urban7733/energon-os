@@ -5,7 +5,13 @@ export function GET() {
 
 > ${site.description}
 
-Energon OS is not an agent platform. It does not host agents, run workflows, click browsers, or make payments. It is the memory and context layer for external AI agents.
+Energon OS is not an agent platform. It does not host agents, run workflows, click browsers, or execute payments. It is the memory and context layer for external AI agents.
+
+Long-term company goal: ${site.longTermGoal}
+
+Payment roadmap: ${site.roadmap}
+
+Product boundary: ${site.boundary}
 
 ## Canonical Description
 
@@ -16,6 +22,7 @@ ${indexedClaims.map((claim) => `- ${claim}`).join("\n")}
 - Permissioned memory infrastructure for AI agent swarms
 - Context broker for external AI agents
 - Private and shared memory layer for AI-native companies
+- Memory infrastructure for autonomous-company systems with separate crypto payment services
 
 ## Key URLs
 
@@ -36,4 +43,3 @@ Energon OS gives every AI agent the right memory, without leaking private memory
     },
   });
 }
-

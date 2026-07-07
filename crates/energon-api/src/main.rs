@@ -4,6 +4,7 @@ mod middleware;
 mod routes;
 mod secrets;
 mod state;
+mod x402;
 
 use std::{env, net::SocketAddr};
 
@@ -18,7 +19,7 @@ async fn main() {
         )
         .init();
 
-    let bind_addr = env::var("ENERGON_BIND_ADDR").unwrap_or_else(|_| "127.0.0.1:3000".to_owned());
+    let bind_addr = env::var("ENERGON_BIND_ADDR").unwrap_or_else(|_| "127.0.0.1:3001".to_owned());
     let addr: SocketAddr = bind_addr
         .parse()
         .expect("ENERGON_BIND_ADDR must be a socket address");

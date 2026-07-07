@@ -14,6 +14,27 @@ External Agent
   -> Context Pack
 ```
 
+The API is the primary product surface. Humans may use the dashboard to operate
+and inspect the system, but autonomous agents should integrate through the API or
+SDKs. The long-term architecture target is massive autonomous usage: fleets of
+agents, and eventually billions of agent calls, asking Energon for allowed memory
+without Energon becoming their runtime.
+
+Energon is not the system of record for external agent files or raw tool outputs.
+An agent may browse the internet, coordinate research, inspect customer systems,
+or generate local artifacts elsewhere. Energon only sees what an authenticated
+agent writes as memory or asks to retrieve as context.
+
+```txt
+External agent runtime
+  owns tools, files, browser state, raw notes
+  -> writes selected memory to Energon
+  -> requests allowed context from Energon
+
+Energon OS
+  owns identity, relationships, permissions, memory records, context packs, audits
+```
+
 ## Core Rule
 
 ```txt
@@ -31,6 +52,15 @@ open/org/project/role memory
 + agent_private/user_private/session overlays
 = dynamic context pack per agent request
 ```
+
+Promotion is the only path from private to shared memory:
+
+```txt
+agent_private -> open/org/project/role
+```
+
+Each promotion requires a reason and writes a promotion audit record tied to the
+source memory, promoted memory, agent, org, target scope, and timestamp.
 
 ## Runtime Components
 
@@ -58,3 +88,17 @@ ENERGON_RETRIEVAL_CANDIDATE_LIMIT=500
 
 This keeps request work bounded while preserving the key security invariant: the core still rejects any memory that fails the permission check.
 
+The scale direction is API-first and agent-native:
+
+```txt
+many autonomous agents
+  -> authenticated API requests
+  -> bounded candidate selection
+  -> core permission verification
+  -> packed context
+  -> audit trail
+```
+
+The system should scale by improving identity, storage partitioning, retrieval
+indexes, caching, queueing, and SDK ergonomics. It should not scale by absorbing
+agent runtime responsibilities into this repository.

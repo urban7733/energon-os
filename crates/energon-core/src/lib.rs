@@ -7,7 +7,7 @@ pub mod memory;
 pub mod permissions;
 pub mod retrieval;
 
-pub use audit::AuditRecord;
+pub use audit::{AuditRecord, PromotionAuditRecord};
 pub use context_broker::{ContextBuildOutcome, ContextBuildRequest, ContextItem, ContextPack};
 pub use errors::EnergonError;
 pub use identity::AgentIdentity;

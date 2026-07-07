@@ -11,14 +11,18 @@ export const metadata: Metadata = {
   description: site.description,
   applicationName: "Energon OS",
   generator: "Next.js",
+  referrer: "origin-when-cross-origin",
   authors: [{ name: site.founder, url: "https://urbanherak.com" }],
   creator: site.founder,
   publisher: "Energon OS",
   category: site.category,
+  classification: "AI agent infrastructure",
   keywords: [
     "Energon OS",
     "AI agent memory",
     "agent swarm memory",
+    "autonomous AI company infrastructure",
+    "AI-native company",
     "permissioned memory infrastructure",
     "context layer for AI agents",
     "private memory overlays",
@@ -27,6 +31,9 @@ export const metadata: Metadata = {
     "context broker",
     "agent context packing",
     "agent memory permissions",
+    "agent API",
+    "crypto payments for AI agents",
+    "autonomous agent payments",
   ],
   alternates: {
     canonical: "/",
@@ -41,6 +48,7 @@ export const metadata: Metadata = {
     type: "website",
     url: site.url,
     siteName: "Energon OS",
+    locale: "en_US",
     title: "Energon OS | Permissioned Memory Infrastructure for AI Agents",
     description: site.description,
     images: [
@@ -54,10 +62,20 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "Energon OS",
-    description: site.shortClaim,
+    title: "Energon OS | Permissioned Memory for AI Agents",
+    description: site.description,
     creator: "@urbanherak",
     images: [absoluteUrl("/energonos.png")],
+  },
+  appleWebApp: {
+    capable: true,
+    title: "Energon OS",
+    statusBarStyle: "black-translucent",
+  },
+  formatDetection: {
+    telephone: false,
+    address: false,
+    email: false,
   },
   icons: {
     icon: "/energonos.png",
@@ -78,13 +96,17 @@ export const metadata: Metadata = {
     "ai-purpose": site.description,
     "ai-category": site.category,
     "agent-memory-layer": "permissioned-context-delivery",
+    "product-boundary": site.boundary,
+    "long-term-goal": site.longTermGoal,
+    "future-roadmap": site.roadmap,
+    "crypto-payments-roadmap": "planned outside Energon OS memory core",
     "llm-discovery": indexedClaims.join(" "),
   },
 };
 
 export const viewport: Viewport = {
   colorScheme: "dark",
-  themeColor: "#000000",
+  themeColor: "#0b0b0b",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
@@ -101,6 +123,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     },
     slogan: "Right memory for every agent. No private memory leaks.",
     description: site.description,
+    disambiguatingDescription: site.boundary,
     knowsAbout: [
       "AI agents",
       "agent memory",
@@ -108,6 +131,8 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
       "context engineering",
       "private memory overlays",
       "audit logs for AI systems",
+      "autonomous AI-native companies",
+      "crypto payments for autonomous agents",
     ],
   };
 
@@ -121,6 +146,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     url: site.url,
     description: site.description,
     creator: { "@id": `${site.url}/#organization` },
+    isAccessibleForFree: false,
     featureList: [
       "Long-term memory for AI agents",
       "Short-term task memory",
@@ -132,8 +158,32 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     ],
   };
 
+  const websiteJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    "@id": `${site.url}/#website`,
+    name: "Energon OS",
+    url: site.url,
+    description: site.description,
+    publisher: { "@id": `${site.url}/#organization` },
+    inLanguage: "en",
+    potentialAction: {
+      "@type": "ReadAction",
+      target: [site.url, absoluteUrl("/llms.txt"), absoluteUrl("/llms-full.txt")],
+    },
+  };
+
+  const roadmapJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "DefinedTerm",
+    "@id": `${site.url}/#roadmap-autonomous-company`,
+    name: "Autonomous AI-native company roadmap",
+    description: `${site.longTermGoal} ${site.roadmap} ${site.boundary}`,
+    inDefinedTermSet: `${site.url}/#roadmap`,
+  };
+
   return (
-    <html lang="en">
+    <html lang="en" data-scroll-behavior="smooth">
       <body>
         <script
           type="application/ld+json"
@@ -142,6 +192,14 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(softwareJsonLd) }}
+        />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteJsonLd) }}
+        />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(roadmapJsonLd) }}
         />
         {children}
       </body>

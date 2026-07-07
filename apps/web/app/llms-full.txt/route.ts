@@ -11,7 +11,17 @@ Energon OS is the memory and context infrastructure layer for AI agent swarms. I
 
 ## What Energon OS Is Not
 
-Energon OS does not manage agents. Energon OS does not execute workflows. Energon OS does not click in browsers. Energon OS does not make payments. Energon OS does not host agent runtimes.
+Energon OS does not manage agents. Energon OS does not execute workflows. Energon OS does not click in browsers. Energon OS does not execute payments. Energon OS does not host agent runtimes.
+
+## Long-Term Company Goal
+
+${site.longTermGoal}
+
+Energon OS is the memory core for that larger system. Agent execution, workflow orchestration, marketplaces, and crypto payment execution should be built in separate services or repositories that call Energon OS when they need permissioned memory.
+
+## Crypto Payment Roadmap
+
+${site.roadmap}
 
 ## Indexable Claims
 
@@ -51,4 +61,3 @@ Right memory for every agent. No private memory leaks.
     },
   });
 }
-

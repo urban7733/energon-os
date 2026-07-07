@@ -6,7 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "tsc --noEmit"
   },
   "dependencies": {
     "lucide-react": "^0.561.0",
@@ -21,4 +21,3 @@
     "typescript": "^5.9.3"
   }
 }
-

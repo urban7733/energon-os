@@ -1,13 +1,37 @@
-use energon_core::{AgentIdentity, MemoryRecord, MemoryScope};
-use sqlx::{PgPool, Row, postgres::PgRow};
+use energon_core::{AgentIdentity, MemoryRecord, MemoryScope, PromotionAuditRecord};
+use sqlx::{PgPool, Postgres, Row, Transaction, postgres::PgRow};
 
-use crate::{DbError, errors::i64_to_u128, identity};
+use crate::{DbError, audit, errors::i64_to_u128, identity};
 
 pub async fn insert_memory(pool: &PgPool, record: &MemoryRecord) -> Result<(), DbError> {
     identity::ensure_memory_record_refs(pool, record).await?;
 
     let mut tx = pool.begin().await?;
+    insert_memory_in_tx(&mut tx, record).await?;
+    tx.commit().await?;
 
+    Ok(())
+}
+
+pub async fn insert_promoted_memory(
+    pool: &PgPool,
+    record: &MemoryRecord,
+    promotion: &PromotionAuditRecord,
+) -> Result<(), DbError> {
+    identity::ensure_memory_record_refs(pool, record).await?;
+
+    let mut tx = pool.begin().await?;
+    insert_memory_in_tx(&mut tx, record).await?;
+    audit::insert_promotion_audit_in_tx(&mut tx, promotion).await?;
+    tx.commit().await?;
+
+    Ok(())
+}
+
+async fn insert_memory_in_tx(
+    tx: &mut Transaction<'_, Postgres>,
+    record: &MemoryRecord,
+) -> Result<(), DbError> {
     sqlx::query(
         r#"
         INSERT INTO memory_entries (
@@ -55,7 +79,7 @@ pub async fn insert_memory(pool: &PgPool, record: &MemoryRecord) -> Result<(), D
     .bind(&record.source)
     .bind(&record.promoted_from)
     .bind(record.created_at_unix_ms as f64)
-    .execute(&mut *tx)
+    .execute(&mut **tx)
     .await?;
 
     sqlx::query(
@@ -75,10 +99,8 @@ pub async fn insert_memory(pool: &PgPool, record: &MemoryRecord) -> Result<(), D
     .bind(&record.memory_id)
     .bind(&record.content)
     .bind(record.created_at_unix_ms as f64)
-    .execute(&mut *tx)
+    .execute(&mut **tx)
     .await?;
-
-    tx.commit().await?;
 
     Ok(())
 }

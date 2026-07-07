@@ -3,7 +3,7 @@
 Base URL:
 
 ```txt
-http://127.0.0.1:3000
+http://127.0.0.1:3001
 ```
 
 Production agent requests use:
@@ -11,6 +11,46 @@ Production agent requests use:
 ```txt
 Authorization: Bearer eos_live_...
 ```
+
+When x402 is enabled, paid routes also require an x402 payment payload:
+
+```txt
+PAYMENT-SIGNATURE: <x402 payment payload>
+```
+
+Without payment, the API responds with `402 Payment Required` and a
+`PAYMENT-REQUIRED` header containing the accepted payment requirements.
+
+## x402 Billing Status
+
+```bash
+curl http://127.0.0.1:3001/v1/billing/x402
+```
+
+Relevant environment variables:
+
+```txt
+ENERGON_X402_ENABLED=true
+ENERGON_X402_PAY_TO=0xYourReceivingAddress
+ENERGON_X402_NETWORK=eip155:84532
+ENERGON_X402_ASSET=0x036CbD53842c5426634e7929541eC2318f3dCF7e
+ENERGON_X402_FACILITATOR_URL=https://x402.org/facilitator
+ENERGON_X402_FACILITATOR_BEARER=<optional facilitator bearer token>
+```
+
+Paid routes:
+
+```txt
+POST /v1/memory/write                    $0.001 USDC
+POST /v1/memory/promote                  $0.001 USDC
+POST /v1/context/build                   $0.003 USDC
+GET  /v1/audit/context/{request_id}      $0.0005 USDC
+GET  /v1/audit/promotion/{memory_id}     $0.0005 USDC
+```
+
+For local UI testing only, `ENERGON_X402_ACCEPT_UNVERIFIED=1` accepts a non-empty
+`PAYMENT-SIGNATURE` without facilitator verification. Do not use that in
+production.
 
 ## Create Agent
 
@@ -21,7 +61,7 @@ x-energon-admin-token: <ENERGON_ADMIN_TOKEN>
 ```
 
 ```bash
-curl -X POST http://127.0.0.1:3000/v1/admin/agents \
+curl -X POST http://127.0.0.1:3001/v1/admin/agents \
   -H 'content-type: application/json' \
   -H "x-energon-admin-token: $ENERGON_ADMIN_TOKEN" \
   -d '{
@@ -38,7 +78,7 @@ The response includes `api_key` once. Store it immediately.
 ## Write Memory
 
 ```bash
-curl -X POST http://127.0.0.1:3000/v1/memory/write \
+curl -X POST http://127.0.0.1:3001/v1/memory/write \
   -H 'content-type: application/json' \
   -H "Authorization: Bearer $ENERGON_AGENT_API_KEY" \
   -d '{
@@ -51,7 +91,7 @@ curl -X POST http://127.0.0.1:3000/v1/memory/write \
 ## Build Context
 
 ```bash
-curl -X POST http://127.0.0.1:3000/v1/context/build \
+curl -X POST http://127.0.0.1:3001/v1/context/build \
   -H 'content-type: application/json' \
   -H "Authorization: Bearer $ENERGON_AGENT_API_KEY" \
   -d '{
@@ -63,8 +103,12 @@ curl -X POST http://127.0.0.1:3000/v1/context/build \
 
 ## Promote Memory
 
+Only `agent_private` memory can be promoted. The target scope must be one of
+`open`, `org`, `project`, or `role`, and `reason` is required for the promotion
+audit trail.
+
 ```bash
-curl -X POST http://127.0.0.1:3000/v1/memory/promote \
+curl -X POST http://127.0.0.1:3001/v1/memory/promote \
   -H 'content-type: application/json' \
   -H "Authorization: Bearer $ENERGON_AGENT_API_KEY" \
   -d '{
@@ -74,12 +118,21 @@ curl -X POST http://127.0.0.1:3000/v1/memory/promote \
   }'
 ```
 
-## Read Audit
+## Read Context Audit
 
 Only the same agent/org that created the context request can read its audit record.
 
 ```bash
-curl http://127.0.0.1:3000/v1/audit/context/ctx_... \
+curl http://127.0.0.1:3001/v1/audit/context/ctx_... \
   -H "Authorization: Bearer $ENERGON_AGENT_API_KEY"
 ```
 
+## Read Promotion Audit
+
+Only the same agent/org that created the promotion can read its promotion audit
+record.
+
+```bash
+curl http://127.0.0.1:3001/v1/audit/promotion/mem_... \
+  -H "Authorization: Bearer $ENERGON_AGENT_API_KEY"
+```

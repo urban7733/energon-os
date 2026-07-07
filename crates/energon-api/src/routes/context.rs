@@ -1,17 +1,22 @@
-use axum::{Json, extract::State, http::HeaderMap};
-use energon_core::{ContextBuildRequest, ContextPack, context_broker};
+use axum::{Json, extract::State, http::HeaderMap, response::Response};
+use energon_core::{ContextBuildRequest, context_broker};
 
 use crate::{
     errors::ApiError,
     middleware::auth::identity_from_request,
     state::{AppState, StorageBackend, now_unix_ms},
+    x402::{PaidRoute, attach_payment_response},
 };
 
 pub async fn build_context(
     State(state): State<AppState>,
     headers: HeaderMap,
     Json(request): Json<ContextBuildRequest>,
-) -> Result<Json<ContextPack>, ApiError> {
+) -> Result<Response, ApiError> {
+    let payment_response = state
+        .x402
+        .require_payment(&headers, PaidRoute::ContextBuild)
+        .await?;
     let agent = identity_from_request(&state, &headers).await?;
 
     if let StorageBackend::Postgres(pool) = &state.storage {
@@ -58,5 +63,8 @@ pub async fn build_context(
         }
     }
 
-    Ok(Json(outcome.pack))
+    Ok(attach_payment_response(
+        Json(outcome.pack),
+        payment_response,
+    ))
 }
