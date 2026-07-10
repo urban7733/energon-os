@@ -165,7 +165,9 @@ POST /v1/admin/agents
 POST /v1/memory/write
 POST /v1/context/build
 POST /v1/memory/promote
+GET  /v1/vault/obsidian.zip
 GET  /v1/audit/context/{request_id}
+GET  /v1/audit/promotion/{promoted_memory_id}
 ```
 
 Production agent requests use:

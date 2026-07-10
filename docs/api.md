@@ -46,6 +46,7 @@ POST /v1/memory/promote                  $0.001 USDC
 POST /v1/context/build                   $0.003 USDC
 GET  /v1/audit/context/{request_id}      $0.0005 USDC
 GET  /v1/audit/promotion/{memory_id}     $0.0005 USDC
+GET  /v1/vault/obsidian.zip              $0.005 USDC
 ```
 
 For local UI testing only, `ENERGON_X402_ACCEPT_UNVERIFIED=1` accepts a non-empty
@@ -136,3 +137,21 @@ record.
 curl http://127.0.0.1:3001/v1/audit/promotion/mem_... \
   -H "Authorization: Bearer $ENERGON_AGENT_API_KEY"
 ```
+
+## Export Obsidian Vault
+
+Exports a real Obsidian-compatible ZIP vault for the authenticated agent. The
+vault contains Markdown notes with YAML frontmatter and `[[wikilinks]]` for
+agents, organizations, projects, roles, sessions, memory records, context builds,
+and memory promotions.
+
+The export is permission-filtered. It only includes memory visible to the
+calling identity and optional `project_id`, `user_id`, and `session_id` filters.
+
+```bash
+curl "http://127.0.0.1:3001/v1/vault/obsidian.zip?project_id=apex_verify&limit=500" \
+  -H "Authorization: Bearer $ENERGON_AGENT_API_KEY" \
+  -o energon-obsidian-vault.zip
+```
+
+Open the extracted folder in Obsidian to use the native graph view.

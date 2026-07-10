@@ -12,3 +12,4 @@ pub use context_broker::{ContextBuildOutcome, ContextBuildRequest, ContextItem, 
 pub use errors::EnergonError;
 pub use identity::AgentIdentity;
 pub use memory::{MemoryRecord, MemoryScope, PromoteMemoryRequest, WriteMemoryRequest};
+pub use permissions::{AccessContext, can_read_memory};

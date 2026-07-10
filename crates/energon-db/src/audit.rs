@@ -1,4 +1,4 @@
-use energon_core::{AuditRecord, ContextItem, PromotionAuditRecord};
+use energon_core::{AgentIdentity, AuditRecord, ContextItem, PromotionAuditRecord};
 use sqlx::{PgPool, Postgres, Row, Transaction};
 
 use crate::{
@@ -140,6 +140,37 @@ pub async fn get_context_audit(
     }))
 }
 
+pub async fn list_context_audits_for_agent(
+    pool: &PgPool,
+    agent: &AgentIdentity,
+    limit: i64,
+) -> Result<Vec<AuditRecord>, DbError> {
+    let rows = sqlx::query(
+        r#"
+        SELECT request_id
+        FROM context_requests
+        WHERE agent_id = $1 AND org_id = $2
+        ORDER BY created_at DESC
+        LIMIT $3
+        "#,
+    )
+    .bind(&agent.agent_id)
+    .bind(&agent.org_id)
+    .bind(limit)
+    .fetch_all(pool)
+    .await?;
+
+    let mut audits = Vec::with_capacity(rows.len());
+    for row in rows {
+        let request_id: String = row.try_get("request_id")?;
+        if let Some(audit) = get_context_audit(pool, &request_id).await? {
+            audits.push(audit);
+        }
+    }
+
+    Ok(audits)
+}
+
 pub async fn insert_promotion_audit_in_tx(
     tx: &mut Transaction<'_, Postgres>,
     audit: &PromotionAuditRecord,
@@ -222,4 +253,51 @@ pub async fn get_promotion_audit(
         reason: row.try_get("reason")?,
         created_at_unix_ms: i64_to_u128(created_at_unix_ms, "created_at_unix_ms")?,
     }))
+}
+
+pub async fn list_promotion_audits_for_agent(
+    pool: &PgPool,
+    agent: &AgentIdentity,
+    limit: i64,
+) -> Result<Vec<PromotionAuditRecord>, DbError> {
+    let rows = sqlx::query(
+        r#"
+        SELECT
+            promotion_id,
+            source_memory_id,
+            promoted_memory_id,
+            agent_id,
+            org_id,
+            target_scope,
+            reason,
+            floor(extract(epoch from created_at) * 1000)::bigint AS created_at_unix_ms
+        FROM memory_promotions
+        WHERE agent_id = $1 AND org_id = $2
+        ORDER BY created_at DESC
+        LIMIT $3
+        "#,
+    )
+    .bind(&agent.agent_id)
+    .bind(&agent.org_id)
+    .bind(limit)
+    .fetch_all(pool)
+    .await?;
+
+    rows.into_iter().map(row_to_promotion_audit).collect()
+}
+
+fn row_to_promotion_audit(row: sqlx::postgres::PgRow) -> Result<PromotionAuditRecord, DbError> {
+    let target_scope: String = row.try_get("target_scope")?;
+    let created_at_unix_ms: i64 = row.try_get("created_at_unix_ms")?;
+
+    Ok(PromotionAuditRecord {
+        promotion_id: row.try_get("promotion_id")?,
+        source_memory_id: row.try_get("source_memory_id")?,
+        promoted_memory_id: row.try_get("promoted_memory_id")?,
+        agent_id: row.try_get("agent_id")?,
+        org_id: row.try_get("org_id")?,
+        target_scope: scope_from_str(&target_scope)?,
+        reason: row.try_get("reason")?,
+        created_at_unix_ms: i64_to_u128(created_at_unix_ms, "created_at_unix_ms")?,
+    })
 }

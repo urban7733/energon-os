@@ -27,6 +27,8 @@ fn cors_layer() -> CorsLayer {
         .allow_origin([
             HeaderValue::from_static("http://localhost:3000"),
             HeaderValue::from_static("http://127.0.0.1:3000"),
+            HeaderValue::from_static("http://localhost:3002"),
+            HeaderValue::from_static("http://127.0.0.1:3002"),
         ])
         .allow_methods([Method::GET, Method::POST, Method::OPTIONS])
         .allow_headers([

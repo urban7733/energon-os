@@ -35,6 +35,7 @@ pub enum PaidRoute {
     ContextBuild,
     ContextAuditRead,
     PromotionAuditRead,
+    ObsidianVaultExport,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -190,6 +191,7 @@ impl X402Config {
                 self.payment_required(PaidRoute::ContextBuild),
                 self.payment_required(PaidRoute::ContextAuditRead),
                 self.payment_required(PaidRoute::PromotionAuditRead),
+                self.payment_required(PaidRoute::ObsidianVaultExport),
             ],
             "note": "Payment execution is external. Energon API enforces x402 before paid memory/context delivery."
         })
@@ -295,6 +297,7 @@ impl PaidRoute {
             PaidRoute::ContextBuild => "POST /v1/context/build",
             PaidRoute::ContextAuditRead => "GET /v1/audit/context/{request_id}",
             PaidRoute::PromotionAuditRead => "GET /v1/audit/promotion/{promoted_memory_id}",
+            PaidRoute::ObsidianVaultExport => "GET /v1/vault/obsidian.zip",
         }
     }
 
@@ -302,7 +305,14 @@ impl PaidRoute {
         PaymentResource {
             url: self.path(),
             description: self.description(),
-            mime_type: "application/json",
+            mime_type: self.mime_type(),
+        }
+    }
+
+    fn mime_type(self) -> &'static str {
+        match self {
+            PaidRoute::ObsidianVaultExport => "application/zip",
+            _ => "application/json",
         }
     }
 
@@ -313,6 +323,9 @@ impl PaidRoute {
             PaidRoute::ContextBuild => "Build an allowed context pack for an external agent.",
             PaidRoute::ContextAuditRead => "Read the audit record for a context build.",
             PaidRoute::PromotionAuditRead => "Read the audit record for a memory promotion.",
+            PaidRoute::ObsidianVaultExport => {
+                "Export a permission-filtered Obsidian-compatible memory vault."
+            }
         }
     }
 
@@ -322,6 +335,7 @@ impl PaidRoute {
             PaidRoute::MemoryPromote => 1_000,
             PaidRoute::ContextBuild => 3_000,
             PaidRoute::ContextAuditRead | PaidRoute::PromotionAuditRead => 500,
+            PaidRoute::ObsidianVaultExport => 5_000,
         }
     }
 }

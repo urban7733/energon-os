@@ -192,6 +192,7 @@ GET  /v1/billing/x402
 POST /v1/memory/write
 POST /v1/context/build
 POST /v1/memory/promote
+GET  /v1/vault/obsidian.zip
 GET  /v1/audit/context/{request_id}
 GET  /v1/audit/promotion/{promoted_memory_id}
 ```
@@ -218,6 +219,19 @@ curl -X POST http://127.0.0.1:3001/v1/admin/agents \
 ```
 
 Full API examples are in [docs/api.md](docs/api.md).
+
+## Obsidian Vault Export
+
+Humans can inspect agent memory as a real Obsidian-compatible vault. The API
+exports permission-filtered Markdown notes for agents, organizations, projects,
+roles, sessions, memories, context builds, and promotions. Notes use YAML
+frontmatter and Obsidian `[[wikilinks]]`, so Obsidian's graph view shows who
+wrote what, where it belongs, which context builds used it, and how private
+memory was promoted.
+
+The vault is a read-only human view. Energon OS remains the source of truth for
+permissions, Postgres storage, pgvector retrieval, and audit logs. The export
+must never bypass identity or permission filtering.
 
 ## Local Development
 

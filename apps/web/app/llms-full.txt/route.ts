@@ -1,5 +1,7 @@
 import { indexedClaims, site } from "../../lib/site";
 
+export const dynamic = "force-static";
+
 export function GET() {
   const body = `# Energon OS Full Context
 

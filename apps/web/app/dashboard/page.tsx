@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Image from "next/image";
 import Link from "next/link";
 import { site } from "../../lib/site";
 import { DashboardConsole } from "./dashboard-console";
@@ -18,19 +17,14 @@ export default function DashboardPage() {
   return (
     <main className="dashboard-shell">
       <aside className="dashboard-rail" aria-label="Dashboard navigation">
-        <Link className="brand brand-image-link" href="/" aria-label="Energon OS home">
-          <Image
-            className="brand-logo"
-            src="/energonos-wordmark.png"
-            alt="Energon OS"
-            width={580}
-            height={180}
-            priority
-          />
+        <Link className="brand" href="/" aria-label="Energon OS home">
+          <span className="brand-mark" aria-hidden="true" />
+          <span>Energon</span>
         </Link>
         <nav>
           <a href="#agents">Agents</a>
           <a href="#memory">Memory</a>
+          <a href="#memory-graph">Graph</a>
           <a href="#context">Context</a>
           <a href="#audit">Audit</a>
         </nav>

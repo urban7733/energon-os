@@ -3,7 +3,7 @@
   "name": "@energon/web",
   "version": "0.1.0",
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev --webpack",
     "build": "next build",
     "start": "next start",
     "lint": "tsc --noEmit"

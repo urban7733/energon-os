@@ -12,6 +12,7 @@ import {
   FileSearch,
   Gauge,
   KeyRound,
+  Network,
   PackageCheck,
   Send,
   ShieldCheck,
@@ -33,6 +34,42 @@ type MemoryScope =
   | "user_private"
   | "session";
 type SharedMemoryScope = "open" | "org" | "project" | "role";
+type MemoryGraphNode = {
+  id: string;
+  kind:
+    | "identity"
+    | "agent"
+    | "payment"
+    | "memory"
+    | "shared"
+    | "vector"
+    | "context"
+    | "audit";
+  label: string;
+  title: string;
+  detail: string;
+  owner: string;
+  location: string;
+  access: string;
+  status: string;
+  active: boolean;
+  x: number;
+  y: number;
+};
+
+const rawMemoryGraphEdges = [
+  { from: "org", to: "agent", label: "tenant" },
+  { from: "project", to: "agent", label: "project" },
+  { from: "role", to: "agent", label: "role" },
+  { from: "agent", to: "private-memory", label: "writes" },
+  { from: "private-memory", to: "shared-memory", label: "promotes" },
+  { from: "private-memory", to: "vector-index", label: "chunks" },
+  { from: "shared-memory", to: "vector-index", label: "shared" },
+  { from: "agent", to: "context-build", label: "requests" },
+  { from: "payment-rail", to: "context-build", label: "x402" },
+  { from: "vector-index", to: "context-build", label: "retrieves" },
+  { from: "context-build", to: "audit-log", label: "records" },
+] as const;
 
 export function DashboardConsole() {
   const [apiBaseUrl, setApiBaseUrl] = useState(site.apiBaseUrl);
@@ -65,6 +102,7 @@ export function DashboardConsole() {
   const [x402Status, setX402Status] = useState<"unchecked" | "enabled" | "disabled" | "offline">(
     "unchecked",
   );
+  const [selectedGraphNodeId, setSelectedGraphNodeId] = useState("agent");
   const [busy, setBusy] = useState(false);
 
   const cleanBaseUrl = useMemo(() => apiBaseUrl.replace(/\/$/, ""), [apiBaseUrl]);
@@ -88,6 +126,164 @@ export function DashboardConsole() {
     ["private", scope.includes("private") ? 82 : 48],
     ["session", scope === "session" ? 82 : 28],
   ] as const;
+  const memoryPreview = compactText(memory, 96);
+  const memoryGraphNodes: MemoryGraphNode[] = [
+    {
+      id: "org",
+      kind: "identity",
+      label: "org",
+      title: orgId || "org missing",
+      detail: "Tenant boundary for shared organizational memory.",
+      owner: orgId || "unset",
+      location: "organization",
+      access: "org scoped memory",
+      status: orgId ? "mapped" : "missing",
+      active: Boolean(orgId),
+      x: 12,
+      y: 18,
+    },
+    {
+      id: "project",
+      kind: "identity",
+      label: "project",
+      title: projectId || "project missing",
+      detail: "Mission or customer case that constrains retrieval.",
+      owner: orgId || "unset",
+      location: projectId || "unset",
+      access: "project scoped memory",
+      status: projectId ? "mapped" : "missing",
+      active: Boolean(projectId),
+      x: 12,
+      y: 50,
+    },
+    {
+      id: "role",
+      kind: "identity",
+      label: "role",
+      title: roleId || "role missing",
+      detail: "Work function used for role memory and policy decisions.",
+      owner: agentId || "unset",
+      location: roleId || "unset",
+      access: "role scoped memory",
+      status: roleId ? "mapped" : "missing",
+      active: Boolean(roleId),
+      x: 12,
+      y: 82,
+    },
+    {
+      id: "agent",
+      kind: "agent",
+      label: "agent",
+      title: agentId || "agent missing",
+      detail: `Authenticated through ${authMode}.`,
+      owner: agentId || "unset",
+      location: `${orgId || "org"} / ${projectId || "project"}`,
+      access: agentApiKey.trim() ? "bearer key" : "dev identity headers",
+      status: apiStatus,
+      active: Boolean(agentId),
+      x: 34,
+      y: 50,
+    },
+    {
+      id: "payment-rail",
+      kind: "payment",
+      label: "payment",
+      title: "x402 rail",
+      detail: "Paid autonomous API calls are challenged before protected memory routes run.",
+      owner: "agent wallet",
+      location: "paid API routes",
+      access: "crypto payment gate",
+      status: x402Status,
+      active: x402Status === "enabled",
+      x: 36,
+      y: 82,
+    },
+    {
+      id: "private-memory",
+      kind: "memory",
+      label: "private memory",
+      title: memoryId || "draft memory",
+      detail: memoryPreview,
+      owner: agentId || "unset",
+      location: scope,
+      access: scope.includes("private") ? "owner only" : "shared scope draft",
+      status: memoryId ? "written" : "not written",
+      active: Boolean(memoryId),
+      x: 58,
+      y: 26,
+    },
+    {
+      id: "shared-memory",
+      kind: "shared",
+      label: "shared memory",
+      title: promotedMemoryId || promotionTargetScope,
+      detail: promotionReason,
+      owner: orgId || "unset",
+      location: promotionTargetScope,
+      access: "explicit private-to-shared promotion",
+      status: promotedMemoryId ? "promoted" : "waiting for promotion",
+      active: Boolean(promotedMemoryId),
+      x: 58,
+      y: 72,
+    },
+    {
+      id: "vector-index",
+      kind: "vector",
+      label: "pgvector",
+      title: "semantic index",
+      detail: "memory_chunks.embedding stores searchable vector chunks after permissioned writes.",
+      owner: "Energon DB",
+      location: "Postgres + pgvector",
+      access: "API mediated only",
+      status: apiStatus === "online" ? "available" : "not checked",
+      active: apiStatus === "online" || Boolean(memoryId || promotedMemoryId),
+      x: 78,
+      y: 50,
+    },
+    {
+      id: "context-build",
+      kind: "context",
+      label: "context",
+      title: requestId || "context build",
+      detail: task,
+      owner: agentId || "unset",
+      location: projectId || "unset",
+      access: "permission filtered before packing",
+      status: requestId ? "built" : "not built",
+      active: Boolean(requestId),
+      x: 90,
+      y: 24,
+    },
+    {
+      id: "audit-log",
+      kind: "audit",
+      label: "audit",
+      title: result.label,
+      detail: "Shows which memory influenced the response and which promotion path changed scope.",
+      owner: "human operator",
+      location: "dashboard",
+      access: "human visual inspection",
+      status: requestId || promotedMemoryId ? "inspectable" : "waiting",
+      active: Boolean(requestId || promotedMemoryId),
+      x: 90,
+      y: 78,
+    },
+  ];
+  const selectedGraphNode =
+    memoryGraphNodes.find((node) => node.id === selectedGraphNodeId) ?? memoryGraphNodes[3];
+  const memoryGraphEdges = rawMemoryGraphEdges.flatMap((edge) => {
+    const fromNode = memoryGraphNodes.find((node) => node.id === edge.from);
+    const toNode = memoryGraphNodes.find((node) => node.id === edge.to);
+    if (!fromNode || !toNode) return [];
+    return [
+      {
+        ...edge,
+        active: fromNode.active && toNode.active,
+        fromNode,
+        toNode,
+      },
+    ];
+  });
 
   async function run(label: string, action: () => Promise<unknown>) {
     setBusy(true);
@@ -271,6 +467,40 @@ export function DashboardConsole() {
     });
   }
 
+  async function exportObsidianVault() {
+    await run("Exported Obsidian vault", async () => {
+      const params = new URLSearchParams();
+      if (projectId.trim()) params.set("project_id", projectId.trim());
+      params.set("limit", "500");
+
+      const response = await fetch(`${cleanBaseUrl}/v1/vault/obsidian.zip?${params}`, {
+        headers: agentRequestHeaders(agentApiKey, agentId, orgId, roleId, projectId),
+      });
+      if (!response.ok) {
+        const body = await response.text();
+        throw new Error(body);
+      }
+
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `energon-obsidian-vault-${agentId || "agent"}.zip`;
+      document.body.append(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+
+      return {
+        status: "download_started",
+        format: "obsidian_vault_zip",
+        endpoint: "/v1/vault/obsidian.zip",
+        agent_id: agentId,
+        project_id: projectId,
+      };
+    });
+  }
+
   return (
     <div className="dashboard-console">
       <section className="dashboard-overview" aria-label="Energon operating model">
@@ -410,6 +640,98 @@ export function DashboardConsole() {
             ))}
           </div>
         </article>
+      </section>
+
+      <section id="memory-graph" className="memory-graph-panel" aria-labelledby="memory-graph-title">
+        <div className="memory-graph-header">
+          <div className="panel-title">
+            <Network size={18} aria-hidden="true" />
+            <h2 id="memory-graph-title">Memory graph</h2>
+          </div>
+          <div className="graph-tools">
+            <div className="graph-legend" aria-label="Memory graph legend">
+              <span>identity</span>
+              <span>memory</span>
+              <span>context</span>
+              <span>audit</span>
+            </div>
+            <button className="inline-action" type="button" disabled={busy} onClick={exportObsidianVault}>
+              <Network size={16} aria-hidden="true" />
+              Export Obsidian vault
+            </button>
+          </div>
+        </div>
+
+        <div className="memory-graph-layout">
+          <div className="memory-graph-stage" aria-label="Visual agent memory network">
+            <svg className="memory-graph-edges" aria-hidden="true" viewBox="0 0 100 100" preserveAspectRatio="none">
+              {memoryGraphEdges.map((edge) => (
+                <g
+                  className={edge.active ? "memory-edge active" : "memory-edge"}
+                  key={`${edge.from}-${edge.to}`}
+                >
+                  <line
+                    x1={edge.fromNode.x}
+                    y1={edge.fromNode.y}
+                    x2={edge.toNode.x}
+                    y2={edge.toNode.y}
+                  />
+                  <text
+                    x={(edge.fromNode.x + edge.toNode.x) / 2}
+                    y={(edge.fromNode.y + edge.toNode.y) / 2}
+                  >
+                    {edge.label}
+                  </text>
+                </g>
+              ))}
+            </svg>
+
+            {memoryGraphNodes.map((node) => (
+              <button
+                className={[
+                  "memory-graph-node",
+                  node.kind,
+                  node.active ? "active" : "",
+                  selectedGraphNode.id === node.id ? "selected" : "",
+                ]
+                  .filter(Boolean)
+                  .join(" ")}
+                key={node.id}
+                onClick={() => setSelectedGraphNodeId(node.id)}
+                style={{ left: `${node.x}%`, top: `${node.y}%` }}
+                type="button"
+              >
+                <span>{node.label}</span>
+                <strong>{node.title}</strong>
+                <em>{node.status}</em>
+              </button>
+            ))}
+          </div>
+
+          <aside className="memory-inspector" aria-label="Selected memory graph detail">
+            <span className="inspector-kicker">{selectedGraphNode.label}</span>
+            <h3>{selectedGraphNode.title}</h3>
+            <p>{selectedGraphNode.detail}</p>
+            <dl>
+              <div>
+                <dt>Who</dt>
+                <dd>{selectedGraphNode.owner}</dd>
+              </div>
+              <div>
+                <dt>Where</dt>
+                <dd>{selectedGraphNode.location}</dd>
+              </div>
+              <div>
+                <dt>Access</dt>
+                <dd>{selectedGraphNode.access}</dd>
+              </div>
+              <div>
+                <dt>Status</dt>
+                <dd>{selectedGraphNode.status}</dd>
+              </div>
+            </dl>
+          </aside>
+        </div>
       </section>
 
       <div className="console-grid">
@@ -634,4 +956,10 @@ function isMemoryRecord(value: unknown): value is { memory_id: string } {
     "memory_id" in value &&
     typeof (value as { memory_id: unknown }).memory_id === "string"
   );
+}
+
+function compactText(value: string, maxLength: number) {
+  const cleanValue = value.replace(/\s+/g, " ").trim();
+  if (cleanValue.length <= maxLength) return cleanValue;
+  return `${cleanValue.slice(0, maxLength - 1).trim()}...`;
 }

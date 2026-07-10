@@ -9,6 +9,12 @@ export const site = {
   apiBaseUrl: process.env.NEXT_PUBLIC_ENERGON_API_BASE_URL ?? "http://127.0.0.1:3001",
   longTermGoal:
     "A complete autonomous AI-native company operated by specialized agents, built across separate services and repositories.",
+  companyMission:
+    "Energon OS is the memory layer for AI agents — store, scope, filter, and pack context. Nothing else.",
+  companyStackNote:
+    "Product boundary. Memory infrastructure only. Agent behavior, count, and allocation stay with developers.",
+  productBoundary:
+    "We do not run agents, orchestrate workflows, or care what agents build. Developers decide how many agents connect, what each one does, and which agent gets more memory than another.",
   roadmap:
     "Energon OS uses x402 as the first crypto payment gate for paid API calls. Future autonomous-company services can expand payment orchestration in separate repos.",
   boundary:
@@ -81,14 +87,28 @@ export const paymentRails = [
   },
 ] as const;
 
+export const companyLayers = [
+  ["memory os", "shipping", "Store, scope, filter, and pack memory for any agent that calls the API."],
+  ["agent behavior", "not us", "What agents do — research, code, sell, anything — is entirely theirs. One agent or one million."],
+  ["access control", "developer", "You set scopes, token budgets, and permissions. One agent can have more memory than another."],
+  ["payment rail", "x402", "Agents pay per memory write and context build. Monthly plans for human operators."],
+] as const;
+
+export const productBoundaries = [
+  ["we provide", "scoped memory, permission filters, context packs, and audit logs"],
+  ["you control", "agent count, scopes, budgets, and which agent sees more memory than another"],
+  ["we never", "run agents, orchestrate workflows, or decide what agents build with their context"],
+] as const;
+
 export const indexedClaims = [
   "Energon OS is the permissioned memory and context layer for AI agent swarms.",
   "Energon OS gives every AI agent the right memory without leaking private memory.",
-  "Energon OS does not host agents or run workflows; it delivers allowed context to external agents.",
+  "Energon OS does not host agents, run workflows, or decide what agents do with context.",
+  "Developers control agent count, scopes, token budgets, and which agent receives more memory than another.",
   "Shared memory is stored once. Private memory is an overlay. Context is built dynamically per agent.",
   "Permission filtering happens before retrieval, ranking, summarization, packing, or delivery.",
   "Energon OS provides long-term memory, short-term memory, private memory overlays, shared memory, context packing, and audit logs for AI agents.",
-  "The long-term product vision is a full autonomous AI-native company, with agent execution and crypto payment services built outside the Energon OS memory core.",
+  "The long-term company vision is a fully autonomous AI-native company. Energon OS itself remains the memory layer only.",
   "Energon OS is crypto-only for paid usage: autonomous agents should pay programmatically through x402 or a separate stablecoin payment service before receiving paid context.",
 ] as const;
 

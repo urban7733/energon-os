@@ -1,12 +1,10 @@
-import Image from "next/image";
 import Link from "next/link";
-import { ArrowRight } from "lucide-react";
-import { indexedClaims, paymentRails, pricingPlans, site } from "../lib/site";
+import { companyLayers, paymentRails, pricingPlans, productBoundaries, site } from "../lib/site";
 
 const platformPillars = [
-  ["API-first", "External agents call Energon directly through authenticated API routes."],
-  ["Permission-first", "Denied memory is removed before retrieval, ranking, packing, or delivery."],
-  ["Audit-native", "Context builds and private-to-shared promotions leave durable evidence."],
+  ["Memory only", "Store, scope, filter, and pack context. No agent runtime. No orchestration."],
+  ["Developer control", "You decide agent count, scopes, budgets, and who gets more memory."],
+  ["Permission-first", "Denied memory is removed before retrieval, ranking, or packing."],
 ] as const;
 
 const flowSteps = [
@@ -16,39 +14,19 @@ const flowSteps = [
   ["04", "Context pack", "compact JSON with influencing memory ids"],
 ] as const;
 
-const primitives = [
-  [
-    "Identity registry",
-    "Map every calling agent to organization, project, role, team, and session context.",
-  ],
-  [
-    "Scoped memory",
-    "Store open, org, project, role, private, and session memory without duplicating shared facts.",
-  ],
-  [
-    "Context builder",
-    "Assemble the smallest allowed memory pack for the current task and token budget.",
-  ],
-  [
-    "Promotion audit",
-    "Move agent_private memory into shared scopes only through explicit promotion records.",
-  ],
-  [
-    "Boundary ledger",
-    "Keep external files, browsers, tools, and runtimes outside Energon's ownership boundary.",
-  ],
-  [
-    "Operator dashboard",
-    "Give humans a control surface while the API remains the primary product surface for agents.",
-  ],
+const products = [
+  ["Identity registry", "Map every agent to org, project, role, and session."],
+  ["Scoped memory", "Open, org, project, role, private, and session scopes."],
+  ["Context builder", "Pack only allowed memory into a token budget."],
+  ["Permission filter", "Check access before retrieval, ranking, or delivery."],
+  ["Promotion audit", "Explicit private-to-shared promotion with lineage."],
+  ["Audit logs", "Record exactly which memory influenced each build."],
 ] as const;
 
-const relationships = [
-  ["Organization", "company, lab, customer tenant"],
-  ["Project", "mission, case, product surface"],
-  ["Role", "researcher, writer, reviewer, operator"],
-  ["Team", "agents that collaborate on the same outcome"],
-  ["Session", "short-lived task or investigation window"],
+const stats = [
+  ["7", "memory scopes"],
+  ["500", "candidate limit per build"],
+  ["100%", "permission check before pack"],
 ] as const;
 
 const scopes = [
@@ -61,101 +39,103 @@ const scopes = [
   ["session", "temporary memory for one task window"],
 ] as const;
 
-const useCases = [
-  ["Research swarms", "Agents search the internet and coordinate findings while Energon controls what memory they can reuse."],
-  ["Company operators", "Human teams keep dashboard visibility for writes, promotions, audits, and context inspection."],
-  ["Future agent payments", "Separate crypto-payment services can let agents pay and settle autonomously while Energon supplies identity, memory, permissions, and audit context."],
-  ["Future SDKs", "The long-term surface is high-volume agent access, not manual dashboard operation."],
+const relationships = [
+  ["Organization", "company, lab, customer tenant"],
+  ["Project", "mission, case, product surface"],
+  ["Role", "researcher, writer, reviewer, operator"],
+  ["Team", "agents that collaborate on the same outcome"],
+  ["Session", "short-lived task or investigation window"],
+] as const;
+
+const apiRoutes = [
+  ["POST", "/v1/context/build"],
+  ["POST", "/v1/memory/write"],
+  ["POST", "/v1/memory/promote"],
+  ["GET", "/v1/audit/context/{id}"],
+  ["auth", "Authorization: Bearer eos_live_..."],
 ] as const;
 
 export default function HomePage() {
   return (
     <main className="site-shell">
       <header className="topbar" aria-label="Energon OS primary navigation">
-        <Link className="brand brand-image-link" href="/" aria-label="Energon OS home">
-          <Image
-            className="brand-logo"
-            src="/energonos-wordmark.png"
-            alt="Energon OS"
-            width={580}
-            height={180}
-            priority
-          />
+        <Link className="brand" href="/" aria-label="Energon OS home">
+          <span className="brand-mark" aria-hidden="true" />
+          <span>Energon</span>
         </Link>
         <nav className="nav-links" aria-label="Main links">
-          <a href="#platform">Platform</a>
+          <a href="#boundary">Boundary</a>
+          <a href="#products">Platform</a>
           <a href="#api">API</a>
-          <a href="#access">Access</a>
-          <a href="#scopes">Scopes</a>
+          <a href="#scopes">Memory</a>
           <a href="#pricing">Pricing</a>
-          <Link href="/dashboard">Dashboard</Link>
         </nav>
+        <div className="nav-actions">
+          <a
+            className="nav-badge"
+            href="https://github.com/urban7733/energon-os"
+            target="_blank"
+            rel="noreferrer"
+          >
+            GitHub
+          </a>
+          <Link className="nav-cta" href="/dashboard">
+            Open dashboard
+          </Link>
+        </div>
       </header>
 
-      <section className="hero" aria-labelledby="hero-title">
-        <div className="hero-copy">
-          <p className="eyebrow">AI agent memory platform</p>
-          <h1 id="hero-title">Permissioned memory infrastructure for autonomous agents.</h1>
+      <div className="hero-wrap">
+        <div className="container hero">
+          <Link className="crumb" href="#boundary">
+            &lt; MEMORY OS
+          </Link>
+          <h1 id="hero-title">The memory OS for AI agents.</h1>
           <p className="hero-lede">
-            Energon OS is the context layer external agents call through an API. It decides which
-            memory an agent is allowed to see, builds a compact context pack, and records the audit
-            trail behind that decision.
+            {site.companyMission} Connect one agent or one million — developers control scopes,
+            budgets, and which agent gets more memory than another.
           </p>
-          <div className="hero-actions">
-            <Link className="primary-action" href="/dashboard" aria-label="Open Energon dashboard">
-              <span>Open dashboard</span>
-              <ArrowRight size={18} aria-hidden="true" />
-            </Link>
-            <a className="secondary-action" href="#api">
-              View API model
-            </a>
+
+          <hr className="dot-rule" aria-hidden="true" />
+
+          <div className="frame" aria-label="Context build pipeline">
+            <div className="frame-header">
+              Context pipeline. Identify agent, filter permissions, pack memory, record audit.
+            </div>
+            <div className="frame-body">
+              <div className="flow-grid">
+                {flowSteps.map(([number, title, detail]) => (
+                  <article className="flow-cell" key={title}>
+                    <span>{number}</span>
+                    <strong>{title}</strong>
+                    <p>{detail}</p>
+                  </article>
+                ))}
+              </div>
+              <div className="code-block">
+                <em>POST /v1/context/build</em>
+                {"\n"}
+                agent_id: agent.17 · scope: project + role · budget: 8k tokens
+                {"\n"}
+                → allowed_context_pack.json · audit_id · denied_memory_count
+              </div>
+            </div>
           </div>
-          <p className="hero-boundary">
-            Not an agent runtime. Not workflow orchestration. Energon owns memory, permissions,
-            context packing, and audit logs.
-          </p>
+
+          <p className="hero-boundary">{site.productBoundary}</p>
         </div>
+      </div>
 
-        <aside className="hero-system" aria-label="Energon OS context build flow">
-          <div className="system-toolbar">
-            <span>POST /v1/context/build</span>
-            <strong>permission filter first</strong>
-          </div>
-
-          <div className="request-card">
-            <div>
-              <span className="panel-label">request identity</span>
-              <strong>research.agent.17</strong>
-            </div>
-            <div className="request-fields" aria-label="Request fields">
-              <span>org: venture-lab</span>
-              <span>project: person-search</span>
-              <span>role: researcher</span>
-              <span>session: web-intel-042</span>
-            </div>
-          </div>
-
-          <div className="flow-board">
-            {flowSteps.map(([number, title, detail]) => (
-              <article className="flow-node" key={title}>
-                <span>{number}</span>
-                <strong>{title}</strong>
-                <p>{detail}</p>
-              </article>
-            ))}
-          </div>
-
-          <div className="output-card">
-            <div>
-              <span className="panel-label">response</span>
-              <strong>allowed_context_pack.json</strong>
-            </div>
-            <p>memory_ids, summaries, scopes, promotion lineage, audit id</p>
-          </div>
-        </aside>
+      <section className="stats-band container" aria-label="Platform metrics">
+        {stats.map(([value, label]) => (
+          <article key={label}>
+            <strong>{value}</strong>
+            <span>{label}</span>
+          </article>
+        ))}
       </section>
 
-      <section id="platform" className="proof-band" aria-label="Energon platform pillars">
+      <section className="proof-band container" aria-label="Platform pillars">
         {platformPillars.map(([title, detail]) => (
           <article key={title}>
             <strong>{title}</strong>
@@ -164,195 +144,192 @@ export default function HomePage() {
         ))}
       </section>
 
-      <section className="product-visual-section" aria-labelledby="product-visual-title">
-        <div className="product-visual-copy">
-          <p className="eyebrow">Product layer</p>
-          <h2 id="product-visual-title">One memory layer for every specialized agent.</h2>
-          <p>
-            Research, coding, writing, planning, data, and analytics agents can stay in their own
-            runtimes. Energon gives them the same permissioned context layer: identity, memory
-            scopes, retrieval, promotion, billing, and audit through one API.
-          </p>
-        </div>
-        <Image
-          className="product-visual-image"
-          src="/theenergon.png?v=direct-copy"
-          alt="Energon OS product visualization showing specialized agents connected to a central memory layer"
-          width={1254}
-          height={1254}
-          sizes="(max-width: 1260px) calc(100vw - 40px), 1220px"
-          unoptimized
-        />
-      </section>
-
-      <section className="platform-section" aria-labelledby="platform-title">
-        <div className="section-heading">
-          <p className="eyebrow">Platform primitives</p>
-          <h2 id="platform-title">A memory control plane built for agent-scale usage.</h2>
-          <p>
-            The dashboard can stay for human operators, but the product is designed for fleets of
-            external agents that need reliable memory access without sharing the wrong context.
-          </p>
-        </div>
-        <div className="primitive-grid">
-          {primitives.map(([title, detail]) => (
-            <article key={title}>
-              <strong>{title}</strong>
-              <p>{detail}</p>
-            </article>
-          ))}
-        </div>
-      </section>
-
-      <section id="api" className="api-section" aria-labelledby="api-title">
-        <div className="api-copy">
-          <p className="eyebrow">Agent API</p>
-          <h2 id="api-title">Agents bring their tools. Energon returns the memory they can use.</h2>
-          <p>
-            A web-search agent, coding agent, finance agent, or operations agent can keep its
-            browser, files, and runtime elsewhere. Energon only accepts selected memory writes and
-            returns permissioned context for the next task.
-          </p>
-        </div>
-        <div className="api-panel" aria-label="Energon API contract example">
-          <div className="api-panel-header">
-            <span>context request</span>
-            <strong>authenticated</strong>
+      <section id="boundary" className="section">
+        <div className="container">
+          <div className="section-heading">
+            <p className="eyebrow">Boundary</p>
+            <h2>Memory infrastructure. Nothing about what agents do with it.</h2>
+            <p>{site.productBoundary}</p>
           </div>
-          <div className="api-row">
-            <span>caller</span>
-            <strong>agent_id + org boundary</strong>
-          </div>
-          <div className="api-row">
-            <span>intent</span>
-            <strong>task, project, role, session</strong>
-          </div>
-          <div className="api-row">
-            <span>filtering</span>
-            <strong>before retrieval</strong>
-          </div>
-          <div className="api-row">
-            <span>delivery</span>
-            <strong>allowed context pack</strong>
-          </div>
-        </div>
-      </section>
-
-      <section id="access" className="access-section" aria-labelledby="access-title">
-        <div className="section-heading">
-          <p className="eyebrow">Access model</p>
-          <h2 id="access-title">Who belongs together decides which memory is visible.</h2>
-          <p>
-            Energon resolves relationships before context is assembled. That is how agents can
-            coordinate around a person search, a company project, or a short-lived investigation
-            without merging their private files or raw tool outputs.
-          </p>
-        </div>
-        <div className="relationship-map" aria-label="Agent relationship dimensions">
-          {relationships.map(([title, detail]) => (
-            <article key={title}>
-              <span>{title}</span>
-              <p>{detail}</p>
-            </article>
-          ))}
-        </div>
-      </section>
-
-      <section id="scopes" className="scope-section" aria-labelledby="scope-title">
-        <div className="scope-copy">
-          <p className="eyebrow">Memory scopes</p>
-          <h2 id="scope-title">Shared memory is stored once. Private memory stays an overlay.</h2>
-        </div>
-        <div className="scope-table" aria-label="Energon memory scopes">
-          {scopes.map(([scope, detail]) => (
-            <div className="scope-row" key={scope}>
-              <strong>{scope}</strong>
-              <p>{detail}</p>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      <section className="use-case-section" aria-labelledby="use-case-title">
-        <div>
-          <p className="eyebrow">Operating model</p>
-          <h2 id="use-case-title">Built for agents first, with a dashboard when humans need control.</h2>
-        </div>
-        <div className="use-case-grid">
-          {useCases.map(([title, detail]) => (
-            <article key={title}>
-              <strong>{title}</strong>
-              <p>{detail}</p>
-            </article>
-          ))}
-        </div>
-      </section>
-
-      <section id="pricing" className="pricing-section" aria-labelledby="pricing-title">
-        <div className="section-heading">
-          <p className="eyebrow">Crypto-only pricing</p>
-          <h2 id="pricing-title">Agents pay programmatically. Humans pay plans in stablecoins.</h2>
-          <p>
-            Energon paid usage is crypto-only. The payment execution layer lives outside the memory
-            core and grants signed entitlements before the API returns paid context.
-          </p>
-        </div>
-        <div className="pricing-grid">
-          {pricingPlans.map((plan) => (
-            <article key={plan.name}>
-              <span>{plan.audience}</span>
-              <strong>{plan.name}</strong>
-              <p>{plan.price}</p>
-              <em>{plan.settlement}</em>
-              <ul>
-                {plan.details.map((detail) => (
-                  <li key={detail}>{detail}</li>
+          <div className="frame">
+            <div className="frame-header">{site.companyStackNote}</div>
+            <div className="frame-body">
+              <div className="company-layer-table" aria-label="Product boundary">
+                {productBoundaries.map(([label, detail]) => (
+                  <div className="company-layer-row boundary-row" key={label}>
+                    <strong>{label}</strong>
+                    <p>{detail}</p>
+                  </div>
                 ))}
-              </ul>
-            </article>
-          ))}
-        </div>
-        <div className="payment-rail-grid" aria-label="Energon payment rails">
-          {paymentRails.map((rail) => (
-            <article key={rail.name}>
-              <strong>{rail.name}</strong>
-              <p>{rail.role}</p>
-            </article>
-          ))}
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 
-      <section className="thesis-section" aria-label="Energon OS product thesis">
-        <p>A vector database retrieves similar text. Energon OS retrieves allowed context.</p>
-        <div className="thesis-meta">
-          <span>permission-aware retrieval</span>
-          <span>explicit private-to-shared promotion</span>
-          <span>API and SDK surface for external agents</span>
+      <hr className="dot-rule container" aria-hidden="true" />
+
+      <section id="company" className="section">
+        <div className="container">
+          <div className="section-heading">
+            <p className="eyebrow">Company</p>
+            <h2>An AI-native company — with a memory OS at the core.</h2>
+            <p>
+              Energon is building a fully autonomous AI-native company. Energon OS is the product
+              that ships today: permissioned memory for any agent a developer connects.
+            </p>
+          </div>
+          <div className="company-layer-table scope-table" aria-label="Company model">
+            {companyLayers.map(([layer, status, detail]) => (
+              <div className="company-layer-row" key={layer}>
+                <strong>{layer}</strong>
+                <span>{status}</span>
+                <p>{detail}</p>
+              </div>
+            ))}
+          </div>
         </div>
       </section>
 
-      <section className="proof-band final-proof" aria-label="Energon OS indexed claims">
-        {indexedClaims.slice(0, 3).map((claim) => (
-          <article key={claim}>
-            <p>{claim}</p>
-          </article>
-        ))}
+      <hr className="dot-rule container" aria-hidden="true" />
+
+      <section id="products" className="section">
+        <div className="container">
+          <div className="section-heading">
+            <p className="eyebrow">Platform</p>
+            <h2>Memory infrastructure when many agents share context.</h2>
+            <p>
+              Identity, scoped memory, context packing, and audit — for any number of external
+              agents you connect.
+            </p>
+          </div>
+          <div className="product-grid">
+            {products.map(([title, detail]) => (
+              <article key={title}>
+                <strong>{title}</strong>
+                <p>{detail}</p>
+              </article>
+            ))}
+          </div>
+        </div>
       </section>
 
-      <section className="footer-transition" aria-hidden="true" />
+      <section id="api" className="section">
+        <div className="container api-section">
+          <div>
+            <p className="eyebrow">Developer platform</p>
+            <h2>Your agents call in. Energon returns the memory they are allowed to use.</h2>
+            <p className="hero-lede">
+              Authenticate with bearer API keys. Write scoped memory. Build context packs. Read
+              audit trails. What agents do after that is entirely yours.
+            </p>
+            <div className="hero-actions">
+              <Link className="primary-action" href="/dashboard">
+                Try the API
+              </Link>
+              <Link className="secondary-action" href="/llms-full.txt">
+                llms-full.txt
+              </Link>
+            </div>
+          </div>
+          <div className="api-panel" aria-label="API routes">
+            {apiRoutes.map(([method, route]) => (
+              <div className="api-row" key={route}>
+                <span>{method}</span>
+                <strong>{route}</strong>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section id="access" className="section">
+        <div className="container">
+          <div className="section-heading">
+            <p className="eyebrow">Access model</p>
+            <h2>Developers decide who belongs together — and who gets more memory.</h2>
+            <p>
+              Energon resolves org, project, role, and session before context is assembled. Token
+              budgets and scope rules are yours to set per agent.
+            </p>
+          </div>
+          <div className="relationship-map">
+            {relationships.map(([title, detail]) => (
+              <article key={title}>
+                <span>{title}</span>
+                <p>{detail}</p>
+              </article>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section id="scopes" className="section">
+        <div className="container">
+          <div className="section-heading">
+            <p className="eyebrow">Memory scopes</p>
+            <h2>Shared memory is stored once. Private memory stays an overlay.</h2>
+            <p>Seven scopes from open to session-private. Promotion is always explicit.</p>
+          </div>
+          <div className="scope-table">
+            {scopes.map(([scope, detail]) => (
+              <div className="scope-row" key={scope}>
+                <strong>{scope}</strong>
+                <p>{detail}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section id="pricing" className="section">
+        <div className="container">
+          <div className="section-heading">
+            <p className="eyebrow">Pricing</p>
+            <h2>Pay for memory operations — not for what agents build.</h2>
+            <p>Crypto-native metered API for agents. Monthly plans for human operators.</p>
+          </div>
+          <div className="pricing-grid">
+            {pricingPlans.map((plan) => (
+              <article key={plan.name}>
+                <span>{plan.audience}</span>
+                <strong>{plan.name}</strong>
+                <p>{plan.price}</p>
+                <em>{plan.settlement}</em>
+                <ul>
+                  {plan.details.map((detail) => (
+                    <li key={detail}>{detail}</li>
+                  ))}
+                </ul>
+              </article>
+            ))}
+          </div>
+          <div className="payment-rail-grid">
+            {paymentRails.map((rail) => (
+              <article key={rail.name}>
+                <strong>{rail.name}</strong>
+                <p>{rail.role}</p>
+              </article>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="thesis-section">
+        <div className="container">
+          <p>A vector database retrieves similar text. Energon OS retrieves allowed context.</p>
+          <div className="thesis-meta">
+            <span>memory os only</span>
+            <span>developer-controlled access</span>
+            <span>permission-aware retrieval</span>
+            <span>any agent count</span>
+          </div>
+        </div>
+      </section>
 
       <footer className="footer">
-        <div className="footer-visual" aria-hidden="true">
-          <Image
-            src="/energon-footer-universe.png"
-            alt=""
-            fill
-            sizes="100vw"
-            quality={92}
-          />
-        </div>
-        <div className="footer-content">
-          <p>{site.name}: memory and context infrastructure for AI-native companies.</p>
+        <div className="container footer-content">
+          <p>{site.name} — memory layer for AI agents.</p>
           <nav aria-label="Footer links">
             <Link href="/llms.txt">llms.txt</Link>
             <Link href="/llms-full.txt">llms-full.txt</Link>

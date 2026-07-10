@@ -34,6 +34,7 @@ POST /v1/memory/promote                  1000 micro-USDC
 POST /v1/context/build                   3000 micro-USDC
 GET  /v1/audit/context/{request_id}       500 micro-USDC
 GET  /v1/audit/promotion/{memory_id}      500 micro-USDC
+GET  /v1/vault/obsidian.zip              5000 micro-USDC
 ```
 
 ## Local Development

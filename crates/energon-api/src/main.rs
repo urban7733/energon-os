@@ -1,6 +1,7 @@
 mod app;
 mod errors;
 mod middleware;
+mod obsidian_vault;
 mod routes;
 mod secrets;
 mod state;
