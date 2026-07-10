@@ -1,10 +1,50 @@
 # Energon OS
 
-Energon OS is the permissioned memory and context layer for AI agent swarms.
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
+[![Rust](https://img.shields.io/badge/rust-2024-orange.svg)](https://www.rust-lang.org/)
+
+**The memory OS for AI agents.** Open source core. Hosted API for production.
+
+Energon OS is the permissioned memory and context layer for AI agent swarms. Connect one agent or one million — developers control scopes, token budgets, and which agent gets more memory than another.
 
 It does not run agents, click browsers, execute workflows, make payments, or host agent runtimes. Agents live in other systems. Energon decides what memory each agent is allowed to see for a specific task, retrieves only permitted context, packs it into a token budget, and records an audit trail.
 
 > Energon OS gives every AI agent the right memory, without leaking private memory.
+
+## Links
+
+- Website: [energon.os](https://energon.os)
+- API docs: [docs/api.md](docs/api.md)
+- LLM context: [/llms.txt](https://energon.os/llms.txt)
+- Contributing: [CONTRIBUTING.md](CONTRIBUTING.md)
+- Security: [SECURITY.md](SECURITY.md)
+
+## Open Source Model
+
+This repository is the **open source core**:
+
+```txt
+Open source     permission engine, API, scopes, audit format, self-host path
+Commercial      hosted API, operator dashboard, enterprise tenancy, SLA
+```
+
+You can self-host the memory layer for free under Apache 2.0. Production hosting, managed operations, and enterprise features are offered separately at [energon.os](https://energon.os).
+
+Why open source the core:
+
+```txt
+Developers need to trust permission boundaries before sending agent memory.
+Private overlays, scope rules, and audit trails should be inspectable.
+The moat is reliable operation at scale — not hidden permission logic.
+```
+
+## Product Boundary
+
+```txt
+We provide     scoped memory, permission filters, context packs, audit logs
+You control    agent count, scopes, budgets, promotion rules
+We never       run agents, orchestrate workflows, or decide what agents build
+```
 
 ## Mission
 
@@ -294,7 +334,13 @@ docs/architecture.md
 docs/api.md
 docs/crypto-payments.md
 docs/operations.md
+CONTRIBUTING.md
+SECURITY.md
 ```
+
+## License
+
+Apache License 2.0. See [LICENSE](LICENSE).
 
 ## Remaining Production Work
 
