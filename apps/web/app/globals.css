@@ -879,8 +879,7 @@ button:hover {
 .ops-panel,
 .result-panel,
 .surface-card,
-.chart-panel,
-.memory-graph-panel {
+.chart-panel {
   min-width: 0;
   overflow: hidden;
   border: 1px solid var(--line);
@@ -1010,35 +1009,6 @@ pre {
   display: block;
   height: 100%;
   background: var(--ink);
-}
-
-.memory-graph-stage {
-  position: relative;
-  min-height: 400px;
-  overflow: hidden;
-  border: 1px solid var(--line);
-  background: var(--bg);
-}
-
-.memory-graph-node {
-  position: absolute;
-  display: grid;
-  width: clamp(100px, 10vw, 140px);
-  gap: 4px;
-  border: 1px solid var(--line);
-  background: var(--bg);
-  color: var(--text);
-  padding: 8px;
-  transform: translate(-50%, -50%);
-}
-
-.memory-graph-node.active {
-  border-color: var(--ink);
-}
-
-.memory-inspector {
-  border: 1px solid var(--line);
-  padding: 14px;
 }
 
 @media (max-width: 900px) {

@@ -24,7 +24,6 @@ export default function DashboardPage() {
         <nav>
           <a href="#agents">Agents</a>
           <a href="#memory">Memory</a>
-          <a href="#memory-graph">Graph</a>
           <a href="#context">Context</a>
           <a href="#audit">Audit</a>
         </nav>

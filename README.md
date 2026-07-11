@@ -15,9 +15,35 @@ It does not run agents, click browsers, execute workflows, make payments, or hos
 
 - Website: [energon.os](https://energon.os)
 - API docs: [docs/api.md](docs/api.md)
+- Deployment: [docs/deployment.md](docs/deployment.md)
 - LLM context: [/llms.txt](https://energon.os/llms.txt)
 - Contributing: [CONTRIBUTING.md](CONTRIBUTING.md)
 - Security: [SECURITY.md](SECURITY.md)
+
+## Quick Start
+
+```bash
+bun install
+cargo test --workspace
+bun run api:dev
+bun run web:dev
+```
+
+Open the dashboard at `http://localhost:3000/dashboard`. The fast local path uses
+in-memory storage and dev identity headers. Use Postgres for durable data.
+
+## Repository Map
+
+```txt
+crates/energon-core    pure domain logic: memory, scopes, permissions, context, audit
+crates/energon-api     Axum API: auth, memory writes, context builds, audits, x402, vault export
+crates/energon-db      sqlx repositories for Postgres, pgvector, identity, memory, audit
+crates/energon-worker  embedding worker for pending memory chunks
+apps/web               static Next.js landing page and operator dashboard
+docs/                  API, architecture, deployment, operations, crypto payments
+policies/              Cedar policy starting point
+migrations/            Postgres schema and scale indexes
+```
 
 ## Open Source Model
 
@@ -207,7 +233,7 @@ Cedar policies for authorization rules
 Cloudflare R2 / MinIO for large document storage
 OpenAI embeddings behind a provider interface
 TypeScript and Python SDKs later
-React/Bun dashboard later
+Next.js/Bun landing page and operator dashboard
 ```
 
 Current repository state:
@@ -216,9 +242,10 @@ Current repository state:
 crates/energon-core   pure domain logic for memory, permissions, retrieval, packing
 crates/energon-api    Axum API with dev identity headers and pluggable storage
 crates/energon-db     Postgres/sqlx repositories for identity, memory, and audit
-crates/energon-worker async worker placeholder for embeddings and documents
+crates/energon-worker async worker for OpenAI embeddings into pgvector chunks
 migrations/           Postgres schema for identity, memory, chunks, and audit
 policies/             Cedar policy starting point
+apps/web              static Next.js site and dashboard for Cloudflare Pages
 ```
 
 ## Production API
@@ -325,6 +352,14 @@ Run checks:
 ```bash
 cargo fmt --all
 cargo test --workspace
+bun run web:lint
+bun run web:build
+```
+
+Deploy the static web surface to Cloudflare Pages:
+
+```bash
+bun run deploy:cloudflare
 ```
 
 ## Documentation
@@ -333,6 +368,7 @@ cargo test --workspace
 docs/architecture.md
 docs/api.md
 docs/crypto-payments.md
+docs/deployment.md
 docs/operations.md
 CONTRIBUTING.md
 SECURITY.md

@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security vulnerability
+    url: mailto:security@energon.os
+    about: Please report security issues privately by email.
+  - name: API documentation
+    url: https://github.com/urban7733/energon-os/blob/main/docs/api.md
+    about: Read endpoint examples before opening an API question.

@@ -10,7 +10,7 @@ const platformPillars = [
 const flowSteps = [
   ["01", "Agent call", "agent_id, org, project, role, session, purpose"],
   ["02", "Policy filter", "remove forbidden memory before candidate search"],
-  ["03", "Memory graph", "shared memory plus explicit private overlays"],
+  ["03", "Scoped memory", "shared memory plus explicit private overlays"],
   ["04", "Context pack", "compact JSON with influencing memory ids"],
 ] as const;
 

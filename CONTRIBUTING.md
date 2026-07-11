@@ -49,6 +49,7 @@ bun run api:dev
 ```bash
 cargo fmt --all
 cargo test --workspace
+bun run web:lint
 bun run web:build
 ```
 
@@ -66,7 +67,7 @@ bun run web:build
 - [ ] Docs updated when API, scopes, or product boundary changes
 - [ ] No secrets or local-only paths committed
 - [ ] `cargo fmt --all` and `cargo test --workspace` pass
-- [ ] Web build passes if `apps/web` changed
+- [ ] Web lint and build pass if `apps/web` changed
 
 ## Security
 
