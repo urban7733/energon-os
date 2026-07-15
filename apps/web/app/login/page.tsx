@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { auth } from "../../lib/auth";
-import { LoginForm } from "./login-form";
+import { auth, enabledSocialProviders } from "../../lib/auth";
+import { LoginForm, type SocialProviderId } from "./login-form";
 
 export const metadata: Metadata = {
   title: "Sign in",
@@ -21,6 +21,10 @@ export default async function LoginPage() {
     redirect("/dashboard");
   }
 
+  const socialProviders = (Object.keys(enabledSocialProviders) as SocialProviderId[]).filter(
+    (provider) => enabledSocialProviders[provider],
+  );
+
   return (
     <main className="auth-shell">
       <div className="auth-card">
@@ -36,7 +40,7 @@ export default async function LoginPage() {
             separately with bearer API keys.
           </p>
         </header>
-        <LoginForm />
+        <LoginForm socialProviders={socialProviders} />
       </div>
     </main>
   );

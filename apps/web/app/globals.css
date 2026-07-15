@@ -1045,6 +1045,51 @@ pre {
   line-height: 1.6;
 }
 
+.auth-social {
+  display: grid;
+  gap: 8px;
+}
+
+.auth-social-button {
+  border: 1px solid var(--line);
+  border-radius: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-size: 12px;
+  padding: 10px 14px;
+  cursor: pointer;
+}
+
+.auth-social-button:hover:not(:disabled) {
+  border-color: var(--line-strong);
+  background: var(--line);
+}
+
+.auth-social-button:disabled {
+  color: var(--dim);
+  cursor: default;
+}
+
+.auth-divider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--dim);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.auth-divider::before,
+.auth-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background-image: radial-gradient(circle, var(--line-strong) 1px, transparent 1px);
+  background-size: 6px 1px;
+  background-repeat: repeat-x;
+}
+
 .auth-mode-switch {
   display: grid;
   grid-template-columns: 1fr 1fr;

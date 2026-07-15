@@ -252,7 +252,7 @@ crates/energon-db     Postgres/sqlx repositories for identity, memory, and audit
 crates/energon-worker async worker for OpenAI embeddings into pgvector chunks
 migrations/           Postgres schema for identity, memory, chunks, and audit
 policies/             Cedar policy starting point
-apps/web              Next.js site + Better Auth (email/password, orgs, JWT/JWKS)
+apps/web              Next.js site + Better Auth (email/password + GitHub/Google/Apple, orgs, JWT/JWKS)
 ```
 
 ## Production API
@@ -283,10 +283,15 @@ DELETE /v1/orgs/{org_id}/memories/{memory_id}
 GET    /v1/orgs/{org_id}/usage
 ```
 
-Humans sign in through the web app (Better Auth email/password), create an
-organization, and manage agents and API keys from the dashboard. The dashboard
-mints short-lived EdDSA JWTs which the Rust API verifies against the Better
-Auth JWKS endpoint (`ENERGON_JWKS_URL`).
+Humans sign in through the web app — Better Auth email/password, or GitHub,
+Google, and Apple social login (each provider enables itself when its
+`*_CLIENT_ID`/`*_CLIENT_SECRET` env vars are set; see `.env.example`). Users
+create an organization and manage agents and API keys from the dashboard. The
+dashboard mints short-lived EdDSA JWTs which the Rust API verifies against the
+Better Auth JWKS endpoint (`ENERGON_JWKS_URL`).
+
+All paid usage is crypto-only: agents pay per request through x402, and human
+plans settle in USDC. There is no fiat payment path anywhere in the platform.
 
 `POST /v1/admin/agents` with `x-energon-admin-token` still exists but is a
 BOOTSTRAP-ONLY escape hatch (e.g. first agent before the web app is up):

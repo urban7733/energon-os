@@ -7,7 +7,15 @@ import { authClient } from "../../lib/auth-client";
 
 type AuthMode = "sign-in" | "sign-up";
 
-export function LoginForm() {
+export type SocialProviderId = "github" | "google" | "apple";
+
+const socialProviderLabels: Record<SocialProviderId, string> = {
+  github: "Continue with GitHub",
+  google: "Continue with Google",
+  apple: "Continue with Apple",
+};
+
+export function LoginForm({ socialProviders }: { socialProviders: SocialProviderId[] }) {
   const router = useRouter();
   const [mode, setMode] = useState<AuthMode>("sign-in");
   const [name, setName] = useState("");
@@ -15,6 +23,27 @@ export function LoginForm() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  async function signInSocial(provider: SocialProviderId) {
+    setBusy(true);
+    setError(null);
+
+    try {
+      const result = await authClient.signIn.social({
+        provider,
+        callbackURL: "/dashboard",
+      });
+
+      if (result.error) {
+        setError(result.error.message ?? `Sign-in with ${provider} failed.`);
+        setBusy(false);
+      }
+      // On success the browser redirects to the provider; keep busy state.
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : String(cause));
+      setBusy(false);
+    }
+  }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -43,6 +72,27 @@ export function LoginForm() {
 
   return (
     <form onSubmit={submit} aria-label={mode === "sign-in" ? "Sign in" : "Create account"}>
+      {socialProviders.length > 0 ? (
+        <>
+          <div className="auth-social" aria-label="Sign in with a provider">
+            {socialProviders.map((provider) => (
+              <button
+                key={provider}
+                type="button"
+                className="auth-social-button"
+                disabled={busy}
+                onClick={() => void signInSocial(provider)}
+              >
+                {socialProviderLabels[provider]}
+              </button>
+            ))}
+          </div>
+          <div className="auth-divider" aria-hidden="true">
+            <span>or with email</span>
+          </div>
+        </>
+      ) : null}
+
       <div className="auth-mode-switch" role="tablist" aria-label="Authentication mode">
         <button
           type="button"
