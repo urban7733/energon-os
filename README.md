@@ -5,7 +5,7 @@
 
 **The memory OS for AI agents.** Open source core. Hosted API for production.
 
-Energon OS is the permissioned memory and context layer for AI agent swarms. Connect one agent or one million — developers control scopes, token budgets, and which agent gets more memory than another.
+Energon OS is the permissioned memory and context layer for AI agent swarms. Connect one agent or a distributed swarm — developers control scopes, token budgets, and which agent gets more memory than another.
 
 It does not run agents, click browsers, execute workflows, make payments, or host agent runtimes. Agents live in other systems. Energon decides what memory each agent is allowed to see for a specific task, retrieves only permitted context, packs it into a token budget, and records an audit trail.
 

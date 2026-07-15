@@ -90,10 +90,10 @@ export default function HomePage() {
           <Link className="crumb" href="#boundary">
             &lt; MEMORY OS
           </Link>
-          <h1 id="hero-title">The memory OS for AI agents.</h1>
+          <h1 id="hero-title">The memory OS for AI agent swarms.</h1>
           <p className="hero-lede">
-            {site.companyMission} Connect one agent or one million — developers control scopes,
-            budgets, and which agent gets more memory than another.
+            {site.companyMission} Connect one agent or a distributed swarm — developers control
+            scopes, budgets, and which agent gets more memory than another.
           </p>
 
           <hr className="dot-rule" aria-hidden="true" />
@@ -197,10 +197,10 @@ export default function HomePage() {
         <div className="container">
           <div className="section-heading">
             <p className="eyebrow">Platform</p>
-            <h2>Memory infrastructure when many agents share context.</h2>
+            <h2>Memory infrastructure built for agent swarms.</h2>
             <p>
-              Identity, scoped memory, context packing, and audit — for any number of external
-              agents you connect.
+              Give each external agent its own identity, scopes, private overlays, and token
+              budget while shared memory stays permissioned and auditable.
             </p>
           </div>
           <div className="product-grid">

@@ -89,7 +89,7 @@ export const paymentRails = [
 
 export const companyLayers = [
   ["memory os", "shipping", "Store, scope, filter, and pack memory for any agent that calls the API."],
-  ["agent behavior", "not us", "What agents do — research, code, sell, anything — is entirely theirs. One agent or one million."],
+  ["agent behavior", "not us", "What agents do — research, code, sell, anything — is entirely theirs, from one agent to a distributed swarm."],
   ["access control", "developer", "You set scopes, token budgets, and permissions. One agent can have more memory than another."],
   ["payment rail", "x402", "Agents pay per memory write and context build. Monthly plans for human operators."],
 ] as const;
