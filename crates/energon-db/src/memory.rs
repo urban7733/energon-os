@@ -123,6 +123,95 @@ pub async fn list_org_memories(pool: &PgPool, org_id: &str) -> Result<Vec<Memory
     rows.into_iter().map(row_to_memory).collect()
 }
 
+#[derive(Debug, Clone)]
+pub struct OrgMemorySummary {
+    pub memory_id: String,
+    pub scope: MemoryScope,
+    pub content_preview: String,
+    pub tags: Vec<String>,
+    pub project_id: Option<String>,
+    pub role_id: Option<String>,
+    pub owner_agent_id: Option<String>,
+    pub created_at_unix_ms: i64,
+}
+
+const PREVIEW_CHARS: i32 = 160;
+
+/// List org memories (metadata plus a truncated content preview) for the
+/// operator dashboard. Filterable by scope, paginated.
+pub async fn list_org_memories_page(
+    pool: &PgPool,
+    org_id: &str,
+    scope: Option<&MemoryScope>,
+    limit: i64,
+    offset: i64,
+) -> Result<Vec<OrgMemorySummary>, DbError> {
+    let rows = sqlx::query(
+        r#"
+        SELECT
+            memory_id,
+            scope,
+            left(content, $4) AS content_preview,
+            tags,
+            project_id,
+            role_id,
+            owner_agent_id,
+            floor(extract(epoch from created_at) * 1000)::bigint AS created_at_unix_ms
+        FROM memory_entries
+        WHERE org_id = $1
+          AND ($5::text IS NULL OR scope = $5)
+        ORDER BY created_at DESC
+        LIMIT $2 OFFSET $3
+        "#,
+    )
+    .bind(org_id)
+    .bind(limit)
+    .bind(offset)
+    .bind(PREVIEW_CHARS)
+    .bind(scope.map(scope_to_str))
+    .fetch_all(pool)
+    .await?;
+
+    rows.into_iter()
+        .map(|row| {
+            let scope: String = row.try_get("scope")?;
+
+            Ok(OrgMemorySummary {
+                memory_id: row.try_get("memory_id")?,
+                scope: scope_from_str(&scope)?,
+                content_preview: row.try_get("content_preview")?,
+                tags: row.try_get("tags")?,
+                project_id: row.try_get("project_id")?,
+                role_id: row.try_get("role_id")?,
+                owner_agent_id: row.try_get("owner_agent_id")?,
+                created_at_unix_ms: row.try_get("created_at_unix_ms")?,
+            })
+        })
+        .collect()
+}
+
+/// Delete a memory (chunks cascade). Scoped by org so an operator can never
+/// delete another org's memory. Returns `false` when nothing matched.
+pub async fn delete_org_memory(
+    pool: &PgPool,
+    org_id: &str,
+    memory_id: &str,
+) -> Result<bool, DbError> {
+    let result = sqlx::query(
+        r#"
+        DELETE FROM memory_entries
+        WHERE memory_id = $1
+          AND org_id = $2
+        "#,
+    )
+    .bind(memory_id)
+    .bind(org_id)
+    .execute(pool)
+    .await?;
+
+    Ok(result.rows_affected() == 1)
+}
+
 pub async fn list_candidate_memories(
     pool: &PgPool,
     agent: &AgentIdentity,
@@ -167,6 +256,94 @@ pub async fn list_candidate_memories(
     .bind(&agent.agent_id)
     .bind(user_id)
     .bind(session_id)
+    .bind(limit)
+    .fetch_all(pool)
+    .await?;
+
+    rows.into_iter().map(row_to_memory).collect()
+}
+
+/// Semantic candidate retrieval: pgvector cosine distance over embedded
+/// chunks, with THE SAME permission WHERE clause as
+/// [`list_candidate_memories`] applied inside SQL, before any ranking.
+///
+/// Memories whose chunks have no embeddings yet (the worker has not caught up)
+/// are unioned in by recency so they are never invisible.
+pub async fn list_candidate_memories_semantic(
+    pool: &PgPool,
+    agent: &AgentIdentity,
+    project_id: Option<&str>,
+    user_id: Option<&str>,
+    session_id: Option<&str>,
+    query_embedding: &str,
+    limit: i64,
+) -> Result<Vec<MemoryRecord>, DbError> {
+    let rows = sqlx::query(
+        r#"
+        WITH allowed AS (
+            SELECT memory_id, created_at
+            FROM memory_entries
+            WHERE org_id = $1
+              AND (
+                scope IN ('open', 'org')
+                OR (scope = 'project' AND project_id = $2)
+                OR (scope = 'role' AND role_id = $3)
+                OR (scope = 'agent_private' AND owner_agent_id = $4)
+                OR (scope = 'user_private' AND user_id = $5)
+                OR (scope = 'session' AND session_id = $6)
+              )
+        ),
+        semantic AS (
+            SELECT allowed.memory_id
+            FROM allowed
+            INNER JOIN memory_chunks ON memory_chunks.memory_id = allowed.memory_id
+            WHERE memory_chunks.embedding IS NOT NULL
+            GROUP BY allowed.memory_id
+            ORDER BY min(memory_chunks.embedding <=> $7::vector) ASC
+            LIMIT $8
+        ),
+        unembedded AS (
+            SELECT allowed.memory_id
+            FROM allowed
+            WHERE NOT EXISTS (
+                SELECT 1
+                FROM memory_chunks
+                WHERE memory_chunks.memory_id = allowed.memory_id
+                  AND memory_chunks.embedding IS NOT NULL
+            )
+            ORDER BY allowed.created_at DESC
+            LIMIT $8
+        )
+        SELECT
+            memory_id,
+            org_id,
+            scope,
+            content,
+            tags,
+            project_id,
+            role_id,
+            owner_agent_id,
+            user_id,
+            session_id,
+            source,
+            promoted_from,
+            floor(extract(epoch from created_at) * 1000)::bigint AS created_at_unix_ms
+        FROM memory_entries
+        WHERE memory_id IN (
+            SELECT memory_id FROM semantic
+            UNION
+            SELECT memory_id FROM unembedded
+        )
+        ORDER BY created_at DESC
+        "#,
+    )
+    .bind(&agent.org_id)
+    .bind(project_id)
+    .bind(agent.role_id.as_deref())
+    .bind(&agent.agent_id)
+    .bind(user_id)
+    .bind(session_id)
+    .bind(query_embedding)
     .bind(limit)
     .fetch_all(pool)
     .await?;

@@ -25,7 +25,111 @@ pub struct X402Config {
     pub facilitator_url: String,
     pub facilitator_bearer: Option<String>,
     pub max_timeout_seconds: u64,
+    pub pricing: RoutePricing,
     client: reqwest::Client,
+}
+
+/// Per-route pricing in USDC micro units, overridable via environment.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RoutePricing {
+    pub memory_write_micro: u64,
+    pub memory_promote_micro: u64,
+    pub context_build_micro: u64,
+    pub audit_read_micro: u64,
+    pub vault_export_micro: u64,
+}
+
+impl Default for RoutePricing {
+    fn default() -> Self {
+        Self {
+            memory_write_micro: 1_000,
+            memory_promote_micro: 1_000,
+            context_build_micro: 3_000,
+            audit_read_micro: 500,
+            vault_export_micro: 5_000,
+        }
+    }
+}
+
+impl RoutePricing {
+    pub fn from_env() -> Self {
+        let defaults = Self::default();
+
+        Self {
+            memory_write_micro: price_env(
+                "ENERGON_PRICE_MEMORY_WRITE_MICRO",
+                defaults.memory_write_micro,
+            ),
+            memory_promote_micro: price_env(
+                "ENERGON_PRICE_MEMORY_PROMOTE_MICRO",
+                defaults.memory_promote_micro,
+            ),
+            context_build_micro: price_env(
+                "ENERGON_PRICE_CONTEXT_BUILD_MICRO",
+                defaults.context_build_micro,
+            ),
+            audit_read_micro: price_env(
+                "ENERGON_PRICE_AUDIT_READ_MICRO",
+                defaults.audit_read_micro,
+            ),
+            vault_export_micro: price_env(
+                "ENERGON_PRICE_VAULT_EXPORT_MICRO",
+                defaults.vault_export_micro,
+            ),
+        }
+    }
+
+    pub fn amount_usdc_micro(&self, route: PaidRoute) -> u64 {
+        match route {
+            PaidRoute::MemoryWrite => self.memory_write_micro,
+            PaidRoute::MemoryPromote => self.memory_promote_micro,
+            PaidRoute::ContextBuild => self.context_build_micro,
+            PaidRoute::ContextAuditRead | PaidRoute::PromotionAuditRead => self.audit_read_micro,
+            PaidRoute::ObsidianVaultExport => self.vault_export_micro,
+        }
+    }
+}
+
+fn price_env(name: &str, default: u64) -> u64 {
+    match env::var(name) {
+        Ok(value) => match value.trim().parse::<u64>() {
+            Ok(parsed) => parsed,
+            Err(_) => {
+                tracing::warn!(%name, %value, %default, "invalid price override; using default");
+                default
+            }
+        },
+        Err(_) => default,
+    }
+}
+
+/// A settled x402 payment (facilitator confirmed and executed the transfer).
+#[derive(Debug, Clone)]
+pub struct SettledPayment {
+    pub amount_usdc_micro: u64,
+    pub network: String,
+    pub asset: String,
+    pub pay_to: String,
+    pub payer: Option<String>,
+    pub tx_hash: Option<String>,
+    pub raw: serde_json::Value,
+}
+
+/// Result of the x402 gate for a paid route.
+#[derive(Debug, Clone, Default)]
+pub struct PaymentOutcome {
+    /// A signature was accepted without facilitator verification (dev mode).
+    pub accepted_unverified: bool,
+    /// A settled payment, when the facilitator verified and settled.
+    pub settled: Option<SettledPayment>,
+    /// Header value to return to the caller (settlement response).
+    pub response_header: Option<HeaderValue>,
+}
+
+impl PaymentOutcome {
+    pub fn paid(&self) -> bool {
+        self.settled.is_some() || self.accepted_unverified
+    }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -85,6 +189,12 @@ struct VerifyResponse {
 #[derive(Debug, Deserialize)]
 struct SettleResponse {
     success: bool,
+    #[serde(default)]
+    transaction: Option<String>,
+    #[serde(default, rename = "txHash")]
+    tx_hash: Option<String>,
+    #[serde(default)]
+    payer: Option<String>,
 }
 
 impl X402Config {
@@ -118,6 +228,7 @@ impl X402Config {
                 .and_then(|value| value.parse::<u64>().ok())
                 .filter(|value| *value > 0)
                 .unwrap_or(60),
+            pricing: RoutePricing::from_env(),
             client: reqwest::Client::new(),
         })
     }
@@ -126,21 +237,27 @@ impl X402Config {
         &self,
         headers: &HeaderMap,
         route: PaidRoute,
-    ) -> Result<Option<HeaderValue>, ApiError> {
+    ) -> Result<PaymentOutcome, ApiError> {
         if !self.enabled {
-            return Ok(None);
+            return Ok(PaymentOutcome::default());
         }
 
         if has_payment_signature(headers) {
             if self.accept_unverified {
-                return Ok(None);
+                return Ok(PaymentOutcome {
+                    accepted_unverified: true,
+                    settled: None,
+                    response_header: None,
+                });
             }
 
             let payload = payment_payload(headers)?;
             return self.verify_and_settle(route, payload).await;
         }
 
-        Err(ApiError::PaymentRequired(self.payment_required(route)))
+        Err(ApiError::PaymentRequired(Box::new(
+            self.payment_required(route),
+        )))
     }
 
     pub fn payment_required(&self, route: PaidRoute) -> PaymentRequiredResponse {
@@ -164,7 +281,7 @@ impl X402Config {
             scheme: "exact",
             network: self.network.clone(),
             asset: self.asset.clone(),
-            amount: route.amount_usdc_micro().to_string(),
+            amount: self.pricing.amount_usdc_micro(route).to_string(),
             pay_to,
             max_timeout_seconds: self.max_timeout_seconds,
             extra: PaymentRequirementsExtra {
@@ -201,7 +318,7 @@ impl X402Config {
         &self,
         route: PaidRoute,
         payment_payload: serde_json::Value,
-    ) -> Result<Option<HeaderValue>, ApiError> {
+    ) -> Result<PaymentOutcome, ApiError> {
         let body = json!({
             "x402Version": X402_VERSION,
             "paymentPayload": payment_payload,
@@ -210,7 +327,9 @@ impl X402Config {
 
         let (verify_status, verify_value) = self.post_facilitator("verify", &body).await?;
         if verify_status == 402 {
-            return Err(ApiError::PaymentRequired(self.payment_required(route)));
+            return Err(ApiError::PaymentRequired(Box::new(
+                self.payment_required(route),
+            )));
         }
         if !(200..300).contains(&verify_status) {
             return Err(ApiError::PaymentUnavailable(format!(
@@ -226,12 +345,16 @@ impl X402Config {
             })?;
 
         if !verify.is_valid {
-            return Err(ApiError::PaymentRequired(self.payment_required(route)));
+            return Err(ApiError::PaymentRequired(Box::new(
+                self.payment_required(route),
+            )));
         }
 
         let (settle_status, settle_value) = self.post_facilitator("settle", &body).await?;
         if settle_status == 402 {
-            return Err(ApiError::PaymentRequired(self.payment_required(route)));
+            return Err(ApiError::PaymentRequired(Box::new(
+                self.payment_required(route),
+            )));
         }
         if !(200..300).contains(&settle_status) {
             return Err(ApiError::PaymentUnavailable(format!(
@@ -247,7 +370,9 @@ impl X402Config {
             })?;
 
         if !settle.success {
-            return Err(ApiError::PaymentRequired(self.payment_required(route)));
+            return Err(ApiError::PaymentRequired(Box::new(
+                self.payment_required(route),
+            )));
         }
 
         let receipt = serde_json::to_string(&settle_value).map_err(|error| {
@@ -255,9 +380,25 @@ impl X402Config {
                 "failed to serialize x402 settlement response: {error}"
             ))
         })?;
-        HeaderValue::from_str(&receipt)
-            .map(Some)
-            .map_err(|error| ApiError::Internal(format!("invalid x402 receipt header: {error}")))
+        let response_header = HeaderValue::from_str(&receipt)
+            .map_err(|error| ApiError::Internal(format!("invalid x402 receipt header: {error}")))?;
+
+        Ok(PaymentOutcome {
+            accepted_unverified: false,
+            settled: Some(SettledPayment {
+                amount_usdc_micro: self.pricing.amount_usdc_micro(route),
+                network: self.network.clone(),
+                asset: self.asset.clone(),
+                pay_to: self
+                    .pay_to
+                    .clone()
+                    .unwrap_or_else(|| "0x0000000000000000000000000000000000000000".to_owned()),
+                payer: settle.payer,
+                tx_hash: settle.tx_hash.or(settle.transaction),
+                raw: settle_value,
+            }),
+            response_header: Some(response_header),
+        })
     }
 
     async fn post_facilitator(
@@ -329,13 +470,15 @@ impl PaidRoute {
         }
     }
 
-    fn amount_usdc_micro(self) -> u64 {
+    /// Stable identifier used for receipts and usage metering.
+    pub fn key(self) -> &'static str {
         match self {
-            PaidRoute::MemoryWrite => 1_000,
-            PaidRoute::MemoryPromote => 1_000,
-            PaidRoute::ContextBuild => 3_000,
-            PaidRoute::ContextAuditRead | PaidRoute::PromotionAuditRead => 500,
-            PaidRoute::ObsidianVaultExport => 5_000,
+            PaidRoute::MemoryWrite => "memory_write",
+            PaidRoute::MemoryPromote => "memory_promote",
+            PaidRoute::ContextBuild => "context_build",
+            PaidRoute::ContextAuditRead => "context_audit_read",
+            PaidRoute::PromotionAuditRead => "promotion_audit_read",
+            PaidRoute::ObsidianVaultExport => "vault_export",
         }
     }
 }
@@ -442,6 +585,7 @@ mod tests {
             facilitator_url: default_facilitator_url(),
             facilitator_bearer: None,
             max_timeout_seconds: 60,
+            pricing: RoutePricing::default(),
             client: reqwest::Client::new(),
         }
     }
@@ -477,12 +621,65 @@ mod tests {
             HeaderValue::from_static("dev-signature"),
         );
 
-        let receipt = config
+        let outcome = config
             .require_payment(&headers, PaidRoute::MemoryWrite)
             .await
             .unwrap();
 
-        assert!(receipt.is_none());
+        assert!(outcome.accepted_unverified);
+        assert!(outcome.paid());
+        assert!(outcome.settled.is_none());
+        assert!(outcome.response_header.is_none());
+    }
+
+    #[tokio::test]
+    async fn disabled_config_charges_nothing() {
+        let mut config = enabled_config();
+        config.enabled = false;
+
+        let outcome = config
+            .require_payment(&HeaderMap::new(), PaidRoute::ContextBuild)
+            .await
+            .unwrap();
+
+        assert!(!outcome.paid());
+    }
+
+    #[test]
+    fn default_pricing_matches_documented_amounts() {
+        let pricing = RoutePricing::default();
+
+        assert_eq!(pricing.amount_usdc_micro(PaidRoute::MemoryWrite), 1_000);
+        assert_eq!(pricing.amount_usdc_micro(PaidRoute::MemoryPromote), 1_000);
+        assert_eq!(pricing.amount_usdc_micro(PaidRoute::ContextBuild), 3_000);
+        assert_eq!(pricing.amount_usdc_micro(PaidRoute::ContextAuditRead), 500);
+        assert_eq!(
+            pricing.amount_usdc_micro(PaidRoute::PromotionAuditRead),
+            500
+        );
+        assert_eq!(
+            pricing.amount_usdc_micro(PaidRoute::ObsidianVaultExport),
+            5_000
+        );
+    }
+
+    #[test]
+    fn price_env_parses_overrides_and_ignores_garbage() {
+        // SAFETY: tests in this module that touch these env vars run in the
+        // same process; unique names avoid collisions with other tests.
+        unsafe {
+            std::env::set_var("ENERGON_TEST_PRICE_VALID", "2500");
+            std::env::set_var("ENERGON_TEST_PRICE_INVALID", "not-a-number");
+        }
+
+        assert_eq!(price_env("ENERGON_TEST_PRICE_VALID", 1), 2_500);
+        assert_eq!(price_env("ENERGON_TEST_PRICE_INVALID", 42), 42);
+        assert_eq!(price_env("ENERGON_TEST_PRICE_MISSING", 7), 7);
+
+        unsafe {
+            std::env::remove_var("ENERGON_TEST_PRICE_VALID");
+            std::env::remove_var("ENERGON_TEST_PRICE_INVALID");
+        }
     }
 
     #[test]

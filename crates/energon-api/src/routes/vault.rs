@@ -15,6 +15,7 @@ use crate::{
     errors::ApiError,
     middleware::auth::identity_from_request,
     obsidian_vault::build_obsidian_vault,
+    payments::record_usage,
     state::{AppState, StorageBackend},
     x402::{PaidRoute, attach_payment_response},
 };
@@ -36,11 +37,12 @@ pub async fn export_obsidian_vault(
     headers: HeaderMap,
     Query(query): Query<VaultExportQuery>,
 ) -> Result<Response, ApiError> {
-    let payment_response = state
+    let payment = state
         .x402
         .require_payment(&headers, PaidRoute::ObsidianVaultExport)
         .await?;
     let agent = identity_from_request(&state, &headers).await?;
+    record_usage(&state, &agent, PaidRoute::ObsidianVaultExport, &payment).await;
     let limit = query.limit.unwrap_or(500).clamp(1, 5_000);
     let project_id = clean_optional(query.project_id).or_else(|| agent.project_id.clone());
     let user_id = clean_optional(query.user_id);
@@ -61,7 +63,7 @@ pub async fn export_obsidian_vault(
         )?,
     );
 
-    Ok(attach_payment_response(response, payment_response))
+    Ok(attach_payment_response(response, payment.response_header))
 }
 
 async fn vault_data(

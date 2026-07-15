@@ -11,17 +11,25 @@ use std::{
 use energon_core::{AuditRecord, MemoryRecord, PromotionAuditRecord};
 use sqlx::PgPool;
 
-use crate::x402::X402Config;
+use crate::{
+    embedding::EmbeddingClient, jwt::JwtVerifier, middleware::rate_limit::RateLimiter,
+    x402::X402Config,
+};
 
 #[derive(Clone)]
 pub struct AppState {
     pub storage: StorageBackend,
     pub auth: AuthConfig,
     pub x402: X402Config,
+    pub jwt: Option<JwtVerifier>,
+    pub embedding: Option<EmbeddingClient>,
+    pub rate_limiter: RateLimiter,
     pub retrieval_candidate_limit: i64,
     next_memory: Arc<AtomicU64>,
     next_promotion: Arc<AtomicU64>,
     next_request: Arc<AtomicU64>,
+    next_receipt: Arc<AtomicU64>,
+    next_usage_event: Arc<AtomicU64>,
 }
 
 #[derive(Clone)]
@@ -37,11 +45,21 @@ pub enum StorageBackend {
     Postgres(PgPool),
 }
 
+/// In-memory usage counters keyed by `(org_id, route)`. Used only when the
+/// API runs without Postgres; nothing is persisted (documented behavior).
+#[derive(Debug, Clone, Copy, Default)]
+pub struct UsageCounter {
+    pub calls: u64,
+    pub paid_calls: u64,
+    pub amount_usdc_micro: u64,
+}
+
 #[derive(Clone)]
 pub struct InMemoryStorage {
     pub memories: Arc<RwLock<Vec<MemoryRecord>>>,
     pub audits: Arc<RwLock<HashMap<String, AuditRecord>>>,
     pub promotion_audits: Arc<RwLock<HashMap<String, PromotionAuditRecord>>>,
+    pub usage: Arc<RwLock<HashMap<(String, String), UsageCounter>>>,
 }
 
 impl AppState {
@@ -54,10 +72,15 @@ impl AppState {
                 api_key_pepper: env::var("ENERGON_API_KEY_PEPPER").ok(),
             },
             x402,
+            jwt: JwtVerifier::from_env(),
+            embedding: EmbeddingClient::from_env(),
+            rate_limiter: RateLimiter::from_env(),
             retrieval_candidate_limit: retrieval_candidate_limit(),
             next_memory: Arc::new(AtomicU64::new(1)),
             next_promotion: Arc::new(AtomicU64::new(1)),
             next_request: Arc::new(AtomicU64::new(1)),
+            next_receipt: Arc::new(AtomicU64::new(1)),
+            next_usage_event: Arc::new(AtomicU64::new(1)),
         }
     }
 
@@ -74,6 +97,8 @@ impl AppState {
         };
 
         let pool = energon_db::pool::connect(&database_url).await?;
+        energon_db::pool::run_migrations(&pool).await?;
+
         let api_key_pepper = required_env("ENERGON_API_KEY_PEPPER")?;
 
         let dev_identity_headers = env::var("ENERGON_DEV_AUTH")
@@ -90,10 +115,15 @@ impl AppState {
                 api_key_pepper: Some(api_key_pepper),
             },
             x402,
+            jwt: JwtVerifier::from_env(),
+            embedding: EmbeddingClient::from_env(),
+            rate_limiter: RateLimiter::from_env(),
             retrieval_candidate_limit: retrieval_candidate_limit(),
             next_memory: Arc::new(AtomicU64::new(1)),
             next_promotion: Arc::new(AtomicU64::new(1)),
             next_request: Arc::new(AtomicU64::new(1)),
+            next_receipt: Arc::new(AtomicU64::new(1)),
+            next_usage_event: Arc::new(AtomicU64::new(1)),
         })
     }
 
@@ -110,6 +140,16 @@ impl AppState {
     pub fn next_promotion_id(&self) -> String {
         let id = self.next_promotion.fetch_add(1, Ordering::Relaxed);
         format!("prom_{}_{}", now_unix_ms(), id)
+    }
+
+    pub fn next_receipt_id(&self) -> String {
+        let id = self.next_receipt.fetch_add(1, Ordering::Relaxed);
+        format!("rcpt_{}_{}", now_unix_ms(), id)
+    }
+
+    pub fn next_usage_event_id(&self) -> String {
+        let id = self.next_usage_event.fetch_add(1, Ordering::Relaxed);
+        format!("usage_{}_{}", now_unix_ms(), id)
     }
 }
 
@@ -140,6 +180,7 @@ impl InMemoryStorage {
             memories: Arc::new(RwLock::new(Vec::new())),
             audits: Arc::new(RwLock::new(HashMap::new())),
             promotion_audits: Arc::new(RwLock::new(HashMap::new())),
+            usage: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 }

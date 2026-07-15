@@ -1,6 +1,6 @@
 use axum::{
     Router,
-    routing::{get, post},
+    routing::{delete, get, post},
 };
 
 use crate::state::AppState;
@@ -11,6 +11,7 @@ pub mod billing;
 pub mod context;
 pub mod health;
 pub mod memory;
+pub mod orgs;
 pub mod vault;
 
 pub fn router() -> Router<AppState> {
@@ -26,4 +27,22 @@ pub fn router() -> Router<AppState> {
             "/audit/promotion/{promoted_memory_id}",
             get(audit::get_promotion_audit),
         )
+        .route(
+            "/orgs/{org_id}/agents",
+            post(orgs::create_org_agent).get(orgs::list_org_agents),
+        )
+        .route(
+            "/orgs/{org_id}/agents/{agent_id}/keys",
+            post(orgs::rotate_agent_key),
+        )
+        .route(
+            "/orgs/{org_id}/keys/{api_key_id}",
+            delete(orgs::revoke_api_key),
+        )
+        .route("/orgs/{org_id}/memories", get(orgs::list_org_memories))
+        .route(
+            "/orgs/{org_id}/memories/{memory_id}",
+            delete(orgs::delete_org_memory),
+        )
+        .route("/orgs/{org_id}/usage", get(orgs::org_usage))
 }

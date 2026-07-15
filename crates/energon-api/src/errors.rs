@@ -16,8 +16,9 @@ pub enum ApiError {
     Unauthorized(String),
     Forbidden(String),
     NotFound(String),
-    PaymentRequired(PaymentRequiredResponse),
+    PaymentRequired(Box<PaymentRequiredResponse>),
     PaymentUnavailable(String),
+    TooManyRequests(String),
     Internal(String),
 }
 
@@ -63,6 +64,7 @@ impl IntoResponse for ApiError {
             ApiError::NotFound(message) => (StatusCode::NOT_FOUND, message),
             ApiError::PaymentRequired(_) => unreachable!("handled above"),
             ApiError::PaymentUnavailable(message) => (StatusCode::SERVICE_UNAVAILABLE, message),
+            ApiError::TooManyRequests(message) => (StatusCode::TOO_MANY_REQUESTS, message),
             ApiError::Internal(message) => (StatusCode::INTERNAL_SERVER_ERROR, message),
         };
 

@@ -102,6 +102,159 @@ pub async fn create_agent_with_api_key(
     Ok(())
 }
 
+/// Create the org row if it does not exist yet. Used to link Better Auth
+/// organization ids to the Energon `orgs` table on first use.
+pub async fn ensure_org_exists(pool: &PgPool, org_id: &str) -> Result<(), DbError> {
+    let mut tx = pool.begin().await?;
+    ensure_org(&mut tx, org_id).await?;
+    tx.commit().await?;
+
+    Ok(())
+}
+
+#[derive(Debug, Clone)]
+pub struct ApiKeyMetadata {
+    pub api_key_id: String,
+    pub agent_id: String,
+    pub created_at_unix_ms: i64,
+    pub revoked_at_unix_ms: Option<i64>,
+}
+
+#[derive(Debug, Clone)]
+pub struct OrgAgent {
+    pub agent_id: String,
+    pub name: String,
+    pub role_id: Option<String>,
+    pub project_id: Option<String>,
+    pub created_at_unix_ms: i64,
+    pub keys: Vec<ApiKeyMetadata>,
+}
+
+/// List all agents in an org with API key metadata (never hashes).
+pub async fn list_org_agents(pool: &PgPool, org_id: &str) -> Result<Vec<OrgAgent>, DbError> {
+    let agent_rows = sqlx::query(
+        r#"
+        SELECT
+            agent_id,
+            name,
+            role_id,
+            project_id,
+            floor(extract(epoch from created_at) * 1000)::bigint AS created_at_unix_ms
+        FROM agents
+        WHERE org_id = $1
+        ORDER BY created_at DESC
+        "#,
+    )
+    .bind(org_id)
+    .fetch_all(pool)
+    .await?;
+
+    let key_rows = sqlx::query(
+        r#"
+        SELECT
+            agent_api_keys.api_key_id,
+            agent_api_keys.agent_id,
+            floor(extract(epoch from agent_api_keys.created_at) * 1000)::bigint
+                AS created_at_unix_ms,
+            floor(extract(epoch from agent_api_keys.revoked_at) * 1000)::bigint
+                AS revoked_at_unix_ms
+        FROM agent_api_keys
+        INNER JOIN agents ON agents.agent_id = agent_api_keys.agent_id
+        WHERE agents.org_id = $1
+        ORDER BY agent_api_keys.created_at DESC
+        "#,
+    )
+    .bind(org_id)
+    .fetch_all(pool)
+    .await?;
+
+    let mut keys_by_agent: std::collections::HashMap<String, Vec<ApiKeyMetadata>> =
+        std::collections::HashMap::new();
+    for row in key_rows {
+        let metadata = ApiKeyMetadata {
+            api_key_id: row.try_get("api_key_id")?,
+            agent_id: row.try_get("agent_id")?,
+            created_at_unix_ms: row.try_get("created_at_unix_ms")?,
+            revoked_at_unix_ms: row.try_get("revoked_at_unix_ms")?,
+        };
+        keys_by_agent
+            .entry(metadata.agent_id.clone())
+            .or_default()
+            .push(metadata);
+    }
+
+    agent_rows
+        .into_iter()
+        .map(|row| {
+            let agent_id: String = row.try_get("agent_id")?;
+            let keys = keys_by_agent.remove(&agent_id).unwrap_or_default();
+
+            Ok(OrgAgent {
+                agent_id,
+                name: row.try_get("name")?,
+                role_id: row.try_get("role_id")?,
+                project_id: row.try_get("project_id")?,
+                created_at_unix_ms: row.try_get("created_at_unix_ms")?,
+                keys,
+            })
+        })
+        .collect()
+}
+
+/// Insert a fresh API key for an existing agent, enforcing org membership.
+/// Returns `false` when the agent does not belong to the org.
+pub async fn insert_agent_api_key(
+    pool: &PgPool,
+    org_id: &str,
+    agent_id: &str,
+    api_key_id: &str,
+    key_hash: &str,
+) -> Result<bool, DbError> {
+    let result = sqlx::query(
+        r#"
+        INSERT INTO agent_api_keys (api_key_id, agent_id, key_hash)
+        SELECT $1, agents.agent_id, $3
+        FROM agents
+        WHERE agents.agent_id = $2
+          AND agents.org_id = $4
+        "#,
+    )
+    .bind(api_key_id)
+    .bind(agent_id)
+    .bind(key_hash)
+    .bind(org_id)
+    .execute(pool)
+    .await?;
+
+    Ok(result.rows_affected() == 1)
+}
+
+/// Revoke an API key, enforcing org membership through the owning agent.
+/// Returns `false` when no active key matched inside the org.
+pub async fn revoke_agent_api_key(
+    pool: &PgPool,
+    org_id: &str,
+    api_key_id: &str,
+) -> Result<bool, DbError> {
+    let result = sqlx::query(
+        r#"
+        UPDATE agent_api_keys
+        SET revoked_at = now()
+        FROM agents
+        WHERE agent_api_keys.api_key_id = $1
+          AND agent_api_keys.revoked_at IS NULL
+          AND agents.agent_id = agent_api_keys.agent_id
+          AND agents.org_id = $2
+        "#,
+    )
+    .bind(api_key_id)
+    .bind(org_id)
+    .execute(pool)
+    .await?;
+
+    Ok(result.rows_affected() == 1)
+}
+
 pub async fn agent_for_api_key_hash(
     pool: &PgPool,
     key_hash: &str,

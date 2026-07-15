@@ -2,7 +2,7 @@ use crate::{context_broker::ContextItem, retrieval::ScoredMemory};
 
 pub fn approximate_tokens(text: &str) -> usize {
     let words = text.split_whitespace().count();
-    ((words * 4) + 2) / 3
+    (words * 4).div_ceil(3)
 }
 
 pub fn pack_context(scored: Vec<ScoredMemory>, token_budget: usize) -> (Vec<ContextItem>, usize) {

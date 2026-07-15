@@ -7,5 +7,9 @@ authors.workspace = true
 
 [dependencies]
 energon-core = { path = "../energon-core" }
+serde_json.workspace = true
 sqlx.workspace = true
 thiserror.workspace = true
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }

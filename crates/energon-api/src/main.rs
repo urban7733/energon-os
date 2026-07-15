@@ -1,7 +1,10 @@
 mod app;
+mod embedding;
 mod errors;
+mod jwt;
 mod middleware;
 mod obsidian_vault;
+mod payments;
 mod routes;
 mod secrets;
 mod state;
@@ -35,5 +38,10 @@ async fn main() {
 
     tracing::info!(%addr, "Energon OS API listening");
 
-    axum::serve(listener, app).await.expect("API server failed");
+    axum::serve(
+        listener,
+        app.into_make_service_with_connect_info::<SocketAddr>(),
+    )
+    .await
+    .expect("API server failed");
 }
