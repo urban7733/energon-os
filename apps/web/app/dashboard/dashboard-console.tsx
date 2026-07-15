@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   ArrowRight,
   ArrowUpRight,
@@ -12,11 +13,16 @@ import {
   FileSearch,
   Gauge,
   KeyRound,
+  ListChecks,
+  LogOut,
   PackageCheck,
+  RefreshCcw,
   Send,
   ShieldCheck,
+  Trash2,
   Users,
 } from "lucide-react";
+import { authClient, fetchApiToken } from "../../lib/auth-client";
 import { site } from "../../lib/site";
 
 type ApiResult = {
@@ -34,14 +40,43 @@ type MemoryScope =
   | "session";
 type SharedMemoryScope = "open" | "org" | "project" | "role";
 
-export function DashboardConsole() {
+type AgentKeyMetadata = {
+  api_key_id: string;
+  created_at_unix_ms: number;
+  revoked_at_unix_ms: number | null;
+};
+
+type OrgAgent = {
+  agent_id: string;
+  name: string;
+  role_id: string | null;
+  project_id: string | null;
+  created_at_unix_ms: number;
+  keys: AgentKeyMetadata[];
+};
+
+type OrgMemory = {
+  memory_id: string;
+  scope: MemoryScope;
+  content_preview: string;
+  tags: string[];
+  project_id: string | null;
+  role_id: string | null;
+  owner_agent_id: string | null;
+  created_at_unix_ms: number;
+};
+
+export function DashboardConsole({ userEmail }: { userEmail: string }) {
+  const router = useRouter();
+  const { data: organizations } = authClient.useListOrganizations();
+  const { data: activeOrganization } = authClient.useActiveOrganization();
+
   const [apiBaseUrl, setApiBaseUrl] = useState(site.apiBaseUrl);
-  const [adminToken, setAdminToken] = useState("");
   const [agentApiKey, setAgentApiKey] = useState("");
   const [agentId, setAgentId] = useState("agent_777");
-  const [orgId, setOrgId] = useState("org_1");
   const [roleId, setRoleId] = useState("strategist");
   const [projectId, setProjectId] = useState("apex_verify");
+  const [newOrgName, setNewOrgName] = useState("");
   const [scope, setScope] = useState<MemoryScope>("agent_private");
   const [memoryId, setMemoryId] = useState("");
   const [promotedMemoryId, setPromotedMemoryId] = useState("");
@@ -54,6 +89,10 @@ export function DashboardConsole() {
   );
   const [task, setTask] = useState("prepare investor outreach");
   const [requestId, setRequestId] = useState("");
+  const [orgAgents, setOrgAgents] = useState<OrgAgent[]>([]);
+  const [orgMemories, setOrgMemories] = useState<OrgMemory[]>([]);
+  const [memoryScopeFilter, setMemoryScopeFilter] = useState<"" | MemoryScope>("");
+  const [mintedKey, setMintedKey] = useState<string | null>(null);
   const [result, setResult] = useState<ApiResult>({
     label: "Ready",
     body: {
@@ -68,9 +107,11 @@ export function DashboardConsole() {
   const [busy, setBusy] = useState(false);
 
   const cleanBaseUrl = useMemo(() => apiBaseUrl.replace(/\/$/, ""), [apiBaseUrl]);
+  const orgId = activeOrganization?.id ?? "";
   const authMode = agentApiKey.trim() ? "Bearer API key" : "Dev identity headers";
   const lifecycle = [
     ["API health", apiStatus === "online", apiStatus],
+    ["Organization", Boolean(orgId), activeOrganization?.name ?? "no active org"],
     ["Agent identity", Boolean(agentApiKey || agentId), agentApiKey ? "bearer key" : "dev headers"],
     ["Private memory", Boolean(memoryId), memoryId || "not written"],
     ["Promotion", Boolean(promotedMemoryId), promotedMemoryId || "not promoted"],
@@ -107,6 +148,60 @@ export function DashboardConsole() {
     }
   }
 
+  async function managementFetch(path: string, init?: RequestInit): Promise<unknown> {
+    const token = await fetchApiToken();
+    const response = await fetch(`${cleanBaseUrl}${path}`, {
+      ...init,
+      headers: {
+        "content-type": "application/json",
+        Authorization: `Bearer ${token}`,
+        ...(init?.headers ?? {}),
+      },
+    });
+    const body: unknown = await response.json();
+    if (!response.ok) throw new Error(JSON.stringify(body));
+    return body;
+  }
+
+  function requireOrg(): string {
+    if (!orgId) {
+      throw new Error("Create or select an organization first.");
+    }
+    return orgId;
+  }
+
+  async function signOut() {
+    await authClient.signOut();
+    router.push("/login");
+    router.refresh();
+  }
+
+  async function createOrganization(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    await run("Created organization", async () => {
+      const name = newOrgName.trim();
+      if (!name) throw new Error("Organization name is required.");
+      const slug = `${name
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "")}-${Date.now().toString(36)}`;
+      const created = await authClient.organization.create({ name, slug });
+      if (created.error) throw new Error(created.error.message ?? "Organization create failed");
+      await authClient.organization.setActive({ organizationId: created.data.id });
+      setNewOrgName("");
+      return { organization_id: created.data.id, name, slug };
+    });
+  }
+
+  async function setActiveOrganization(organizationId: string) {
+    if (!organizationId) return;
+    await run("Switched organization", async () => {
+      const outcome = await authClient.organization.setActive({ organizationId });
+      if (outcome.error) throw new Error(outcome.error.message ?? "Failed to switch org");
+      return { active_organization_id: organizationId };
+    });
+  }
+
   async function checkHealth(event?: FormEvent<HTMLFormElement>) {
     event?.preventDefault();
     setBusy(true);
@@ -132,38 +227,102 @@ export function DashboardConsole() {
 
   async function createAgent(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!adminToken.trim()) {
-      await run("Using dev identity", async () => ({
-        status: "dev_identity_ready",
-        auth_mode: "Dev identity headers",
-        agent_id: agentId,
-        org_id: orgId,
-        role_id: roleId,
-        project_id: projectId,
-        note: "No bearer key is needed when the API runs with in-memory/dev identity headers. Set Admin token to create a real Postgres-backed API key.",
-      }));
-      return;
-    }
-
     await run("Created agent", async () => {
-      const response = await fetch(`${cleanBaseUrl}/v1/admin/agents`, {
+      const org = requireOrg();
+      const body = await managementFetch(`/v1/orgs/${encodeURIComponent(org)}/agents`, {
         method: "POST",
-        headers: {
-          "content-type": "application/json",
-          "x-energon-admin-token": adminToken,
-        },
         body: JSON.stringify({
           agent_id: agentId,
-          org_id: orgId,
-          role_id: roleId,
-          project_id: projectId,
+          role_id: roleId || null,
+          project_id: projectId || null,
           name: `${agentId} operator`,
         }),
       });
-      const body = await response.json();
-      if (!response.ok) throw new Error(JSON.stringify(body));
-      if (typeof body.api_key === "string") setAgentApiKey(body.api_key);
+      if (isKeyGrant(body)) {
+        setAgentApiKey(body.api_key);
+        setMintedKey(body.api_key);
+      }
+      await refreshAgents();
       return body;
+    });
+  }
+
+  async function refreshAgents() {
+    const org = requireOrg();
+    const body = await managementFetch(`/v1/orgs/${encodeURIComponent(org)}/agents`);
+    if (isAgentList(body)) {
+      setOrgAgents(body.agents);
+    }
+    return body;
+  }
+
+  async function listAgents(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    await run("Listed agents", refreshAgents);
+  }
+
+  async function rotateKey(rotateAgentId: string) {
+    await run("Rotated API key", async () => {
+      const org = requireOrg();
+      const body = await managementFetch(
+        `/v1/orgs/${encodeURIComponent(org)}/agents/${encodeURIComponent(rotateAgentId)}/keys`,
+        { method: "POST" },
+      );
+      if (isKeyGrant(body)) {
+        setAgentApiKey(body.api_key);
+        setMintedKey(body.api_key);
+      }
+      await refreshAgents();
+      return body;
+    });
+  }
+
+  async function revokeKey(apiKeyId: string) {
+    await run("Revoked API key", async () => {
+      const org = requireOrg();
+      const body = await managementFetch(
+        `/v1/orgs/${encodeURIComponent(org)}/keys/${encodeURIComponent(apiKeyId)}`,
+        { method: "DELETE" },
+      );
+      await refreshAgents();
+      return body;
+    });
+  }
+
+  async function refreshOrgMemories() {
+    const org = requireOrg();
+    const query = new URLSearchParams({ limit: "50", offset: "0" });
+    if (memoryScopeFilter) query.set("scope", memoryScopeFilter);
+    const body = await managementFetch(
+      `/v1/orgs/${encodeURIComponent(org)}/memories?${query.toString()}`,
+    );
+    if (isMemoryList(body)) {
+      setOrgMemories(body.memories);
+    }
+    return body;
+  }
+
+  async function listOrgMemories(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    await run("Listed org memories", refreshOrgMemories);
+  }
+
+  async function deleteOrgMemory(deleteMemoryId: string) {
+    await run("Deleted memory", async () => {
+      const org = requireOrg();
+      const body = await managementFetch(
+        `/v1/orgs/${encodeURIComponent(org)}/memories/${encodeURIComponent(deleteMemoryId)}`,
+        { method: "DELETE" },
+      );
+      await refreshOrgMemories();
+      return body;
+    });
+  }
+
+  async function readUsage() {
+    await run("Usage summary", async () => {
+      const org = requireOrg();
+      return managementFetch(`/v1/orgs/${encodeURIComponent(org)}/usage`);
     });
   }
 
@@ -273,6 +432,35 @@ export function DashboardConsole() {
 
   return (
     <div className="dashboard-console">
+      <div className="session-bar" aria-label="Session and organization">
+        <span>
+          signed in as <strong>{userEmail}</strong>
+        </span>
+        <div className="session-actions">
+          <select
+            className="org-select"
+            aria-label="Active organization"
+            value={orgId}
+            onChange={(event) => void setActiveOrganization(event.target.value)}
+          >
+            <option value="">no active org</option>
+            {(organizations ?? []).map((organization) => (
+              <option key={organization.id} value={organization.id}>
+                {organization.name}
+              </option>
+            ))}
+          </select>
+          <button type="button" onClick={() => void readUsage()} disabled={busy || !orgId}>
+            <BarChart3 size={14} aria-hidden="true" />
+            Usage
+          </button>
+          <button type="button" onClick={() => void signOut()}>
+            <LogOut size={14} aria-hidden="true" />
+            Sign out
+          </button>
+        </div>
+      </div>
+
       <section className="dashboard-overview" aria-label="Energon operating model">
         <article className="surface-card command-card">
           <div className="panel-title">
@@ -429,24 +617,30 @@ export function DashboardConsole() {
           </button>
         </form>
         <div className="panel-divider" />
-        <form onSubmit={createAgent}>
+        <form onSubmit={createOrganization}>
           <label>
-            Admin token for real API key creation
+            New organization name
             <input
-              value={adminToken}
-              onChange={(event) => setAdminToken(event.target.value)}
-              type="password"
-              placeholder="optional in local dev"
+              value={newOrgName}
+              onChange={(event) => setNewOrgName(event.target.value)}
+              placeholder="acme swarm"
             />
           </label>
+          <button type="submit" disabled={busy || !newOrgName.trim()}>
+            <Users size={16} aria-hidden="true" />
+            Create organization
+          </button>
+        </form>
+        <div className="panel-divider" />
+        <form onSubmit={createAgent}>
           <div className="form-row">
             <label>
               Agent ID
               <input value={agentId} onChange={(event) => setAgentId(event.target.value)} />
             </label>
             <label>
-              Org ID
-              <input value={orgId} onChange={(event) => setOrgId(event.target.value)} />
+              Org ID (active org)
+              <input value={orgId} readOnly placeholder="create an organization first" />
             </label>
           </div>
           <div className="form-row">
@@ -459,11 +653,126 @@ export function DashboardConsole() {
               <input value={projectId} onChange={(event) => setProjectId(event.target.value)} />
             </label>
           </div>
-          <button type="submit" disabled={busy}>
+          <button type="submit" disabled={busy || !orgId}>
             <PackageCheck size={16} aria-hidden="true" />
-            {adminToken.trim() ? "Create agent key" : "Use dev identity"}
+            Create agent + API key
           </button>
         </form>
+        {mintedKey ? (
+          <p className="key-once">
+            API key (shown once, store it now): <br />
+            {mintedKey}
+          </p>
+        ) : null}
+      </section>
+
+      <section id="org-agents" className="ops-panel" aria-labelledby="org-agents-title">
+        <div className="panel-title">
+          <ListChecks size={18} aria-hidden="true" />
+          <h2 id="org-agents-title">Org agents and keys</h2>
+        </div>
+        <form onSubmit={listAgents}>
+          <button type="submit" disabled={busy || !orgId}>
+            <RefreshCcw size={16} aria-hidden="true" />
+            List agents
+          </button>
+        </form>
+        {orgAgents.length > 0 ? (
+          <div className="data-table" aria-label="Agents in the active organization">
+            {orgAgents.map((agent) => (
+              <div className="data-table-row" key={agent.agent_id}>
+                <strong>{agent.agent_id}</strong>
+                <span>
+                  {agent.keys.filter((key) => key.revoked_at_unix_ms === null).length} active key(s)
+                </span>
+                <span>{agent.role_id ?? "no role"}</span>
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => void rotateKey(agent.agent_id)}
+                >
+                  <RefreshCcw size={14} aria-hidden="true" />
+                  Rotate
+                </button>
+              </div>
+            ))}
+          </div>
+        ) : null}
+        {orgAgents.some((agent) => agent.keys.length > 0) ? (
+          <div className="data-table" aria-label="API keys in the active organization">
+            {orgAgents.flatMap((agent) =>
+              agent.keys.map((key) => (
+                <div className="data-table-row" key={key.api_key_id}>
+                  <strong>{key.api_key_id}</strong>
+                  <span>{agent.agent_id}</span>
+                  <span>{key.revoked_at_unix_ms === null ? "active" : "revoked"}</span>
+                  <button
+                    type="button"
+                    disabled={busy || key.revoked_at_unix_ms !== null}
+                    onClick={() => void revokeKey(key.api_key_id)}
+                  >
+                    <Trash2 size={14} aria-hidden="true" />
+                    Revoke
+                  </button>
+                </div>
+              )),
+            )}
+          </div>
+        ) : null}
+      </section>
+
+      <section id="org-memories" className="ops-panel wide" aria-labelledby="org-memories-title">
+        <div className="panel-title">
+          <Database size={18} aria-hidden="true" />
+          <h2 id="org-memories-title">Org memories</h2>
+        </div>
+        <form onSubmit={listOrgMemories}>
+          <div className="form-row">
+            <label>
+              Scope filter
+              <select
+                value={memoryScopeFilter}
+                onChange={(event) => setMemoryScopeFilter(event.target.value as "" | MemoryScope)}
+              >
+                <option value="">all scopes</option>
+                <option value="open">open</option>
+                <option value="org">org</option>
+                <option value="project">project</option>
+                <option value="role">role</option>
+                <option value="agent_private">agent_private</option>
+                <option value="user_private">user_private</option>
+                <option value="session">session</option>
+              </select>
+            </label>
+            <label>
+              Active org
+              <input value={orgId} readOnly />
+            </label>
+          </div>
+          <button type="submit" disabled={busy || !orgId}>
+            <RefreshCcw size={16} aria-hidden="true" />
+            List memories
+          </button>
+        </form>
+        {orgMemories.length > 0 ? (
+          <div className="data-table" aria-label="Memories in the active organization">
+            {orgMemories.map((entry) => (
+              <div className="data-table-row" key={entry.memory_id}>
+                <strong>{entry.content_preview}</strong>
+                <span>{entry.memory_id}</span>
+                <span>{entry.scope}</span>
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => void deleteOrgMemory(entry.memory_id)}
+                >
+                  <Trash2 size={14} aria-hidden="true" />
+                  Delete
+                </button>
+              </div>
+            ))}
+          </div>
+        ) : null}
       </section>
 
       <section id="memory" className="ops-panel" aria-labelledby="memory-title">
@@ -609,7 +918,7 @@ function agentRequestHeaders(
   const headers: Record<string, string> = {
     "content-type": "application/json",
     "x-energon-agent-id": agentId,
-    "x-energon-org-id": orgId,
+    "x-energon-org-id": orgId || "org_1",
   };
 
   if (roleId?.trim()) headers["x-energon-role-id"] = roleId.trim();
@@ -633,5 +942,32 @@ function isMemoryRecord(value: unknown): value is { memory_id: string } {
     value !== null &&
     "memory_id" in value &&
     typeof (value as { memory_id: unknown }).memory_id === "string"
+  );
+}
+
+function isKeyGrant(value: unknown): value is { api_key: string } {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "api_key" in value &&
+    typeof (value as { api_key: unknown }).api_key === "string"
+  );
+}
+
+function isAgentList(value: unknown): value is { agents: OrgAgent[] } {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "agents" in value &&
+    Array.isArray((value as { agents: unknown }).agents)
+  );
+}
+
+function isMemoryList(value: unknown): value is { memories: OrgMemory[] } {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "memories" in value &&
+    Array.isArray((value as { memories: unknown }).memories)
   );
 }

@@ -10,8 +10,6 @@
     "web:build": "bun --cwd apps/web build",
     "web:start": "bun --cwd apps/web start",
     "web:lint": "bun --cwd apps/web lint",
-    "check": "cargo fmt --all --check && cargo test --workspace && bun run web:lint && bun run web:build",
-    "deploy:cloudflare": "NEXT_PUBLIC_SITE_URL=https://energon.os NEXT_PUBLIC_ENERGON_API_BASE_URL=https://api.energon.os bun run web:build && bunx wrangler pages deploy apps/web/out --project-name energon-os",
-    "preview:cloudflare": "NEXT_PUBLIC_SITE_URL=https://energon.os NEXT_PUBLIC_ENERGON_API_BASE_URL=https://api.energon.os bun run web:build && bunx wrangler pages dev apps/web/out"
+    "check": "cargo fmt --all --check && cargo test --workspace && bun run web:lint && bun run web:build"
   }
 }

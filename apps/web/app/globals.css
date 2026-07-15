@@ -1011,6 +1011,142 @@ pre {
   background: var(--ink);
 }
 
+.auth-shell {
+  display: grid;
+  min-height: 100vh;
+  place-items: center;
+  background: var(--bg);
+  padding: 24px;
+}
+
+.auth-card {
+  display: grid;
+  width: 100%;
+  max-width: 420px;
+  gap: 20px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--bg);
+  padding: 28px;
+}
+
+.auth-header h1 {
+  margin: 10px 0;
+  color: var(--ink);
+  font-size: 18px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
+
+.auth-header p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.auth-mode-switch {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  border: 1px solid var(--line);
+}
+
+.auth-mode {
+  border: 0;
+  border-radius: 0;
+  color: var(--muted);
+}
+
+.auth-mode.active {
+  background: var(--line);
+  color: var(--ink);
+}
+
+.auth-error {
+  margin: 0;
+  border: 1px solid var(--line-strong);
+  color: var(--ink);
+  font-size: 11px;
+  padding: 10px;
+}
+
+.session-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 10px 14px;
+}
+
+.session-bar span {
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.session-bar strong {
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.session-bar .session-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.org-select {
+  min-width: 180px;
+}
+
+.key-once {
+  border: 1px solid var(--line-strong);
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  overflow-wrap: anywhere;
+  padding: 10px;
+}
+
+.data-table {
+  display: grid;
+  gap: 0;
+  border: 1px solid var(--line);
+}
+
+.data-table-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, 0.8fr) auto;
+  gap: 10px;
+  align-items: center;
+  border-bottom: 1px solid var(--line);
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  padding: 8px 10px;
+}
+
+.data-table-row:last-child {
+  border-bottom: 0;
+}
+
+.data-table-row strong {
+  color: var(--ink);
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+
+.data-table-row button {
+  min-height: 26px;
+  font-size: 10px;
+  padding: 0 8px;
+}
+
 @media (max-width: 900px) {
   .topbar {
     grid-template-columns: 1fr;

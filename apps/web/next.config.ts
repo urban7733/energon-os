@@ -16,7 +16,8 @@ const devWatchIgnored = [
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
-  output: "export",
+  // No static export: Better Auth API routes and server-side session checks
+  // require a Node/Bun server runtime (`next start`).
   poweredByHeader: false,
   images: {
     unoptimized: true,
