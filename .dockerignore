@@ -4,4 +4,6 @@ target
 .env.local
 .DS_Store
 data
-
+node_modules
+apps/web/.next
+apps/web/out

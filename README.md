@@ -25,12 +25,19 @@ It does not run agents, click browsers, execute workflows, make payments, or hos
 ```bash
 bun install
 cargo test --workspace
+docker compose up -d postgres        # Postgres 17 + pgvector
+export DATABASE_URL=postgres://energon:energon@localhost:5432/energon
+export ENERGON_API_KEY_PEPPER=$(openssl rand -hex 32)
+export BETTER_AUTH_SECRET=$(openssl rand -base64 32)
+export ENERGON_JWKS_URL=http://localhost:3000/api/auth/jwks
 bun run api:dev
 bun run web:dev
 ```
 
-Open the dashboard at `http://localhost:3000/dashboard`. The fast local path uses
-in-memory storage and dev identity headers. Use Postgres for durable data.
+Open `http://localhost:3000/login`, create an account and an organization, then
+operate agents, keys, memories, and usage from
+`http://localhost:3000/dashboard`. Without `DATABASE_URL` the API falls back to
+in-memory storage and dev identity headers for fast demos only.
 
 ## Repository Map
 
@@ -39,7 +46,7 @@ crates/energon-core    pure domain logic: memory, scopes, permissions, context, 
 crates/energon-api     Axum API: auth, memory writes, context builds, audits, x402, vault export
 crates/energon-db      sqlx repositories for Postgres, pgvector, identity, memory, audit
 crates/energon-worker  embedding worker for pending memory chunks
-apps/web               static Next.js landing page and operator dashboard
+apps/web               Next.js landing page, Better Auth accounts/orgs, operator dashboard
 docs/                  API, architecture, deployment, operations, crypto payments
 policies/              Cedar policy starting point
 migrations/            Postgres schema and scale indexes
@@ -245,16 +252,15 @@ crates/energon-db     Postgres/sqlx repositories for identity, memory, and audit
 crates/energon-worker async worker for OpenAI embeddings into pgvector chunks
 migrations/           Postgres schema for identity, memory, chunks, and audit
 policies/             Cedar policy starting point
-apps/web              static Next.js site and dashboard for Cloudflare Pages
+apps/web              Next.js site + Better Auth (email/password, orgs, JWT/JWKS)
 ```
 
 ## Production API
 
-Endpoints:
+Agent endpoints (bearer `eos_live_...` API keys):
 
 ```txt
 GET  /health
-POST /v1/admin/agents
 GET  /v1/billing/x402
 POST /v1/memory/write
 POST /v1/context/build
@@ -264,13 +270,26 @@ GET  /v1/audit/context/{request_id}
 GET  /v1/audit/promotion/{promoted_memory_id}
 ```
 
-Production agent requests use bearer API keys:
+Operator management endpoints (Better Auth JWT, org-scoped — the JWT `org`
+claim must match `{org_id}` or the API returns 403):
 
 ```txt
-Authorization: Bearer eos_live_...
+POST   /v1/orgs/{org_id}/agents
+GET    /v1/orgs/{org_id}/agents
+POST   /v1/orgs/{org_id}/agents/{agent_id}/keys
+DELETE /v1/orgs/{org_id}/keys/{api_key_id}
+GET    /v1/orgs/{org_id}/memories?scope=&limit=&offset=
+DELETE /v1/orgs/{org_id}/memories/{memory_id}
+GET    /v1/orgs/{org_id}/usage
 ```
 
-Admin creates agents and receives the API key once:
+Humans sign in through the web app (Better Auth email/password), create an
+organization, and manage agents and API keys from the dashboard. The dashboard
+mints short-lived EdDSA JWTs which the Rust API verifies against the Better
+Auth JWKS endpoint (`ENERGON_JWKS_URL`).
+
+`POST /v1/admin/agents` with `x-energon-admin-token` still exists but is a
+BOOTSTRAP-ONLY escape hatch (e.g. first agent before the web app is up):
 
 ```bash
 curl -X POST http://127.0.0.1:3001/v1/admin/agents \
@@ -351,16 +370,17 @@ Run checks:
 
 ```bash
 cargo fmt --all
+cargo clippy --workspace --all-targets
 cargo test --workspace
 bun run web:lint
 bun run web:build
 ```
 
-Deploy the static web surface to Cloudflare Pages:
-
-```bash
-bun run deploy:cloudflare
-```
+The web app requires a Node/Bun server runtime (`bun run web:start` after
+`bun run web:build`) because Better Auth API routes and server-side session
+checks cannot be statically exported. The previous Cloudflare Pages static
+deploy was removed for that reason — deploy `apps/web` to any Node-compatible
+host (or a container) instead.
 
 ## Documentation
 
@@ -380,10 +400,12 @@ Apache License 2.0. See [LICENSE](LICENSE).
 
 ## Remaining Production Work
 
-The first scalable code path is implemented. Before a real public launch, the non-code production work is:
+The first scalable code path is implemented. Migrations now run automatically
+on API startup, and rate limiting, CORS, and body limits are built in. Before a
+real public launch, the remaining non-code production work is:
 
-1. Run migrations on the production database.
-2. Deploy API and worker with real secrets.
-3. Configure backups, monitoring, logs, and rate limits.
-4. Run load tests against realistic memory volume.
-5. Generate public SDKs from the stabilized API.
+1. Deploy API, worker, and web app with real secrets.
+2. Configure backups, monitoring, and log aggregation.
+3. Run load tests against realistic memory volume.
+4. Generate public SDKs from the stabilized API.
+5. Flip x402 to Base mainnet USDC (see docs/crypto-payments.md).

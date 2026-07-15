@@ -6,13 +6,19 @@ Base URL:
 http://127.0.0.1:3001
 ```
 
-Production agent requests use:
+Two authentication surfaces:
 
 ```txt
-Authorization: Bearer eos_live_...
+Agents      Authorization: Bearer eos_live_...          (hashed API keys)
+Operators   Authorization: Bearer <Better Auth JWT>     (EdDSA, verified via JWKS)
 ```
 
-When x402 is enabled, paid routes also require an x402 payment payload:
+Operator JWTs are minted by the web app (`GET /api/auth/token` on the Next.js
+origin) and verified by the Rust API against `ENERGON_JWKS_URL`. The JWT
+carries the active organization in the `org` claim; management routes reject
+any request whose `org` claim does not equal the `{org_id}` path parameter.
+
+When x402 is enabled, paid agent routes also require an x402 payment payload:
 
 ```txt
 PAYMENT-SIGNATURE: <x402 payment payload>
@@ -20,6 +26,10 @@ PAYMENT-SIGNATURE: <x402 payment payload>
 
 Without payment, the API responds with `402 Payment Required` and a
 `PAYMENT-REQUIRED` header containing the accepted payment requirements.
+
+All routes are rate limited per API key (or client IP) with a token bucket
+(default 20 rps, burst 40). Exhausted buckets receive `429 Too Many Requests`.
+Request bodies are limited to 1 MiB by default.
 
 ## x402 Billing Status
 
@@ -38,28 +48,106 @@ ENERGON_X402_FACILITATOR_URL=https://x402.org/facilitator
 ENERGON_X402_FACILITATOR_BEARER=<optional facilitator bearer token>
 ```
 
-Paid routes:
+Paid routes (defaults; override with `ENERGON_PRICE_*_MICRO` env vars):
 
 ```txt
-POST /v1/memory/write                    $0.001 USDC
-POST /v1/memory/promote                  $0.001 USDC
-POST /v1/context/build                   $0.003 USDC
-GET  /v1/audit/context/{request_id}      $0.0005 USDC
-GET  /v1/audit/promotion/{memory_id}     $0.0005 USDC
-GET  /v1/vault/obsidian.zip              $0.005 USDC
+POST /v1/memory/write                    $0.001 USDC   (ENERGON_PRICE_MEMORY_WRITE_MICRO=1000)
+POST /v1/memory/promote                  $0.001 USDC   (ENERGON_PRICE_MEMORY_PROMOTE_MICRO=1000)
+POST /v1/context/build                   $0.003 USDC   (ENERGON_PRICE_CONTEXT_BUILD_MICRO=3000)
+GET  /v1/audit/context/{request_id}      $0.0005 USDC  (ENERGON_PRICE_AUDIT_READ_MICRO=500)
+GET  /v1/audit/promotion/{memory_id}     $0.0005 USDC  (ENERGON_PRICE_AUDIT_READ_MICRO=500)
+GET  /v1/vault/obsidian.zip              $0.005 USDC   (ENERGON_PRICE_VAULT_EXPORT_MICRO=5000)
 ```
+
+Settled payments are persisted to `payment_receipts` (tx hash, payer, raw
+facilitator response) and every paid-route call records a `usage_events` row.
+See `GET /v1/orgs/{org_id}/usage` below.
 
 For local UI testing only, `ENERGON_X402_ACCEPT_UNVERIFIED=1` accepts a non-empty
 `PAYMENT-SIGNATURE` without facilitator verification. Do not use that in
 production.
 
-## Create Agent
+## Organization Management (Operator JWT)
 
-Requires:
+All management routes require `Authorization: Bearer <Better Auth JWT>` whose
+`org` claim equals `{org_id}`. A mismatch returns `403`; a JWT without an
+active organization returns `403`.
 
-```txt
-x-energon-admin-token: <ENERGON_ADMIN_TOKEN>
+### Create Agent + API Key
+
+```bash
+curl -X POST http://127.0.0.1:3001/v1/orgs/$ORG_ID/agents \
+  -H 'content-type: application/json' \
+  -H "Authorization: Bearer $OPERATOR_JWT" \
+  -d '{
+    "agent_id": "agent_777",
+    "role_id": "strategist",
+    "project_id": "apex_verify",
+    "name": "Apex Verify Strategist"
+  }'
 ```
+
+The response includes `api_key` exactly once; only the peppered SHA-256 hash is
+stored. The org row is created on first use, linking the Better Auth
+organization id to the Energon `orgs` table.
+
+### List Agents (key metadata, never hashes)
+
+```bash
+curl http://127.0.0.1:3001/v1/orgs/$ORG_ID/agents \
+  -H "Authorization: Bearer $OPERATOR_JWT"
+```
+
+### Rotate an Agent Key
+
+Mints a new key for the agent. The old key stays valid until revoked so agents
+can switch over without downtime.
+
+```bash
+curl -X POST http://127.0.0.1:3001/v1/orgs/$ORG_ID/agents/agent_777/keys \
+  -H "Authorization: Bearer $OPERATOR_JWT"
+```
+
+### Revoke an API Key
+
+```bash
+curl -X DELETE http://127.0.0.1:3001/v1/orgs/$ORG_ID/keys/key_... \
+  -H "Authorization: Bearer $OPERATOR_JWT"
+```
+
+### List Org Memories
+
+Metadata plus a truncated content preview. Optional `scope`, `limit` (max 200),
+`offset`.
+
+```bash
+curl "http://127.0.0.1:3001/v1/orgs/$ORG_ID/memories?scope=org&limit=50&offset=0" \
+  -H "Authorization: Bearer $OPERATOR_JWT"
+```
+
+### Delete a Memory
+
+Deletes the memory and its chunks (cascade).
+
+```bash
+curl -X DELETE http://127.0.0.1:3001/v1/orgs/$ORG_ID/memories/mem_... \
+  -H "Authorization: Bearer $OPERATOR_JWT"
+```
+
+### Usage & Payments Summary
+
+Per-route call counts, paid counts, settled USDC totals, and recent receipts.
+
+```bash
+curl http://127.0.0.1:3001/v1/orgs/$ORG_ID/usage \
+  -H "Authorization: Bearer $OPERATOR_JWT"
+```
+
+## Create Agent (bootstrap only)
+
+`POST /v1/admin/agents` with the static `ENERGON_ADMIN_TOKEN` header is kept
+ONLY as a bootstrap escape hatch (e.g. minting the first agent before the web
+app is running). Use the JWT-authenticated org routes for everything else.
 
 ```bash
 curl -X POST http://127.0.0.1:3001/v1/admin/agents \
@@ -101,6 +189,14 @@ curl -X POST http://127.0.0.1:3001/v1/context/build \
     "token_budget": 6000
   }'
 ```
+
+Retrieval: when `OPENAI_API_KEY` is set on the API, the task is embedded
+(text-embedding-3-small) and candidates are selected by pgvector cosine
+distance — with the permission filter applied inside SQL, before any ranking.
+Memories whose chunks have not been embedded yet are unioned in by recency so
+they stay reachable. If embedding is not configured or the embedding call
+fails, the API logs a warning and falls back to recency + keyword retrieval;
+an embedding failure never fails the request.
 
 ## Promote Memory
 

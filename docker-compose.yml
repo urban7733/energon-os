@@ -7,13 +7,35 @@ services:
       ENERGON_BIND_ADDR: 0.0.0.0:3000
       DATABASE_URL: postgres://energon:energon@postgres:5432/energon
       ENERGON_API_KEY_PEPPER: change-me-dev-pepper
+      # Bootstrap-only escape hatch; day-to-day management goes through
+      # JWT-authenticated /v1/orgs/{org_id}/... routes.
       ENERGON_ADMIN_TOKEN: change-me-dev-admin-token
       ENERGON_DEV_AUTH: "1"
       ENERGON_RETRIEVAL_CANDIDATE_LIMIT: "500"
+      # Better Auth JWKS (the Next.js app on the host during development).
+      ENERGON_JWKS_URL: http://host.docker.internal:3000/api/auth/jwks
+      ENERGON_JWT_ISSUER: http://localhost:3000
+      ENERGON_JWT_AUDIENCE: energon-api
+      # Browser origin allowed to call management routes.
+      ENERGON_WEB_ORIGIN: http://localhost:3000
+      # Rate limiting and request size.
+      ENERGON_RATE_LIMIT_RPS: "20"
+      ENERGON_RATE_LIMIT_BURST: "40"
+      ENERGON_MAX_BODY_BYTES: "1048576"
+      # Per-route x402 pricing in USDC micro units (defaults shown).
+      ENERGON_PRICE_MEMORY_WRITE_MICRO: "1000"
+      ENERGON_PRICE_MEMORY_PROMOTE_MICRO: "1000"
+      ENERGON_PRICE_CONTEXT_BUILD_MICRO: "3000"
+      ENERGON_PRICE_AUDIT_READ_MICRO: "500"
+      ENERGON_PRICE_VAULT_EXPORT_MICRO: "5000"
+      # Query-time semantic retrieval (optional; falls back to recency).
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       - postgres
     ports:
-      - "3000:3000"
+      - "3001:3000"
 
   worker:
     build: .
@@ -40,6 +62,8 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      # First boot convenience only; the API also runs these embedded
+      # migrations on startup (idempotent).
       - ./migrations:/docker-entrypoint-initdb.d:ro
 
   minio:
