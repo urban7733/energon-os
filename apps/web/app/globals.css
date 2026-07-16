@@ -856,127 +856,7 @@ h2 {
   color: var(--ink);
 }
 
-/* ── Dashboard ── */
-
-.dashboard-shell {
-  color-scheme: dark;
-  display: grid;
-  grid-template-columns: 220px 1fr;
-  min-height: 100vh;
-  background: var(--bg);
-  color: var(--text);
-  font-family: var(--font-mono);
-  font-size: 12px;
-}
-
-.dashboard-rail {
-  position: sticky;
-  top: 0;
-  display: flex;
-  height: 100vh;
-  flex-direction: column;
-  border-right: 1px solid var(--line);
-  background: var(--bg);
-  padding: 20px 16px;
-}
-
-.dashboard-rail nav {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  margin-top: 28px;
-}
-
-.dashboard-rail a {
-  border-radius: var(--radius);
-  color: var(--muted);
-  font-size: 11px;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  padding: 8px 10px;
-}
-
-.dashboard-rail a:hover {
-  color: var(--ink);
-}
-
-.dashboard-main {
-  min-width: 0;
-  padding: 28px 24px;
-}
-
-.dashboard-header {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 20px;
-  margin-bottom: 20px;
-  padding-bottom: 20px;
-  border-bottom: 1px solid var(--line);
-}
-
-.dashboard-header h1 {
-  margin-bottom: 0;
-  font-size: 22px;
-}
-
-.dashboard-header p {
-  max-width: 320px;
-  margin: 0;
-  color: var(--muted);
-  font-size: 12px;
-}
-
-.dashboard-console,
-.console-grid {
-  display: grid;
-  gap: 12px;
-}
-
-.console-grid {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
-.ops-panel,
-.result-panel {
-  min-width: 0;
-  overflow: hidden;
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  background: var(--bg);
-  padding: 16px;
-}
-
-.wide,
-.result-panel {
-  grid-column: span 2;
-}
-
-.panel-title {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 14px;
-  color: var(--ink);
-}
-
-.panel-title svg {
-  color: var(--muted);
-}
-
-.panel-title h2 {
-  margin: 0;
-  font-size: 12px;
-  font-weight: 500;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-
-.panel-divider {
-  height: 1px;
-  margin: 14px 0;
-  background: var(--line);
-}
+/* ── Auth + landing form controls (scoped so shadcn dashboard is unaffected) ── */
 
 .site-shell form,
 .auth-shell form {
@@ -1827,10 +1707,12 @@ pre {
   position: absolute;
   inset: 0;
   z-index: 1;
+  /* Dark sheen: the button is white (bg-primary), so the sweep must be a
+     darkening gradient to be visible. */
   background: linear-gradient(
     120deg,
     transparent 30%,
-    rgba(255, 255, 255, 0.35) 50%,
+    rgba(0, 0, 0, 0.22) 50%,
     transparent 70%
   );
   transform: translateX(-130%);
