@@ -1,20 +1,36 @@
 import {
-  ActivitySquare,
+  Activity,
   ArrowUpRight,
   Bot,
   Coins,
   Database,
-  KeyRound,
   Layers,
   PackageCheck,
 } from "lucide-react";
+import {
+  Card,
+  CardAction,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty";
 import {
   getOrgAnalytics,
   type ActivityKind,
   type DailyPoint,
   type OrgAnalytics,
   type ScopeCount,
-} from "../../lib/analytics";
+} from "@/lib/analytics";
 
 const numberFormatter = new Intl.NumberFormat("en-US");
 
@@ -104,10 +120,8 @@ function TrendChart({ daily }: { daily: DailyPoint[] }) {
   const buildGeometry = buildSeries(builds, max);
   const memoryGeometry = buildSeries(memories, max);
 
-  const gridLines = [0.25, 0.5, 0.75].map((fraction) => {
-    const innerHeight = CHART.height - CHART.padTop - CHART.padBottom;
-    return CHART.padTop + innerHeight * fraction;
-  });
+  const innerHeight = CHART.height - CHART.padTop - CHART.padBottom;
+  const gridLines = [0.25, 0.5, 0.75].map((fraction) => CHART.padTop + innerHeight * fraction);
   const baseline = CHART.height - CHART.padBottom;
 
   return (
@@ -119,14 +133,7 @@ function TrendChart({ daily }: { daily: DailyPoint[] }) {
       aria-label="Context builds and memory writes over the last 14 days"
     >
       {gridLines.map((y) => (
-        <line
-          key={y}
-          className="trend-grid"
-          x1={CHART.padX}
-          x2={CHART.width - CHART.padX}
-          y1={y}
-          y2={y}
-        />
+        <line key={y} className="trend-grid" x1={CHART.padX} x2={CHART.width - CHART.padX} y1={y} y2={y} />
       ))}
       <line
         className="trend-grid trend-baseline"
@@ -143,43 +150,41 @@ function TrendChart({ daily }: { daily: DailyPoint[] }) {
         <path className="trend-line trend-line-primary" d={buildGeometry.linePath} />
       ) : null}
       {buildGeometry.lastPoint ? (
-        <circle
-          className="trend-dot"
-          cx={buildGeometry.lastPoint.x}
-          cy={buildGeometry.lastPoint.y}
-          r={3.5}
-        />
+        <circle className="trend-dot" cx={buildGeometry.lastPoint.x} cy={buildGeometry.lastPoint.y} r={3.5} />
       ) : null}
     </svg>
   );
 }
 
-const KPI_ANIMATION_DELAY = 60;
-
 function KpiCard({
   index,
-  icon,
+  icon: Icon,
   label,
   value,
   sub,
 }: {
   index: number;
-  icon: React.ReactNode;
+  icon: React.ComponentType<{ className?: string }>;
   label: string;
   value: string;
   sub: string;
 }) {
   return (
-    <article className="kpi-card" style={{ animationDelay: `${index * KPI_ANIMATION_DELAY}ms` }}>
-      <div className="kpi-head">
-        <span className="kpi-icon" aria-hidden="true">
-          {icon}
-        </span>
-        <span className="kpi-label">{label}</span>
-      </div>
-      <strong className="kpi-value">{value}</strong>
-      <span className="kpi-sub">{sub}</span>
-    </article>
+    <Card
+      className="animate-in fade-in slide-in-from-bottom-3 gap-2 py-4 duration-500 transition-colors hover:border-foreground/25"
+      style={{ animationDelay: `${index * 60}ms`, animationFillMode: "backwards" }}
+    >
+      <CardHeader className="px-4">
+        <CardDescription className="flex items-center gap-2 text-[11px] tracking-wide uppercase">
+          <Icon className="size-3.5 text-foreground" />
+          {label}
+        </CardDescription>
+        <CardTitle className="text-2xl tabular-nums">{value}</CardTitle>
+      </CardHeader>
+      <CardFooter className="px-4">
+        <span className="truncate text-xs text-muted-foreground">{sub}</span>
+      </CardFooter>
+    </Card>
   );
 }
 
@@ -188,23 +193,23 @@ function ScopeBreakdown({ scopeCounts }: { scopeCounts: ScopeCount[] }) {
   const total = scopeCounts.reduce((sum, entry) => sum + entry.count, 0);
 
   if (scopeCounts.length === 0) {
-    return <p className="panel-empty">No memory written yet.</p>;
+    return <p className="text-sm text-muted-foreground">No memory written yet.</p>;
   }
 
   return (
-    <div className="breakdown">
+    <div className="flex flex-col gap-3">
       {scopeCounts.map((entry) => {
         const width = Math.max(4, Math.round((entry.count / max) * 100));
         const share = total > 0 ? Math.round((entry.count / total) * 100) : 0;
         return (
-          <div className="breakdown-row" key={entry.scope}>
-            <span className="breakdown-scope">{entry.scope}</span>
-            <div className="breakdown-track">
-              <i style={{ width: `${width}%` }} />
+          <div key={entry.scope} className="grid grid-cols-[7rem_1fr_auto] items-center gap-3">
+            <span className="truncate text-xs text-foreground">{entry.scope}</span>
+            <div className="h-2 overflow-hidden rounded-full bg-secondary">
+              <div className="dash-bar h-full rounded-full bg-foreground" style={{ width: `${width}%` }} />
             </div>
-            <span className="breakdown-count">
+            <span className="flex items-baseline gap-1.5 text-xs tabular-nums text-foreground">
               {formatNumber(entry.count)}
-              <em>{share}%</em>
+              <span className="text-[10px] text-muted-foreground">{share}%</span>
             </span>
           </div>
         );
@@ -215,26 +220,31 @@ function ScopeBreakdown({ scopeCounts }: { scopeCounts: ScopeCount[] }) {
 
 function PermissionFunnel({ data }: { data: OrgAnalytics }) {
   const stages = [
-    { label: "written", detail: "memories stored", value: data.memories },
-    { label: "packed", detail: "delivered in context", value: data.packedItems },
-    { label: "blocked", detail: "filtered by permission", value: data.deniedMemories },
-  ];
+    { key: "written", label: "written", detail: "memories stored", value: data.memories },
+    { key: "packed", label: "packed", detail: "delivered in context", value: data.packedItems },
+    { key: "blocked", label: "blocked", detail: "filtered by permission", value: data.deniedMemories },
+  ] as const;
   const max = Math.max(1, ...stages.map((stage) => stage.value));
 
   return (
-    <div className="funnel">
+    <div className="flex flex-col gap-3">
       {stages.map((stage) => {
         const width = Math.max(6, Math.round((stage.value / max) * 100));
         return (
-          <div className="funnel-row" key={stage.label}>
-            <div className="funnel-meta">
-              <strong>{stage.label}</strong>
-              <span>{stage.detail}</span>
+          <div key={stage.key} className="grid grid-cols-[7.5rem_1fr_auto] items-center gap-3">
+            <div className="flex flex-col">
+              <span className="text-[11px] font-medium tracking-wide uppercase text-foreground">
+                {stage.label}
+              </span>
+              <span className="text-[10px] text-muted-foreground">{stage.detail}</span>
             </div>
-            <div className="funnel-track">
-              <i style={{ width: `${width}%` }} data-kind={stage.label} />
+            <div className="h-2.5 overflow-hidden rounded-full bg-secondary">
+              <div
+                className={`dash-bar h-full rounded-full ${stage.key === "blocked" ? "dash-bar-hatch" : "bg-foreground"}`}
+                style={{ width: `${width}%` }}
+              />
             </div>
-            <em className="funnel-value">{formatNumber(stage.value)}</em>
+            <span className="text-sm tabular-nums text-foreground">{formatNumber(stage.value)}</span>
           </div>
         );
       })}
@@ -242,45 +252,31 @@ function PermissionFunnel({ data }: { data: OrgAnalytics }) {
   );
 }
 
-function EmptyAnalytics({ message }: { message: string }) {
-  return (
-    <section className="analytics" aria-label="Organization analytics">
-      <div className="analytics-empty">
-        <ActivitySquare size={18} aria-hidden="true" />
-        <p>{message}</p>
-      </div>
-    </section>
-  );
-}
-
-/**
- * Rendered when an organization exists but no agent has produced real traffic
- * yet (no memory, context builds, promotions, or usage events). The product is
- * pre-launch, so we intentionally show nothing rather than a grid of zeros.
- */
 function IdleAnalytics({ orgName }: { orgName: string | null }) {
   return (
-    <section className="analytics" aria-label="Organization analytics">
-      <div className="analytics-heading">
-        <div>
-          <p className="eyebrow">Live analytics</p>
-          <h2 className="analytics-title">{orgName ?? "Organization"}</h2>
+    <section className="flex flex-col gap-4" aria-label="Organization analytics">
+      <div className="flex items-end justify-between gap-4">
+        <div className="flex flex-col gap-1">
+          <p className="text-[11px] tracking-widest uppercase text-muted-foreground">Live analytics</p>
+          <h2 className="text-lg font-medium tracking-tight text-foreground">{orgName ?? "Organization"}</h2>
         </div>
-        <span className="analytics-pulse analytics-pulse-idle" aria-hidden="true">
-          <i />
+        <Badge variant="outline" className="gap-2 text-muted-foreground">
+          <span className="size-1.5 rounded-full bg-muted-foreground" />
           waiting for traffic
-        </span>
+        </Badge>
       </div>
-      <div className="analytics-idle">
-        <ActivitySquare size={20} aria-hidden="true" />
-        <div>
-          <strong>No agent activity yet</strong>
-          <p>
+      <Empty className="border">
+        <EmptyHeader>
+          <EmptyMedia variant="icon">
+            <Activity />
+          </EmptyMedia>
+          <EmptyTitle>No agent activity yet</EmptyTitle>
+          <EmptyDescription>
             Live analytics appear here automatically once agents start writing memory and building
             context through the Energon API. Nothing is shown until there is real traffic.
-          </p>
-        </div>
-      </div>
+          </EmptyDescription>
+        </EmptyHeader>
+      </Empty>
     </section>
   );
 }
@@ -294,16 +290,26 @@ export async function DashboardAnalytics({
 }) {
   if (!orgId) {
     return (
-      <EmptyAnalytics message="Create or select an organization to see live memory and context analytics." />
+      <section className="flex flex-col gap-4" aria-label="Organization analytics">
+        <Empty className="border">
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <Activity />
+            </EmptyMedia>
+            <EmptyTitle>No active organization</EmptyTitle>
+            <EmptyDescription>
+              Create or select an organization to see live memory and context analytics.
+            </EmptyDescription>
+          </EmptyHeader>
+        </Empty>
+      </section>
     );
   }
 
   const data = await getOrgAnalytics(orgId, userId);
 
   if (!data) {
-    return (
-      <EmptyAnalytics message="No analytics available for this organization yet." />
-    );
+    return <IdleAnalytics orgName={null} />;
   }
 
   const hasActivity =
@@ -321,58 +327,28 @@ export async function DashboardAnalytics({
   const memoriesTotal = data.daily.reduce((sum, point) => sum + point.memories, 0);
 
   const kpis = [
-    {
-      icon: <Bot size={15} aria-hidden="true" />,
-      label: "Agents",
-      value: formatNumber(data.agents),
-      sub: `${formatNumber(data.activeKeys)} active keys`,
-    },
-    {
-      icon: <Database size={15} aria-hidden="true" />,
-      label: "Memories",
-      value: formatNumber(data.memories),
-      sub: `+${formatNumber(data.memories7d)} last 7d`,
-    },
-    {
-      icon: <Layers size={15} aria-hidden="true" />,
-      label: "Context builds",
-      value: formatNumber(data.builds),
-      sub: `+${formatNumber(data.builds7d)} last 7d`,
-    },
-    {
-      icon: <PackageCheck size={15} aria-hidden="true" />,
-      label: "Packed items",
-      value: formatNumber(data.packedItems),
-      sub: `${formatNumber(data.deniedMemories)} blocked`,
-    },
-    {
-      icon: <ArrowUpRight size={15} aria-hidden="true" />,
-      label: "Promotions",
-      value: formatNumber(data.promotions),
-      sub: "private → shared",
-    },
-    {
-      icon: <Coins size={15} aria-hidden="true" />,
-      label: "USDC settled",
-      value: formatUsd(data.settledUsdc),
-      sub: `${formatNumber(data.paidEvents)} paid calls`,
-    },
+    { icon: Bot, label: "Agents", value: formatNumber(data.agents), sub: `${formatNumber(data.activeKeys)} active keys` },
+    { icon: Database, label: "Memories", value: formatNumber(data.memories), sub: `+${formatNumber(data.memories7d)} last 7d` },
+    { icon: Layers, label: "Context builds", value: formatNumber(data.builds), sub: `+${formatNumber(data.builds7d)} last 7d` },
+    { icon: PackageCheck, label: "Packed items", value: formatNumber(data.packedItems), sub: `${formatNumber(data.deniedMemories)} blocked` },
+    { icon: ArrowUpRight, label: "Promotions", value: formatNumber(data.promotions), sub: "private to shared" },
+    { icon: Coins, label: "USDC settled", value: formatUsd(data.settledUsdc), sub: `${formatNumber(data.paidEvents)} paid calls` },
   ];
 
   return (
-    <section className="analytics" aria-label="Organization analytics">
-      <div className="analytics-heading">
-        <div>
-          <p className="eyebrow">Live analytics</p>
-          <h2 className="analytics-title">{data.orgName ?? "Organization"}</h2>
+    <section className="flex flex-col gap-4" aria-label="Organization analytics">
+      <div className="flex items-end justify-between gap-4">
+        <div className="flex flex-col gap-1">
+          <p className="text-[11px] tracking-widest uppercase text-muted-foreground">Live analytics</p>
+          <h2 className="text-lg font-medium tracking-tight text-foreground">{data.orgName ?? "Organization"}</h2>
         </div>
-        <span className="analytics-pulse" aria-hidden="true">
-          <i />
+        <Badge variant="outline" className="gap-2 text-muted-foreground">
+          <span className="dash-pulse size-1.5 rounded-full bg-emerald-400" />
           real-time
-        </span>
+        </Badge>
       </div>
 
-      <div className="kpi-grid">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
         {kpis.map((kpi, index) => (
           <KpiCard
             key={kpi.label}
@@ -385,67 +361,91 @@ export async function DashboardAnalytics({
         ))}
       </div>
 
-      <div className="analytics-grid">
-        <article className="analytics-card trend-card">
-          <div className="analytics-card-head">
-            <div>
-              <span className="analytics-card-label">Activity · last 14 days</span>
-              <p className="analytics-card-note">
-                {formatNumber(buildsTotal)} context builds · {formatNumber(memoriesTotal)} memory
-                writes
+      <div className="grid gap-3 lg:grid-cols-2">
+        <Card className="lg:col-span-2">
+          <CardHeader>
+            <CardTitle className="text-sm font-medium tracking-wide uppercase">Activity</CardTitle>
+            <CardDescription>
+              {formatNumber(buildsTotal)} context builds · {formatNumber(memoriesTotal)} memory writes ·
+              last 14 days
+            </CardDescription>
+            <CardAction className="flex gap-4 text-[10px] tracking-wide uppercase text-muted-foreground">
+              <span className="flex items-center gap-1.5">
+                <span className="h-0.5 w-3 bg-foreground" />
+                builds
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="h-0.5 w-3 bg-muted-foreground" />
+                memory
+              </span>
+            </CardAction>
+          </CardHeader>
+          <CardContent>
+            <TrendChart daily={data.daily} />
+            <div className="mt-2 flex justify-between text-[10px] tracking-wide uppercase text-muted-foreground">
+              <span>{data.daily.length ? formatDayLabel(data.daily[0].day) : ""}</span>
+              <span>{data.daily.length ? formatDayLabel(data.daily[data.daily.length - 1].day) : ""}</span>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm font-medium tracking-wide uppercase">Memory by scope</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ScopeBreakdown scopeCounts={data.scopeCounts} />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm font-medium tracking-wide uppercase">Permission funnel</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <PermissionFunnel data={data} />
+          </CardContent>
+        </Card>
+
+        <Card className="lg:col-span-2">
+          <CardHeader>
+            <CardTitle className="text-sm font-medium tracking-wide uppercase">Recent activity</CardTitle>
+            <CardAction>
+              <Badge variant="secondary" className="tabular-nums">
+                avg {formatNumber(data.avgTokensPerBuild)} tok/build
+              </Badge>
+            </CardAction>
+          </CardHeader>
+          <CardContent>
+            {data.activity.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                No activity yet. Write memory or build a context pack below to populate this feed.
               </p>
-            </div>
-            <div className="trend-legend">
-              <span className="legend-primary">builds</span>
-              <span className="legend-secondary">memory</span>
-            </div>
-          </div>
-          <TrendChart daily={data.daily} />
-          <div className="trend-axis">
-            <span>{data.daily.length ? formatDayLabel(data.daily[0].day) : ""}</span>
-            <span>{data.daily.length ? formatDayLabel(data.daily[data.daily.length - 1].day) : ""}</span>
-          </div>
-        </article>
-
-        <article className="analytics-card">
-          <div className="analytics-card-head">
-            <span className="analytics-card-label">Memory by scope</span>
-          </div>
-          <ScopeBreakdown scopeCounts={data.scopeCounts} />
-        </article>
-
-        <article className="analytics-card">
-          <div className="analytics-card-head">
-            <span className="analytics-card-label">Permission funnel</span>
-          </div>
-          <PermissionFunnel data={data} />
-        </article>
-
-        <article className="analytics-card activity-card">
-          <div className="analytics-card-head">
-            <span className="analytics-card-label">Recent activity</span>
-            <span className="analytics-card-note">avg {formatNumber(data.avgTokensPerBuild)} tok/build</span>
-          </div>
-          {data.activity.length === 0 ? (
-            <p className="panel-empty">
-              No activity yet. Write memory or build a context pack below to populate this feed.
-            </p>
-          ) : (
-            <ul className="activity-feed">
-              {data.activity.map((item) => (
-                <li className="activity-item" key={`${item.kind}-${item.id}`}>
-                  <span className="activity-kind" data-kind={item.kind}>
-                    {ACTIVITY_LABEL[item.kind]}
-                  </span>
-                  <span className="activity-label" title={item.label}>
-                    {item.label || item.id}
-                  </span>
-                  <span className="activity-time">{formatRelative(item.createdAt)}</span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </article>
+            ) : (
+              <ul className="flex flex-col">
+                {data.activity.map((item) => (
+                  <li
+                    key={`${item.kind}-${item.id}`}
+                    className="grid grid-cols-[5.5rem_1fr_auto] items-center gap-3 border-t border-border py-2.5 first:border-t-0"
+                  >
+                    <Badge
+                      variant={item.kind === "context" ? "default" : "outline"}
+                      className="justify-center uppercase"
+                    >
+                      {ACTIVITY_LABEL[item.kind]}
+                    </Badge>
+                    <span className="truncate text-sm text-foreground" title={item.label}>
+                      {item.label || item.id}
+                    </span>
+                    <span className="text-xs tabular-nums text-muted-foreground">
+                      {formatRelative(item.createdAt)}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </CardContent>
+        </Card>
       </div>
     </section>
   );

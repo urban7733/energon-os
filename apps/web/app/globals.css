@@ -1,3 +1,8 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
 :root {
   color-scheme: dark;
   --bg: #111111;
@@ -12,6 +17,74 @@
   --nav-height: 56px;
   --radius: 0px;
   --font-mono: "Berkeley Mono", "SF Mono", "Cascadia Code", "IBM Plex Mono", ui-monospace, monospace;
+}
+
+/* shadcn/ui design tokens — tuned to the pure-black Energon brand. */
+:root {
+  --background: #111111;
+  --foreground: #fafafa;
+  --card: #161616;
+  --card-foreground: #f5f5f5;
+  --popover: #171717;
+  --popover-foreground: #f5f5f5;
+  --primary: #ffffff;
+  --primary-foreground: #0a0a0a;
+  --secondary: #1e1e1e;
+  --secondary-foreground: #f5f5f5;
+  --muted: #191919;
+  --muted-foreground: #8f8f8f;
+  --accent: #232323;
+  --accent-foreground: #ffffff;
+  --destructive: #ef4444;
+  --destructive-foreground: #ffffff;
+  --border: #262626;
+  --input: #2e2e2e;
+  --ring: #6b6b6b;
+  --chart-1: #ffffff;
+  --chart-2: #b4b4b4;
+  --chart-3: #7c7c7c;
+  --chart-4: #565656;
+  --chart-5: #3a3a3a;
+  --radius-dash: 0.625rem;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --font-sans: var(--font-mono);
+  --font-mono: var(--font-mono);
+  --radius-sm: calc(var(--radius-dash) - 4px);
+  --radius-md: calc(var(--radius-dash) - 2px);
+  --radius-lg: var(--radius-dash);
+  --radius-xl: calc(var(--radius-dash) + 4px);
+}
+
+@layer base {
+  * {
+    border-color: var(--border);
+  }
 }
 
 * {
@@ -230,7 +303,8 @@ h2 {
 
 .primary-action,
 .secondary-action,
-button {
+.site-shell button,
+.auth-shell button {
   display: inline-flex;
   min-height: 34px;
   align-items: center;
@@ -250,7 +324,8 @@ button {
 
 .primary-action:hover,
 .secondary-action:hover,
-button:hover {
+.site-shell button:hover,
+.auth-shell button:hover {
   border-color: var(--ink);
 }
 
@@ -903,7 +978,8 @@ button:hover {
   background: var(--line);
 }
 
-form {
+.site-shell form,
+.auth-shell form {
   display: grid;
   gap: 10px;
 }
@@ -914,7 +990,8 @@ form {
   gap: 10px;
 }
 
-label {
+.site-shell label,
+.auth-shell label {
   display: grid;
   gap: 6px;
   color: var(--muted);
@@ -923,9 +1000,12 @@ label {
   text-transform: uppercase;
 }
 
-input,
-select,
-textarea {
+.site-shell input,
+.site-shell select,
+.site-shell textarea,
+.auth-shell input,
+.auth-shell select,
+.auth-shell textarea {
   width: 100%;
   min-width: 0;
   border: 1px solid var(--line);
@@ -937,13 +1017,17 @@ textarea {
   font-size: 12px;
 }
 
-input:focus,
-select:focus,
-textarea:focus {
+.site-shell input:focus,
+.site-shell select:focus,
+.site-shell textarea:focus,
+.auth-shell input:focus,
+.auth-shell select:focus,
+.auth-shell textarea:focus {
   border-color: var(--line-strong);
 }
 
-button:disabled {
+.site-shell button:disabled,
+.auth-shell button:disabled {
   cursor: not-allowed;
   opacity: 0.45;
 }
@@ -1708,6 +1792,78 @@ pre {
 
 .status-chip-muted {
   color: var(--dim);
+}
+
+/* Tailwind/shadcn dashboard motion helpers */
+
+.dash-bar {
+  transform-origin: left center;
+  animation: grow-x 0.7s cubic-bezier(0.22, 0.61, 0.36, 1) forwards;
+}
+
+.dash-bar-hatch {
+  background-image: repeating-linear-gradient(
+    45deg,
+    var(--muted-foreground),
+    var(--muted-foreground) 3px,
+    var(--border) 3px,
+    var(--border) 6px
+  );
+}
+
+.dash-pulse {
+  animation: pulse 2.4s ease-out infinite;
+}
+
+/* Create API key button — animated sheen effect */
+.shimmer-cta {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.shimmer-cta::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background: linear-gradient(
+    120deg,
+    transparent 30%,
+    rgba(255, 255, 255, 0.35) 50%,
+    transparent 70%
+  );
+  transform: translateX(-130%);
+  animation: shimmer-sweep 2.6s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.shimmer-cta:disabled::after {
+  animation-play-state: paused;
+  opacity: 0.4;
+}
+
+@keyframes shimmer-sweep {
+  0% {
+    transform: translateX(-130%);
+  }
+  60%,
+  100% {
+    transform: translateX(230%);
+  }
+}
+
+.key-reveal {
+  animation: rise 0.45s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dash-bar,
+  .dash-pulse,
+  .shimmer-cta::after,
+  .key-reveal {
+    animation: none;
+  }
 }
 
 @media (max-width: 1180px) {
