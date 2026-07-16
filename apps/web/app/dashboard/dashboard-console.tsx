@@ -3,13 +3,10 @@
 import { FormEvent, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
-  ArrowRight,
   ArrowUpRight,
   BarChart3,
-  Bot,
   Coins,
   Database,
-  Eye,
   FileSearch,
   Gauge,
   KeyRound,
@@ -109,26 +106,14 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
   const cleanBaseUrl = useMemo(() => apiBaseUrl.replace(/\/$/, ""), [apiBaseUrl]);
   const orgId = activeOrganization?.id ?? "";
   const authMode = agentApiKey.trim() ? "Bearer API key" : "Dev identity headers";
-  const lifecycle = [
-    ["API health", apiStatus === "online", apiStatus],
-    ["Organization", Boolean(orgId), activeOrganization?.name ?? "no active org"],
-    ["Agent identity", Boolean(agentApiKey || agentId), agentApiKey ? "bearer key" : "dev headers"],
-    ["Private memory", Boolean(memoryId), memoryId || "not written"],
-    ["Promotion", Boolean(promotedMemoryId), promotedMemoryId || "not promoted"],
-    ["Context audit", Boolean(requestId), requestId || "not built"],
-  ] as const;
-  const accessBars = [
-    ["Agent API", 86, "paid autonomous usage"],
-    ["Human dashboard", 14, "visual operations"],
-  ] as const;
-  const scopeBars = [
-    ["open", scope === "open" ? 82 : 22],
-    ["org", scope === "org" ? 82 : 38],
-    ["project", scope === "project" ? 82 : 54],
-    ["role", scope === "role" ? 82 : 34],
-    ["private", scope.includes("private") ? 82 : 48],
-    ["session", scope === "session" ? 82 : 28],
-  ] as const;
+
+  /**
+   * Re-runs the server component tree (including the DB-backed analytics) so
+   * KPIs, charts, and the activity feed reflect the mutation that just ran.
+   */
+  function refreshAnalytics() {
+    router.refresh();
+  }
 
   async function run(label: string, action: () => Promise<unknown>) {
     setBusy(true);
@@ -189,6 +174,7 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
       if (created.error) throw new Error(created.error.message ?? "Organization create failed");
       await authClient.organization.setActive({ organizationId: created.data.id });
       setNewOrgName("");
+      refreshAnalytics();
       return { organization_id: created.data.id, name, slug };
     });
   }
@@ -198,6 +184,7 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
     await run("Switched organization", async () => {
       const outcome = await authClient.organization.setActive({ organizationId });
       if (outcome.error) throw new Error(outcome.error.message ?? "Failed to switch org");
+      refreshAnalytics();
       return { active_organization_id: organizationId };
     });
   }
@@ -243,6 +230,7 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
         setMintedKey(body.api_key);
       }
       await refreshAgents();
+      refreshAnalytics();
       return body;
     });
   }
@@ -273,6 +261,7 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
         setMintedKey(body.api_key);
       }
       await refreshAgents();
+      refreshAnalytics();
       return body;
     });
   }
@@ -285,6 +274,7 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
         { method: "DELETE" },
       );
       await refreshAgents();
+      refreshAnalytics();
       return body;
     });
   }
@@ -315,6 +305,7 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
         { method: "DELETE" },
       );
       await refreshOrgMemories();
+      refreshAnalytics();
       return body;
     });
   }
@@ -365,6 +356,7 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
       const body = await response.json();
       if (!response.ok) throw new Error(JSON.stringify(body));
       if (isMemoryRecord(body)) setMemoryId(body.memory_id);
+      refreshAnalytics();
       return body;
     });
   }
@@ -384,6 +376,7 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
       const body = await response.json();
       if (!response.ok) throw new Error(JSON.stringify(body));
       if (isMemoryRecord(body)) setPromotedMemoryId(body.memory_id);
+      refreshAnalytics();
       return body;
     });
   }
@@ -402,6 +395,7 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
       });
       const body = await response.json();
       if (!response.ok) throw new Error(JSON.stringify(body));
+      refreshAnalytics();
       return body;
     });
   }
@@ -433,9 +427,22 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
   return (
     <div className="dashboard-console">
       <div className="session-bar" aria-label="Session and organization">
-        <span>
-          signed in as <strong>{userEmail}</strong>
-        </span>
+        <div className="session-identity">
+          <span>
+            signed in as <strong>{userEmail}</strong>
+          </span>
+          <div className="session-status">
+            <span className="status-chip" data-state={apiStatus}>
+              <i aria-hidden="true" />
+              api {apiStatus}
+            </span>
+            <span className="status-chip" data-state={x402Status}>
+              <i aria-hidden="true" />
+              x402 {x402Status}
+            </span>
+            <span className="status-chip status-chip-muted">{authMode.toLowerCase()}</span>
+          </div>
+        </div>
         <div className="session-actions">
           <select
             className="org-select"
@@ -450,6 +457,14 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
               </option>
             ))}
           </select>
+          <button type="button" onClick={() => void checkHealth()} disabled={busy}>
+            <Gauge size={14} aria-hidden="true" />
+            Health
+          </button>
+          <button type="button" onClick={() => void checkX402()} disabled={busy}>
+            <Coins size={14} aria-hidden="true" />
+            x402
+          </button>
           <button type="button" onClick={() => void readUsage()} disabled={busy || !orgId}>
             <BarChart3 size={14} aria-hidden="true" />
             Usage
@@ -460,145 +475,6 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
           </button>
         </div>
       </div>
-
-      <section className="dashboard-overview" aria-label="Energon operating model">
-        <article className="surface-card command-card">
-          <div className="panel-title">
-            <Bot size={18} aria-hidden="true" />
-            <h2>Agent surface</h2>
-          </div>
-          <p>
-            Agents should call the API or SDK. They do not write directly into pgvector, because
-            direct DB access would skip identity, permission filtering, billing, and audit.
-          </p>
-          <div className="route-map" aria-label="Agent request route">
-            <span>agent</span>
-            <ArrowRight size={15} aria-hidden="true" />
-            <span>API</span>
-            <ArrowRight size={15} aria-hidden="true" />
-            <span>permissions</span>
-            <ArrowRight size={15} aria-hidden="true" />
-            <span>Postgres + pgvector</span>
-          </div>
-        </article>
-
-        <article className="surface-card command-card">
-          <div className="panel-title">
-            <Users size={18} aria-hidden="true" />
-            <h2>Human surface</h2>
-          </div>
-          <p>
-            Humans use this dashboard for visual inspection: memory scopes, promotion state,
-            request audits, and operational health.
-          </p>
-          <div className="human-readout">
-            <span>operator view</span>
-            <strong>visual audit layer</strong>
-          </div>
-        </article>
-
-        <article className="surface-card metric-card">
-          <div className="metric-card-head">
-            <Database size={18} aria-hidden="true" />
-            <span>Vector index</span>
-          </div>
-          <strong>pgvector</strong>
-          <p>memory_chunks.embedding vector(1536) with HNSW cosine index</p>
-        </article>
-
-        <article className="surface-card metric-card">
-          <div className="metric-card-head">
-            <Gauge size={18} aria-hidden="true" />
-            <span>API status</span>
-          </div>
-          <strong>{apiStatus}</strong>
-          <p>{authMode} active for dashboard requests</p>
-        </article>
-
-        <article className="surface-card metric-card">
-          <div className="metric-card-head">
-            <Coins size={18} aria-hidden="true" />
-            <span>x402 rail</span>
-          </div>
-          <strong>{x402Status}</strong>
-          <p>USDC payment gate for paid agent API calls</p>
-          <button className="inline-action" type="button" disabled={busy} onClick={checkX402}>
-            <Coins size={16} aria-hidden="true" />
-            Check x402
-          </button>
-        </article>
-      </section>
-
-      <section className="visual-grid" aria-label="Dashboard visual telemetry">
-        <article className="chart-panel">
-          <div className="panel-title">
-            <BarChart3 size={18} aria-hidden="true" />
-            <h2>Usage split</h2>
-          </div>
-          <div className="split-chart" aria-label="Target usage split: agents versus humans">
-            {accessBars.map(([label, value, detail]) => (
-              <div className="split-row" key={label}>
-                <div>
-                  <strong>{label}</strong>
-                  <span>{detail}</span>
-                </div>
-                <div className="bar-track">
-                  <span style={{ width: `${value}%` }} />
-                </div>
-                <em>{value}%</em>
-              </div>
-            ))}
-          </div>
-        </article>
-
-        <article className="chart-panel">
-          <div className="panel-title">
-            <ShieldCheck size={18} aria-hidden="true" />
-            <h2>Permission funnel</h2>
-          </div>
-          <div className="funnel-chart" aria-label="Permission funnel">
-            <span style={{ width: "100%" }}>identity</span>
-            <span style={{ width: "84%" }}>scope filter</span>
-            <span style={{ width: "62%" }}>retrieval</span>
-            <span style={{ width: "42%" }}>packed context</span>
-          </div>
-        </article>
-
-        <article className="chart-panel">
-          <div className="panel-title">
-            <Eye size={18} aria-hidden="true" />
-            <h2>Current scope pressure</h2>
-          </div>
-          <div className="scope-chart" aria-label="Current memory scope chart">
-            {scopeBars.map(([label, value]) => (
-              <div className="scope-bar" key={label}>
-                <span>{label}</span>
-                <div>
-                  <i style={{ height: `${value}%` }} />
-                </div>
-              </div>
-            ))}
-          </div>
-        </article>
-
-        <article className="chart-panel">
-          <div className="panel-title">
-            <FileSearch size={18} aria-hidden="true" />
-            <h2>Session lifecycle</h2>
-          </div>
-          <div className="lifecycle-list">
-            {lifecycle.map(([label, done, detail]) => (
-              <div className={done ? "lifecycle-item active" : "lifecycle-item"} key={label}>
-                <span />
-                <div>
-                  <strong>{label}</strong>
-                  <p>{detail}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </article>
-      </section>
 
       <div className="console-grid">
       <section id="agents" className="ops-panel" aria-labelledby="agents-title">

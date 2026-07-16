@@ -4,6 +4,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { auth } from "../../lib/auth";
 import { site } from "../../lib/site";
+import { DashboardAnalytics } from "./dashboard-analytics";
 import { DashboardConsole } from "./dashboard-console";
 
 export const metadata: Metadata = {
@@ -23,6 +24,8 @@ export default async function DashboardPage() {
     redirect("/login");
   }
 
+  const activeOrgId = session.session.activeOrganizationId ?? null;
+
   return (
     <main className="dashboard-shell">
       <aside className="dashboard-rail" aria-label="Dashboard navigation">
@@ -31,6 +34,7 @@ export default async function DashboardPage() {
           <span>Energon</span>
         </Link>
         <nav>
+          <a href="#overview">Overview</a>
           <a href="#agents">Agents</a>
           <a href="#org-agents">Org agents</a>
           <a href="#org-memories">Org memory</a>
@@ -47,6 +51,9 @@ export default async function DashboardPage() {
           </div>
           <p>{site.shortClaim}</p>
         </header>
+        <div id="overview">
+          <DashboardAnalytics orgId={activeOrgId} userId={session.user.id} />
+        </div>
         <DashboardConsole userEmail={session.user.email} />
       </section>
     </main>
