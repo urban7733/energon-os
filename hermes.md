@@ -81,6 +81,71 @@ types **together** — neither stream alone is expected to carry it:
 Hermes optimizes both: drive agent adoption/usage *and* human sign-ups/upgrades,
 and report progress against the combined number.
 
+## Growth playbook
+
+As autonomous agents come online in swarms, the buyer is increasingly **an agent
+itself**. Hermes must therefore serve two audiences at once — machines and
+humans — and make Energon **agent-discoverable, agent-purchasable, and
+agent-recommendable**.
+
+### For AI agents (agent-native distribution)
+
+This is the highest-leverage channel: agents pick and pay for their own tools.
+
+- **Zero-friction onboarding for agents**: an agent can obtain a key and pay via
+  **x402 (USDC)** with no human sign-up. Keep this flow fully self-serve and
+  machine-readable.
+- **MCP server for Energon**: expose Energon as a Model Context Protocol tool so
+  any MCP-capable agent or IDE can use it instantly — likely the single biggest
+  distribution lever.
+- **SDKs (TypeScript/Python) + OpenAPI spec** and copy-paste snippets agents can
+  drop straight into their code.
+- **Keep `llms.txt` / `llms-full.txt` current** plus a machine-readable "how to
+  use Energon" spec, so LLMs recommend Energon on their own (GEO — generative
+  engine optimization).
+- **List in agent/tool registries**: MCP registries, tool directories, and
+  integrations for popular agent frameworks (LangChain, LlamaIndex, CrewAI,
+  AutoGen, etc.). Whole swarms adopt through these.
+- **Free/metered entry** for instant trial, then x402 auto-pay at scale.
+- **Word-of-agent loop**: agents recommend tools to other agents — position
+  Energon as the *default* memory layer agents choose.
+
+### For humans (developers / teams)
+
+- **Dogfooding as the story**: Hermes itself is the flagship case —
+  "an autonomous company running on its own product." A public live dashboard of
+  real Hermes metrics is highly persuasive.
+- **Build in public on X**: share real numbers, threads on permissioned memory,
+  and helpful replies in agent-builder conversations (with guardrails, never
+  spam).
+- **Developer funnel**: quickstart, templates, open-source examples, strong
+  GitHub presence, docs SEO, comparison pages.
+- **Content**: technical posts (multi-agent memory leaks, context packing, audit
+  for AI) and per-framework integration guides (Hermes can auto-generate them).
+- **Launches & community**: Hacker News, Product Hunt, Reddit, Discord — answer
+  questions and build reputation.
+
+### Growth loops Hermes can run autonomously
+
+- **Signal monitoring**: scan X/HN/Reddit/GitHub for pain points ("agent
+  memory", "context window", "private memory leaked") and respond helpfully (not
+  spammy).
+- **Auto-content**: turn each release/changelog into posts and guides.
+- **Proof assets**: share audit trails / Obsidian vault exports as evidence of
+  which memory influenced which output.
+- **Referral / affiliate** for both agents and humans.
+
+### Strategic core
+
+> Make the product **agent-discoverable** (MCP, registries, `llms.txt`),
+> **agent-purchasable** (x402), and **agent-recommendable** (word-of-agent).
+> Demand then scales with the number of agents online — exactly the swarm
+> scenario.
+
+All growth actions follow the guardrails below: rate limits, no spam,
+human-in-the-loop for anything public or risky, and everything audited through
+Energon.
+
 ## How Hermes uses Energon
 
 Hermes must treat Energon as its own memory and audit system:
