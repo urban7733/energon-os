@@ -253,6 +253,38 @@ function EmptyAnalytics({ message }: { message: string }) {
   );
 }
 
+/**
+ * Rendered when an organization exists but no agent has produced real traffic
+ * yet (no memory, context builds, promotions, or usage events). The product is
+ * pre-launch, so we intentionally show nothing rather than a grid of zeros.
+ */
+function IdleAnalytics({ orgName }: { orgName: string | null }) {
+  return (
+    <section className="analytics" aria-label="Organization analytics">
+      <div className="analytics-heading">
+        <div>
+          <p className="eyebrow">Live analytics</p>
+          <h2 className="analytics-title">{orgName ?? "Organization"}</h2>
+        </div>
+        <span className="analytics-pulse analytics-pulse-idle" aria-hidden="true">
+          <i />
+          waiting for traffic
+        </span>
+      </div>
+      <div className="analytics-idle">
+        <ActivitySquare size={20} aria-hidden="true" />
+        <div>
+          <strong>No agent activity yet</strong>
+          <p>
+            Live analytics appear here automatically once agents start writing memory and building
+            context through the Energon API. Nothing is shown until there is real traffic.
+          </p>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 export async function DashboardAnalytics({
   orgId,
   userId,
@@ -272,6 +304,17 @@ export async function DashboardAnalytics({
     return (
       <EmptyAnalytics message="No analytics available for this organization yet." />
     );
+  }
+
+  const hasActivity =
+    data.memories > 0 ||
+    data.builds > 0 ||
+    data.promotions > 0 ||
+    data.usageEvents > 0 ||
+    data.packedItems > 0;
+
+  if (!hasActivity) {
+    return <IdleAnalytics orgName={data.orgName} />;
   }
 
   const buildsTotal = data.daily.reduce((sum, point) => sum + point.builds, 0);

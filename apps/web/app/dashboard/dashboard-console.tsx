@@ -70,21 +70,17 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
 
   const [apiBaseUrl, setApiBaseUrl] = useState(site.apiBaseUrl);
   const [agentApiKey, setAgentApiKey] = useState("");
-  const [agentId, setAgentId] = useState("agent_777");
-  const [roleId, setRoleId] = useState("strategist");
-  const [projectId, setProjectId] = useState("apex_verify");
+  const [agentId, setAgentId] = useState("");
+  const [roleId, setRoleId] = useState("");
+  const [projectId, setProjectId] = useState("");
   const [newOrgName, setNewOrgName] = useState("");
   const [scope, setScope] = useState<MemoryScope>("agent_private");
   const [memoryId, setMemoryId] = useState("");
   const [promotedMemoryId, setPromotedMemoryId] = useState("");
   const [promotionTargetScope, setPromotionTargetScope] = useState<SharedMemoryScope>("project");
-  const [promotionReason, setPromotionReason] = useState(
-    "Approved for shared investor positioning.",
-  );
-  const [memory, setMemory] = useState(
-    "Do not position Apex Verify as just another social app. Investor outreach should frame it as trust infrastructure.",
-  );
-  const [task, setTask] = useState("prepare investor outreach");
+  const [promotionReason, setPromotionReason] = useState("");
+  const [memory, setMemory] = useState("");
+  const [task, setTask] = useState("");
   const [requestId, setRequestId] = useState("");
   const [orgAgents, setOrgAgents] = useState<OrgAgent[]>([]);
   const [orgMemories, setOrgMemories] = useState<OrgMemory[]>([]);
@@ -512,7 +508,11 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
           <div className="form-row">
             <label>
               Agent ID
-              <input value={agentId} onChange={(event) => setAgentId(event.target.value)} />
+              <input
+                value={agentId}
+                onChange={(event) => setAgentId(event.target.value)}
+                placeholder="unique agent id"
+              />
             </label>
             <label>
               Org ID (active org)
@@ -522,14 +522,22 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
           <div className="form-row">
             <label>
               Role
-              <input value={roleId} onChange={(event) => setRoleId(event.target.value)} />
+              <input
+                value={roleId}
+                onChange={(event) => setRoleId(event.target.value)}
+                placeholder="optional"
+              />
             </label>
             <label>
               Project
-              <input value={projectId} onChange={(event) => setProjectId(event.target.value)} />
+              <input
+                value={projectId}
+                onChange={(event) => setProjectId(event.target.value)}
+                placeholder="optional"
+              />
             </label>
           </div>
-          <button type="submit" disabled={busy || !orgId}>
+          <button type="submit" disabled={busy || !orgId || !agentId.trim()}>
             <PackageCheck size={16} aria-hidden="true" />
             Create agent + API key
           </button>
@@ -680,9 +688,14 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
           </label>
           <label>
             Memory
-            <textarea value={memory} onChange={(event) => setMemory(event.target.value)} rows={5} />
+            <textarea
+              value={memory}
+              onChange={(event) => setMemory(event.target.value)}
+              rows={5}
+              placeholder="memory content to store for this agent"
+            />
           </label>
-          <button type="submit" disabled={busy}>
+          <button type="submit" disabled={busy || !memory.trim()}>
             <Send size={16} aria-hidden="true" />
             Write memory
           </button>
@@ -715,9 +728,10 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
               value={promotionReason}
               onChange={(event) => setPromotionReason(event.target.value)}
               rows={3}
+              placeholder="why this memory can be shared"
             />
           </label>
-          <button type="submit" disabled={busy || !memoryId}>
+          <button type="submit" disabled={busy || !memoryId || !promotionReason.trim()}>
             <ArrowUpRight size={16} aria-hidden="true" />
             Promote private memory
           </button>
@@ -732,9 +746,13 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
         <form onSubmit={buildContext}>
           <label>
             Task
-            <input value={task} onChange={(event) => setTask(event.target.value)} />
+            <input
+              value={task}
+              onChange={(event) => setTask(event.target.value)}
+              placeholder="task the agent needs context for"
+            />
           </label>
-          <button type="submit" disabled={busy}>
+          <button type="submit" disabled={busy || !task.trim()}>
             <ShieldCheck size={16} aria-hidden="true" />
             Build context
           </button>

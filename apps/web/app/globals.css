@@ -1342,6 +1342,47 @@ pre {
   margin: 0;
 }
 
+.analytics-idle {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  border: 1px solid var(--line);
+  background: var(--bg);
+  padding: 26px;
+}
+
+.analytics-idle svg {
+  color: var(--ink);
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.analytics-idle strong {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.analytics-idle p {
+  margin: 0;
+  max-width: 560px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.analytics-pulse-idle {
+  color: var(--dim);
+}
+
+.analytics-pulse-idle i {
+  background: var(--dim);
+  box-shadow: none;
+  animation: none;
+}
+
 /* Trend chart */
 
 .trend-legend {
