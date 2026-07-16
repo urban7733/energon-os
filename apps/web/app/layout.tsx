@@ -183,7 +183,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
   };
 
   return (
-    <html lang="en" data-scroll-behavior="smooth">
+    <html lang="en" className="dark" data-scroll-behavior="smooth">
       <body>
         <script
           type="application/ld+json"
