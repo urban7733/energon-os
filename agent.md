@@ -274,6 +274,74 @@ app. Embeddings/x402/social-login/rate-limit vars are optional. The complete,
 annotated list is in [`.env.example`](.env.example). Without `DATABASE_URL` the
 API falls back to in-memory storage (demo only).
 
+## Configuration still needed to go live (operator checklist)
+
+These are the external credentials/values a human must provide before the
+product is fully live. Set them as environment variables (local `.env`, the
+deployment environment, or — in Cursor Cloud — the **Secrets** panel). Never
+commit any of them.
+
+### 1. Secrets to generate (self-serve)
+
+```bash
+ENERGON_API_KEY_PEPPER=$(openssl rand -hex 32)   # peppers agent API-key hashes
+ENERGON_ADMIN_TOKEN=$(openssl rand -hex 32)       # bootstrap-only admin route
+BETTER_AUTH_SECRET=$(openssl rand -base64 32)     # Better Auth signing secret
+```
+
+### 2. Social login OAuth tokens (optional — email/password works without them)
+
+Each provider self-enables only when **both** its id and secret are set.
+
+- **GitHub** — create an OAuth app; callback URL
+  `${BETTER_AUTH_URL}/api/auth/callback/github` →
+  `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`.
+- **Google** — create an OAuth 2.0 client in Google Cloud; authorized redirect
+  URI `${BETTER_AUTH_URL}/api/auth/callback/google` →
+  `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`.
+- **Apple (Sign in with Apple)** — the harder one:
+  - `APPLE_CLIENT_ID` = your **Services ID** (not the App ID).
+  - `APPLE_CLIENT_SECRET` = a **signed ES256 JWT** you generate from your Apple
+    private key; it has a **max 6-month lifetime and must be rotated**.
+  - Return URL `${BETTER_AUTH_URL}/api/auth/callback/apple`.
+  - Apple requires **HTTPS** — it will not work on `localhost`; use a public
+    HTTPS domain (or a tunnel) for testing.
+  - `APPLE_APP_BUNDLE_IDENTIFIER` — only for native-app ID-token flows.
+
+### 3. OpenAI (optional)
+
+`OPENAI_API_KEY` enables embeddings (`text-embedding-3-small`) and query-time
+semantic retrieval. Without it, the API falls back to recency + keyword
+retrieval. Also required to run `energon-worker`.
+
+### 4. Crypto wallet + blockchain (x402 payments)
+
+Energon is **crypto-only**; paid agent calls settle via **x402**. Both the
+network **and** the asset are USDC on **Base** (an Ethereum L2 / EVM chain).
+
+- **Your wallet** — `ENERGON_X402_PAY_TO` = a **public receiving address you
+  control on Base** (a normal `0x…` EVM address). **Public address only — never
+  a private key, seed phrase, or wallet backup**, anywhere in the repo, env, or
+  dashboard.
+- **Which blockchain, exactly:**
+
+  | Purpose | `ENERGON_X402_NETWORK` | `ENERGON_X402_ASSET` (USDC) |
+  | --- | --- | --- |
+  | Testing (Base Sepolia testnet) | `eip155:84532` | `0x036CbD53842c5426634e7929541eC2318f3dCF7e` |
+  | Production (Base mainnet) | `eip155:8453` | `0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913` |
+
+- **Facilitator** — `ENERGON_X402_FACILITATOR_URL=https://x402.org/facilitator`
+  (supports Base Sepolia). **Mainnet** settlement typically needs a facilitator
+  **with credentials** → set `ENERGON_X402_FACILITATOR_BEARER`.
+- **Enable it** — `ENERGON_X402_ENABLED=true`. Going from testnet to mainnet is
+  just the two table values above — no code changes.
+- **Local testing without an onchain payment** —
+  `ENERGON_X402_ACCEPT_UNVERIFIED=1` accepts any non-empty `PAYMENT-SIGNATURE`.
+  **Never use this in production.**
+- Human subscription plans (Developer/Team/Enterprise) also settle in **USDC**;
+  actual checkout/treasury/orchestration lives in a **separate service**, outside
+  this memory core. See [`docs/crypto-payments.md`](docs/crypto-payments.md).
+
 ## Local development & commands
 
 Standard commands (see `README.md`, `CONTRIBUTING.md`, `package.json`, and
