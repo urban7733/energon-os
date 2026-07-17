@@ -1,4 +1,5 @@
 mod app;
+mod chain;
 mod embedding;
 mod errors;
 mod jwt;

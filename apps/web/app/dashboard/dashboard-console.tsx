@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import { authClient, fetchApiToken } from "../../lib/auth-client";
 import { site } from "../../lib/site";
+import { BillingCheckout } from "./billing-checkout";
 
 type ApiResult = {
   label: string;
@@ -601,6 +602,7 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
       </section>
 
       <div className="console-grid">
+      <BillingCheckout apiBaseUrl={cleanBaseUrl} orgId={orgId} />
       <section id="agents" className="ops-panel" aria-labelledby="agents-title">
         <div className="panel-title">
           <KeyRound size={18} aria-hidden="true" />
@@ -794,12 +796,6 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
             Scope
             <select value={scope} onChange={(event) => setScope(event.target.value as MemoryScope)}>
               <option value="agent_private">agent_private</option>
-              <option value="project">project</option>
-              <option value="org">org</option>
-              <option value="open">open</option>
-              <option value="role">role</option>
-              <option value="session">session</option>
-              <option value="user_private">user_private</option>
             </select>
           </label>
           <label>

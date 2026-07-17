@@ -2,9 +2,28 @@ use energon_core::AgentIdentity;
 use energon_db::payments::NewPaymentReceipt;
 
 use crate::{
+    errors::ApiError,
     state::{AppState, StorageBackend},
     x402::{PaidRoute, PaymentOutcome},
 };
+
+/// Use a monthly plan allowance when one is active; otherwise fall back to the
+/// x402 request-payment gate. The caller must already be authenticated so the
+/// allowance is always charged to the correct organization.
+pub async fn authorize_paid_usage(
+    state: &AppState,
+    headers: &axum::http::HeaderMap,
+    agent: &AgentIdentity,
+    route: PaidRoute,
+) -> Result<PaymentOutcome, ApiError> {
+    if let StorageBackend::Postgres(pool) = &state.storage {
+        if energon_db::billing::consume_included_operation(pool, &agent.org_id).await? {
+            return Ok(PaymentOutcome::default());
+        }
+    }
+
+    state.x402.require_payment(headers, route).await
+}
 
 /// Persist the payment receipt (when a payment settled) and a usage event for
 /// a paid-route call.

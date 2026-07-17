@@ -12,11 +12,13 @@ dashmap = "6.2.1"
 energon-core = { path = "../energon-core" }
 energon-db = { path = "../energon-db" }
 jsonwebtoken = { version = "10.4.0", features = ["rust_crypto"] }
+k256 = "0.13"
 rand = "0.8"
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
 serde.workspace = true
 serde_json.workspace = true
 sha2 = "0.10"
+sha3 = "0.10"
 sqlx.workspace = true
 thiserror.workspace = true
 tokio.workspace = true

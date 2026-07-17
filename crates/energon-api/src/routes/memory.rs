@@ -7,7 +7,7 @@ use energon_core::{
 use crate::{
     errors::ApiError,
     middleware::auth::identity_from_request,
-    payments::record_usage,
+    payments::{authorize_paid_usage, record_usage},
     state::{AppState, StorageBackend, now_unix_ms},
     x402::{PaidRoute, attach_payment_response},
 };
@@ -17,11 +17,8 @@ pub async fn write_memory(
     headers: HeaderMap,
     Json(request): Json<WriteMemoryRequest>,
 ) -> Result<Response, ApiError> {
-    let payment = state
-        .x402
-        .require_payment(&headers, PaidRoute::MemoryWrite)
-        .await?;
     let agent = identity_from_request(&state, &headers).await?;
+    let payment = authorize_paid_usage(&state, &headers, &agent, PaidRoute::MemoryWrite).await?;
     record_usage(&state, &agent, PaidRoute::MemoryWrite, &payment).await;
     let record = MemoryRecord::from_write(state.next_memory_id(), &agent, request, now_unix_ms())?;
 
@@ -45,11 +42,8 @@ pub async fn promote_memory(
     headers: HeaderMap,
     Json(request): Json<PromoteMemoryRequest>,
 ) -> Result<Response, ApiError> {
-    let payment = state
-        .x402
-        .require_payment(&headers, PaidRoute::MemoryPromote)
-        .await?;
     let agent = identity_from_request(&state, &headers).await?;
+    let payment = authorize_paid_usage(&state, &headers, &agent, PaidRoute::MemoryPromote).await?;
     record_usage(&state, &agent, PaidRoute::MemoryPromote, &payment).await;
     request.validate()?;
     let reason = request.reason.trim().to_owned();

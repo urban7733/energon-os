@@ -32,6 +32,7 @@ export default async function DashboardPage() {
         </Link>
         <nav>
           <a href="#agents">Agents</a>
+          <a href="#billing">Billing</a>
           <a href="#org-agents">Org agents</a>
           <a href="#org-memories">Org memory</a>
           <a href="#memory">Memory</a>

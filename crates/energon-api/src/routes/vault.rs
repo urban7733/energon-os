@@ -15,7 +15,7 @@ use crate::{
     errors::ApiError,
     middleware::auth::identity_from_request,
     obsidian_vault::build_obsidian_vault,
-    payments::record_usage,
+    payments::{authorize_paid_usage, record_usage},
     state::{AppState, StorageBackend},
     x402::{PaidRoute, attach_payment_response},
 };
@@ -37,11 +37,12 @@ pub async fn export_obsidian_vault(
     headers: HeaderMap,
     Query(query): Query<VaultExportQuery>,
 ) -> Result<Response, ApiError> {
-    let payment = state
-        .x402
-        .require_payment(&headers, PaidRoute::ObsidianVaultExport)
-        .await?;
     let agent = identity_from_request(&state, &headers).await?;
+    if query.user_id.is_some() || query.session_id.is_some() {
+        return Err(energon_core::EnergonError::UntrustedAccessContext.into());
+    }
+    let payment =
+        authorize_paid_usage(&state, &headers, &agent, PaidRoute::ObsidianVaultExport).await?;
     record_usage(&state, &agent, PaidRoute::ObsidianVaultExport, &payment).await;
     let limit = query.limit.unwrap_or(500).clamp(1, 5_000);
     let project_id = clean_optional(query.project_id).or_else(|| agent.project_id.clone());

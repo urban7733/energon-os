@@ -115,11 +115,12 @@ should be built as a separate service or repository. Energon should integrate
 with it through clean APIs when payment-aware agents need memory, identity,
 permissions, or audit context.
 
-The first crypto payment boundary in this repo is an x402 API gate. When enabled,
-paid agent routes return `402 Payment Required` with payment instructions before
-memory or context is delivered. Real wallet custody, private keys, treasury
-automation, accounting, and broader payment orchestration stay outside this
-memory core.
+This repository has two crypto payment boundaries. The x402 API gate lets agents
+pay per paid request; when enabled it returns `402 Payment Required` before
+memory or context is delivered. The operator dashboard also supports a direct
+Base-USDC purchase that unlocks an organization for 30 days after the API
+verifies the transfer. Real wallet custody, private keys, treasury automation,
+accounting, and recurring-debit orchestration stay outside this memory core.
 
 ## API-First Product Model
 
@@ -208,6 +209,12 @@ user_private  one user-approved context path
 session       one temporary task/session
 ```
 
+The schema reserves all seven scopes, but the current agent API only accepts
+direct `agent_private` writes. An agent must explicitly promote its own memory
+to `open`, `org`, `project`, or `role`, with an audit reason. `user_private`
+and `session` access require a separately signed capability grant and are not
+accepted from a bearer API-key request yet.
+
 Private memory never flows back into shared memory automatically. Promotion must be explicit:
 
 ```txt
@@ -281,6 +288,9 @@ DELETE /v1/orgs/{org_id}/keys/{api_key_id}
 GET    /v1/orgs/{org_id}/memories?scope=&limit=&offset=
 DELETE /v1/orgs/{org_id}/memories/{memory_id}
 GET    /v1/orgs/{org_id}/usage
+GET    /v1/orgs/{org_id}/billing
+POST   /v1/orgs/{org_id}/billing/checkout
+POST   /v1/orgs/{org_id}/billing/complete
 ```
 
 Humans sign in through the web app — Better Auth email/password, or GitHub,
@@ -291,7 +301,10 @@ dashboard mints short-lived EdDSA JWTs which the Rust API verifies against the
 Better Auth JWKS endpoint (`ENERGON_JWKS_URL`).
 
 All paid usage is crypto-only: agents pay per request through x402, and human
-plans settle in USDC. There is no fiat payment path anywhere in the platform.
+operators can buy a 30-day organization plan in USDC on Base. The server
+verifies the USDC ERC-20 transfer and wallet signature before it unlocks the
+plan's included operations. There is no fiat payment path anywhere in the
+platform.
 
 `POST /v1/admin/agents` with `x-energon-admin-token` still exists but is a
 BOOTSTRAP-ONLY escape hatch (e.g. first agent before the web app is up):
@@ -413,4 +426,5 @@ real public launch, the remaining non-code production work is:
 2. Configure backups, monitoring, and log aggregation.
 3. Run load tests against realistic memory volume.
 4. Generate public SDKs from the stabilized API.
-5. Flip x402 to Base mainnet USDC (see docs/crypto-payments.md).
+5. Configure a production Base RPC provider, receiving wallet and mainnet USDC
+   variables before enabling real payments (see docs/crypto-payments.md).

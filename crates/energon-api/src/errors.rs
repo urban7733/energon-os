@@ -38,7 +38,9 @@ impl From<EnergonError> for ApiError {
             | EnergonError::MissingUserId
             | EnergonError::MissingSessionId
             | EnergonError::InvalidPromotionSource
-            | EnergonError::InvalidPromotionTarget => ApiError::BadRequest(error.to_string()),
+            | EnergonError::InvalidPromotionTarget
+            | EnergonError::DirectSharedMemoryWriteNotAllowed
+            | EnergonError::UntrustedAccessContext => ApiError::BadRequest(error.to_string()),
             EnergonError::MemoryNotFound(_) => ApiError::NotFound(error.to_string()),
             EnergonError::PermissionDenied { .. } => ApiError::Forbidden(error.to_string()),
         }

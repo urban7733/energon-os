@@ -41,7 +41,11 @@ Energon OS
 Permission filtering happens before ranking, summarization, packing, or delivery.
 ```
 
-The API resolves the agent identity from a bearer API key. Postgres preselects candidate memories using org/project/role/owner/session constraints. The core permission engine verifies every candidate again before retrieval scoring and token packing.
+The API resolves the agent identity from a bearer API key. Postgres preselects
+candidate memories using org/project/role/owner constraints. The core
+permission engine verifies every candidate again before retrieval scoring and
+token packing. User and session overlays require a separate signed capability
+grant; an agent API key cannot claim them through request parameters.
 
 ## Storage Model
 
@@ -49,7 +53,8 @@ Shared memory is stored once. Private memory is stored as an overlay.
 
 ```txt
 open/org/project/role memory
-+ agent_private/user_private/session overlays
++ agent_private overlay (agent API today)
++ user_private/session overlays (reserved for signed capability grants)
 = dynamic context pack per agent request
 ```
 

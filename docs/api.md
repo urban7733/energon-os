@@ -67,6 +67,34 @@ For local UI testing only, `ENERGON_X402_ACCEPT_UNVERIFIED=1` accepts a non-empt
 `PAYMENT-SIGNATURE` without facilitator verification. Do not use that in
 production.
 
+## Human Plan Billing (Operator JWT)
+
+Human operators can pay the active organization plan in USDC on Base. This
+flow requires Postgres, `ENERGON_X402_PAY_TO`, and `ENERGON_BASE_RPC_URL`.
+There are no stored wallet keys and no automatic renewal.
+
+```bash
+curl http://127.0.0.1:3001/v1/orgs/$ORG_ID/billing \
+  -H "Authorization: Bearer $OPERATOR_JWT"
+```
+
+Create a 15-minute checkout intent for `developer` (99 USDC, 100k operations)
+or `team` (499 USDC, 1M operations):
+
+```bash
+curl -X POST http://127.0.0.1:3001/v1/orgs/$ORG_ID/billing/checkout \
+  -H 'content-type: application/json' \
+  -H "Authorization: Bearer $OPERATOR_JWT" \
+  -d '{"plan_id":"developer"}'
+```
+
+The response provides the Base chain, canonical USDC contract, receiving
+address, price in micro-USDC, and intent id. The dashboard transfers USDC,
+waits for a confirmation, signs the checkout message with the same payer
+wallet, then calls `POST /v1/orgs/{org_id}/billing/complete`. The API checks
+the ERC-20 `Transfer` event and the signer before unlocking the organization
+for 30 days.
+
 ## Organization Management (Operator JWT)
 
 All management routes require `Authorization: Bearer <Better Auth JWT>` whose
@@ -242,7 +270,9 @@ agents, organizations, projects, roles, sessions, memory records, context builds
 and memory promotions.
 
 The export is permission-filtered. It only includes memory visible to the
-calling identity and optional `project_id`, `user_id`, and `session_id` filters.
+calling identity and an optional `project_id` filter. `user_id` and
+`session_id` need a signed capability grant and are rejected on agent API-key
+requests.
 
 ```bash
 curl "http://127.0.0.1:3001/v1/vault/obsidian.zip?project_id=apex_verify&limit=500" \

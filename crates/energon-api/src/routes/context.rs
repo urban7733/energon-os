@@ -6,7 +6,7 @@ use crate::{
     embedding::{EmbeddingClient, vector_literal},
     errors::ApiError,
     middleware::auth::identity_from_request,
-    payments::record_usage,
+    payments::{authorize_paid_usage, record_usage},
     state::{AppState, StorageBackend, now_unix_ms},
     x402::{PaidRoute, attach_payment_response},
 };
@@ -16,11 +16,12 @@ pub async fn build_context(
     headers: HeaderMap,
     Json(request): Json<ContextBuildRequest>,
 ) -> Result<Response, ApiError> {
-    let payment = state
-        .x402
-        .require_payment(&headers, PaidRoute::ContextBuild)
-        .await?;
+    if request.user_id.is_some() || request.session_id.is_some() {
+        return Err(energon_core::EnergonError::UntrustedAccessContext.into());
+    }
+
     let agent = identity_from_request(&state, &headers).await?;
+    let payment = authorize_paid_usage(&state, &headers, &agent, PaidRoute::ContextBuild).await?;
     record_usage(&state, &agent, PaidRoute::ContextBuild, &payment).await;
 
     if let StorageBackend::Postgres(pool) = &state.storage {

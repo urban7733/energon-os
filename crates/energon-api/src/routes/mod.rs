@@ -45,4 +45,13 @@ pub fn router() -> Router<AppState> {
             delete(orgs::delete_org_memory),
         )
         .route("/orgs/{org_id}/usage", get(orgs::org_usage))
+        .route("/orgs/{org_id}/billing", get(billing::get_billing_status))
+        .route(
+            "/orgs/{org_id}/billing/checkout",
+            post(billing::create_checkout_intent),
+        )
+        .route(
+            "/orgs/{org_id}/billing/complete",
+            post(billing::complete_checkout),
+        )
 }

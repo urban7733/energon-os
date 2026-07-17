@@ -1,4 +1,5 @@
 pub mod audit;
+pub mod billing;
 pub mod errors;
 pub mod identity;
 pub mod memory;
