@@ -62,30 +62,21 @@ NEXT_PUBLIC_SITE_URL=https://energon.os
 NEXT_PUBLIC_ENERGON_API_BASE_URL=https://api.energon.os
 ```
 
-### Social login
+### GitHub login
 
-Create OAuth applications in the providers' dashboards and set the values only
-in Railway, never in Git:
+Create a GitHub OAuth application and set these values only in Railway, never
+in Git:
 
 ```txt
-GOOGLE_CLIENT_ID=
-GOOGLE_CLIENT_SECRET=
 GITHUB_CLIENT_ID=
 GITHUB_CLIENT_SECRET=
-APPLE_CLIENT_ID=
-APPLE_CLIENT_SECRET=
 ```
 
-Redirect URLs:
+Use this redirect URL:
 
 ```txt
-https://energon.os/api/auth/callback/google
 https://energon.os/api/auth/callback/github
-https://energon.os/api/auth/callback/apple
 ```
-
-Apple requires an Apple Developer account, a Services ID, HTTPS and a signed
-client-secret JWT. Google is the recommended first provider for the hackathon.
 
 ## Human USDC Plans
 

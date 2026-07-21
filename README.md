@@ -259,7 +259,7 @@ crates/energon-db     Postgres/sqlx repositories for identity, memory, and audit
 crates/energon-worker async worker for OpenAI embeddings into pgvector chunks
 migrations/           Postgres schema for identity, memory, chunks, and audit
 policies/             Cedar policy starting point
-apps/web              Next.js site + Better Auth (email/password + GitHub/Google/Apple, orgs, JWT/JWKS)
+apps/web              Next.js site + Better Auth (email/password + optional GitHub, orgs, JWT/JWKS)
 ```
 
 ## Production API
@@ -294,9 +294,8 @@ POST   /v1/orgs/{org_id}/billing/checkout
 POST   /v1/orgs/{org_id}/billing/complete
 ```
 
-Humans sign in through the web app — Better Auth email/password, or GitHub,
-Google, and Apple social login (each provider enables itself when its
-`*_CLIENT_ID`/`*_CLIENT_SECRET` env vars are set; see `.env.example`). Users
+Humans sign in through the web app with Better Auth email/password, or optional
+GitHub login when its credentials are configured (see `.env.example`). Users
 create an organization and manage agents and API keys from the dashboard. The
 dashboard mints short-lived EdDSA JWTs which the Rust API verifies against the
 Better Auth JWKS endpoint (`ENERGON_JWKS_URL`).

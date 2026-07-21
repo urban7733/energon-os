@@ -28,14 +28,10 @@ function socialProvider(
 }
 
 const githubProvider = socialProvider("GITHUB_CLIENT_ID", "GITHUB_CLIENT_SECRET");
-const googleProvider = socialProvider("GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET");
-const appleProvider = socialProvider("APPLE_CLIENT_ID", "APPLE_CLIENT_SECRET");
 
 /** Providers with configured credentials; drives the login page buttons. */
 export const enabledSocialProviders = {
   github: githubProvider !== undefined,
-  google: googleProvider !== undefined,
-  apple: appleProvider !== undefined,
 } as const;
 
 export type SocialProviderId = keyof typeof enabledSocialProviders;
@@ -48,37 +44,24 @@ export type SocialProviderId = keyof typeof enabledSocialProviders;
  *   becomes the Energon org id used by the Rust API.
  * - `jwt` plugin: EdDSA (Ed25519) tokens; the Rust API verifies them against
  *   the JWKS endpoint at `${BETTER_AUTH_URL}/api/auth/jwks`.
- * - Social providers (GitHub, Google, Apple) are enabled per provider when
- *   their client id/secret env vars are set.
+ * - GitHub login is enabled only when its client id/secret environment
+ *   variables are set.
  */
 export const auth = betterAuth({
   baseURL,
   secret: process.env.BETTER_AUTH_SECRET,
   database: new Pool({ connectionString: databaseUrl }),
-  // Apple's OAuth response is posted from appleid.apple.com.
-  trustedOrigins: appleProvider ? ["https://appleid.apple.com"] : [],
   emailAndPassword: {
     enabled: true,
     minPasswordLength: 10,
   },
   socialProviders: {
     ...(githubProvider ? { github: githubProvider } : {}),
-    ...(googleProvider ? { google: googleProvider } : {}),
-    ...(appleProvider
-      ? {
-          apple: {
-            ...appleProvider,
-            ...(process.env.APPLE_APP_BUNDLE_IDENTIFIER
-              ? { appBundleIdentifier: process.env.APPLE_APP_BUNDLE_IDENTIFIER }
-              : {}),
-          },
-        }
-      : {}),
   },
   account: {
     accountLinking: {
       enabled: true,
-      trustedProviders: ["github", "google", "apple"],
+      trustedProviders: ["github"],
     },
   },
   session: {
