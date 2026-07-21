@@ -4,6 +4,8 @@ use thiserror::Error;
 pub enum DbError {
     #[error(transparent)]
     Sqlx(#[from] sqlx::Error),
+    #[error("agent id is already registered to another organization: {0}")]
+    AgentIdAlreadyInUse(String),
     #[error("invalid memory scope in database: {0}")]
     InvalidMemoryScope(String),
     #[error("database integer is out of range for field: {0}")]

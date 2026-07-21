@@ -98,6 +98,14 @@ type ContextAudit = {
   token_budget: number;
 };
 
+type PromotionAudit = {
+  promotion_id: string;
+  source_memory_id: string;
+  promoted_memory_id: string;
+  target_scope: SharedMemoryScope;
+  reason: string;
+};
+
 export function DashboardConsole({ userEmail }: { userEmail: string }) {
   const router = useRouter();
   const { data: organizations } = authClient.useListOrganizations();
@@ -105,7 +113,7 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
 
   const [apiBaseUrl, setApiBaseUrl] = useState(site.apiBaseUrl);
   const [agentApiKey, setAgentApiKey] = useState("");
-  const [agentId, setAgentId] = useState("agent_777");
+  const [agentId, setAgentId] = useState("");
   const [roleId, setRoleId] = useState("strategist");
   const [projectId, setProjectId] = useState("apex_verify");
   const [newOrgName, setNewOrgName] = useState("");
@@ -126,6 +134,7 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
   const [memoryStats, setMemoryStats] = useState<MemoryStats | null>(null);
   const [usageSummary, setUsageSummary] = useState<UsageSummary | null>(null);
   const [contextAudit, setContextAudit] = useState<ContextAudit | null>(null);
+  const [promotionAudit, setPromotionAudit] = useState<PromotionAudit | null>(null);
   const [health, setHealth] = useState<ApiHealth | null>(null);
   const [memoryScopeFilter, setMemoryScopeFilter] = useState<"" | MemoryScope>("");
   const [mintedKey, setMintedKey] = useState<string | null>(null);
@@ -144,7 +153,8 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
 
   const cleanBaseUrl = useMemo(() => apiBaseUrl.replace(/\/$/, ""), [apiBaseUrl]);
   const orgId = activeOrganization?.id ?? "";
-  const authMode = agentApiKey.trim() ? "Bearer API key" : "Dev identity headers";
+  const hasAgentApiKey = Boolean(agentApiKey.trim());
+  const authMode = hasAgentApiKey ? "Bearer API key" : "Create or rotate an agent key";
   const lifecycle = [
     ["API health", health?.status === "ok", health?.database ?? apiStatus],
     ["Organization", Boolean(orgId), activeOrganization?.name ?? "no active org"],
@@ -270,6 +280,7 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
       setMemoryStats(null);
       setUsageSummary(null);
       setContextAudit(null);
+      setPromotionAudit(null);
       return () => {
         current = false;
       };
@@ -290,6 +301,17 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
       current = false;
     };
   }, [cleanBaseUrl, memoryScopeFilter, orgId]);
+
+  useEffect(() => {
+    if (!orgId) return;
+    setAgentId(`agent_${orgId.replace(/[^a-z0-9]/gi, "").slice(-12)}`);
+    setAgentApiKey("");
+    setMintedKey(null);
+    setMemoryId("");
+    setPromotedMemoryId("");
+    setContextAudit(null);
+    setPromotionAudit(null);
+  }, [orgId]);
 
   function requireOrg(): string {
     if (!orgId) {
@@ -326,6 +348,8 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
     await run("Switched organization", async () => {
       const outcome = await authClient.organization.setActive({ organizationId });
       if (outcome.error) throw new Error(outcome.error.message ?? "Failed to switch org");
+      setAgentApiKey("");
+      setMintedKey(null);
       return { active_organization_id: organizationId };
     });
   }
@@ -451,7 +475,7 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
     await run("Wrote memory", async () => {
       const response = await fetch(`${cleanBaseUrl}/v1/memory/write`, {
         method: "POST",
-        headers: agentRequestHeaders(agentApiKey, agentId, orgId, roleId, projectId),
+        headers: agentRequestHeaders(agentApiKey),
         body: JSON.stringify({
           scope,
           content: memory,
@@ -473,7 +497,7 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
     await run("Promoted memory", async () => {
       const response = await fetch(`${cleanBaseUrl}/v1/memory/promote`, {
         method: "POST",
-        headers: agentRequestHeaders(agentApiKey, agentId, orgId, roleId, projectId),
+        headers: agentRequestHeaders(agentApiKey),
         body: JSON.stringify({
           memory_id: memoryId,
           target_scope: promotionTargetScope,
@@ -493,7 +517,7 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
     await run("Built context", async () => {
       const response = await fetch(`${cleanBaseUrl}/v1/context/build`, {
         method: "POST",
-        headers: agentRequestHeaders(agentApiKey, agentId, orgId, roleId, projectId),
+        headers: agentRequestHeaders(agentApiKey),
         body: JSON.stringify({
           task,
           project_id: projectId,
@@ -511,12 +535,12 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
     event.preventDefault();
     await run("Read promotion audit", async () => {
       const response = await fetch(`${cleanBaseUrl}/v1/audit/promotion/${promotedMemoryId}`, {
-        headers: agentRequestHeaders(agentApiKey, agentId, orgId, roleId, projectId),
+        headers: agentRequestHeaders(agentApiKey),
       });
       const body = await response.json();
       if (!response.ok) throw new Error(JSON.stringify(body));
-      if (!isContextAudit(body)) throw new Error("Context audit response was invalid.");
-      setContextAudit(body);
+      if (!isPromotionAudit(body)) throw new Error("Promotion audit response was invalid.");
+      setPromotionAudit(body);
       await refreshUsage();
       return body;
     });
@@ -526,10 +550,12 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
     event.preventDefault();
     await run("Read audit", async () => {
       const response = await fetch(`${cleanBaseUrl}/v1/audit/context/${requestId}`, {
-        headers: agentRequestHeaders(agentApiKey, agentId, orgId, roleId, projectId),
+        headers: agentRequestHeaders(agentApiKey),
       });
       const body = await response.json();
       if (!response.ok) throw new Error(JSON.stringify(body));
+      if (!isContextAudit(body)) throw new Error("Context audit response was invalid.");
+      setContextAudit(body);
       return body;
     });
   }
@@ -780,7 +806,7 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
               <input value={projectId} onChange={(event) => setProjectId(event.target.value)} />
             </label>
           </div>
-          <button type="submit" disabled={busy || !orgId}>
+          <button type="submit" disabled={busy || !orgId || !agentId.trim()}>
             <PackageCheck size={16} aria-hidden="true" />
             Create agent + API key
           </button>
@@ -914,7 +940,7 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
               value={agentApiKey}
               onChange={(event) => setAgentApiKey(event.target.value)}
               type="password"
-              placeholder="optional: empty uses dev identity headers"
+              placeholder="created or rotated in Agent access"
             />
           </label>
           <label>
@@ -927,7 +953,7 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
             Memory
             <textarea value={memory} onChange={(event) => setMemory(event.target.value)} rows={5} />
           </label>
-          <button type="submit" disabled={busy}>
+          <button type="submit" disabled={busy || !hasAgentApiKey}>
             <Send size={16} aria-hidden="true" />
             Write memory
           </button>
@@ -962,7 +988,7 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
               rows={3}
             />
           </label>
-          <button type="submit" disabled={busy || !memoryId}>
+          <button type="submit" disabled={busy || !memoryId || !hasAgentApiKey}>
             <ArrowUpRight size={16} aria-hidden="true" />
             Promote private memory
           </button>
@@ -979,7 +1005,7 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
             Task
             <input value={task} onChange={(event) => setTask(event.target.value)} />
           </label>
-          <button type="submit" disabled={busy}>
+          <button type="submit" disabled={busy || !hasAgentApiKey}>
             <ShieldCheck size={16} aria-hidden="true" />
             Build context
           </button>
@@ -989,7 +1015,7 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
             Request ID
             <input value={requestId} onChange={(event) => setRequestId(event.target.value)} />
           </label>
-          <button type="submit" disabled={busy || !requestId}>
+          <button type="submit" disabled={busy || !requestId || !hasAgentApiKey}>
             <KeyRound size={16} aria-hidden="true" />
             Read audit
           </button>
@@ -1002,7 +1028,7 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
               onChange={(event) => setPromotedMemoryId(event.target.value)}
             />
           </label>
-          <button type="submit" disabled={busy || !promotedMemoryId}>
+          <button type="submit" disabled={busy || !promotedMemoryId || !hasAgentApiKey}>
             <FileSearch size={16} aria-hidden="true" />
             Read promotion audit
           </button>
@@ -1015,37 +1041,27 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
           <h2>{result.label}</h2>
         </div>
         <pre>{JSON.stringify(result.body, null, 2)}</pre>
+        {promotionAudit ? (
+          <p className="chart-note">
+            Latest promotion: {promotionAudit.source_memory_id} to {promotionAudit.target_scope}
+          </p>
+        ) : null}
       </section>
       </div>
     </div>
   );
 }
 
-function agentRequestHeaders(
-  apiKey: string,
-  agentId: string,
-  orgId: string,
-  roleId?: string,
-  projectId?: string,
-) {
+function agentRequestHeaders(apiKey: string) {
   const cleanApiKey = apiKey.trim();
-  if (cleanApiKey) {
-    return {
-      "content-type": "application/json",
-      Authorization: `Bearer ${cleanApiKey}`,
-    };
+  if (!cleanApiKey) {
+    throw new Error("Create or rotate an agent API key before using memory operations.");
   }
 
-  const headers: Record<string, string> = {
+  return {
     "content-type": "application/json",
-    "x-energon-agent-id": agentId,
-    "x-energon-org-id": orgId || "org_1",
+    Authorization: `Bearer ${cleanApiKey}`,
   };
-
-  if (roleId?.trim()) headers["x-energon-role-id"] = roleId.trim();
-  if (projectId?.trim()) headers["x-energon-project-id"] = projectId.trim();
-
-  return headers;
 }
 
 function isContextPack(value: unknown): value is { request_id: string } {
@@ -1149,5 +1165,22 @@ function isContextAudit(value: unknown): value is ContextAudit {
     typeof (value as { estimated_tokens: unknown }).estimated_tokens === "number" &&
     "token_budget" in value &&
     typeof (value as { token_budget: unknown }).token_budget === "number"
+  );
+}
+
+function isPromotionAudit(value: unknown): value is PromotionAudit {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "promotion_id" in value &&
+    typeof (value as { promotion_id: unknown }).promotion_id === "string" &&
+    "source_memory_id" in value &&
+    typeof (value as { source_memory_id: unknown }).source_memory_id === "string" &&
+    "promoted_memory_id" in value &&
+    typeof (value as { promoted_memory_id: unknown }).promoted_memory_id === "string" &&
+    "target_scope" in value &&
+    typeof (value as { target_scope: unknown }).target_scope === "string" &&
+    "reason" in value &&
+    typeof (value as { reason: unknown }).reason === "string"
   );
 }

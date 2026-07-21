@@ -24,7 +24,12 @@ pub enum ApiError {
 
 impl From<energon_db::DbError> for ApiError {
     fn from(error: energon_db::DbError) -> Self {
-        ApiError::Internal(format!("database error: {error}"))
+        match error {
+            energon_db::DbError::AgentIdAlreadyInUse(agent_id) => {
+                ApiError::BadRequest(format!("agent id is already registered: {agent_id}"))
+            }
+            error => ApiError::Internal(format!("database error: {error}")),
+        }
     }
 }
 
