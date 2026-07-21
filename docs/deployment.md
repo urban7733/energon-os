@@ -40,10 +40,10 @@ Do not set `ENERGON_DEV_AUTH` in production.
 
 ## 3. Worker
 
-Create another service from the same root `Dockerfile` with start command:
+Create another service from the same root `Dockerfile` and set:
 
 ```txt
-energon-worker
+ENERGON_PROCESS=energon-worker
 ```
 
 Set `DATABASE_URL`, `OPENAI_API_KEY`, `ENERGON_EMBEDDING_MODEL`, and
