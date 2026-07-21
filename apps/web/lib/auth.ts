@@ -1,3 +1,4 @@
+import { dash } from "@better-auth/infra";
 import { betterAuth } from "better-auth";
 import { nextCookies } from "better-auth/next-js";
 import { jwt, organization } from "better-auth/plugins";
@@ -28,6 +29,7 @@ function socialProvider(
 }
 
 const githubProvider = socialProvider("GITHUB_CLIENT_ID", "GITHUB_CLIENT_SECRET");
+const betterAuthInfraEnabled = Boolean(process.env.BETTER_AUTH_API_KEY?.trim());
 
 /** Providers with configured credentials; drives the login page buttons. */
 export const enabledSocialProviders = {
@@ -95,6 +97,7 @@ export const auth = betterAuth({
         }),
       },
     }),
+    ...(betterAuthInfraEnabled ? [dash()] : []),
     nextCookies(),
   ],
 });
