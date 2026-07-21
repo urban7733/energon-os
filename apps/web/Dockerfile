@@ -8,7 +8,7 @@ RUN bun install --frozen-lockfile
 FROM dependencies AS builder
 
 COPY apps/web apps/web
-RUN bun --cwd apps/web run build
+RUN bun run --cwd apps/web build
 RUN test -f /app/apps/web/.next/BUILD_ID
 
 FROM oven/bun:1.3.6 AS runtime
@@ -21,4 +21,4 @@ COPY --from=builder /app/node_modules /app/node_modules
 COPY --from=builder /app/apps/web /app/apps/web
 RUN test -f /app/apps/web/.next/BUILD_ID
 EXPOSE 3000
-CMD ["sh", "-c", "bun --cwd apps/web start"]
+CMD ["sh", "-c", "bun run --cwd apps/web start"]
