@@ -1,6 +1,5 @@
 "use client";
 
-import { sentinelClient } from "@better-auth/infra/client";
 import { organizationClient } from "better-auth/client/plugins";
 import { createAuthClient } from "better-auth/react";
 
@@ -9,7 +8,7 @@ import { createAuthClient } from "better-auth/react";
  * origin (`/api/auth/*`), so no base URL configuration is needed.
  */
 export const authClient = createAuthClient({
-  plugins: [organizationClient(), sentinelClient()],
+  plugins: [organizationClient()],
 });
 
 /**
