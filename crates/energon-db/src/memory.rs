@@ -135,6 +135,12 @@ pub struct OrgMemorySummary {
     pub created_at_unix_ms: i64,
 }
 
+#[derive(Debug, Clone)]
+pub struct OrgMemoryScopeCount {
+    pub scope: MemoryScope,
+    pub count: i64,
+}
+
 const PREVIEW_CHARS: i32 = 160;
 
 /// List org memories (metadata plus a truncated content preview) for the
@@ -185,6 +191,36 @@ pub async fn list_org_memories_page(
                 role_id: row.try_get("role_id")?,
                 owner_agent_id: row.try_get("owner_agent_id")?,
                 created_at_unix_ms: row.try_get("created_at_unix_ms")?,
+            })
+        })
+        .collect()
+}
+
+/// Count all memory entries by scope for the operator dashboard. Unlike the
+/// paginated memory list, this remains accurate for large organizations.
+pub async fn count_org_memories_by_scope(
+    pool: &PgPool,
+    org_id: &str,
+) -> Result<Vec<OrgMemoryScopeCount>, DbError> {
+    let rows = sqlx::query(
+        r#"
+        SELECT scope, count(*)::bigint AS count
+        FROM memory_entries
+        WHERE org_id = $1
+        GROUP BY scope
+        ORDER BY scope
+        "#,
+    )
+    .bind(org_id)
+    .fetch_all(pool)
+    .await?;
+
+    rows.into_iter()
+        .map(|row| {
+            let scope: String = row.try_get("scope")?;
+            Ok(OrgMemoryScopeCount {
+                scope: scope_from_str(&scope)?,
+                count: row.try_get("count")?,
             })
         })
         .collect()

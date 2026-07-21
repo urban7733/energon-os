@@ -286,6 +286,7 @@ GET    /v1/orgs/{org_id}/agents
 POST   /v1/orgs/{org_id}/agents/{agent_id}/keys
 DELETE /v1/orgs/{org_id}/keys/{api_key_id}
 GET    /v1/orgs/{org_id}/memories?scope=&limit=&offset=
+GET    /v1/orgs/{org_id}/memory-stats
 DELETE /v1/orgs/{org_id}/memories/{memory_id}
 GET    /v1/orgs/{org_id}/usage
 GET    /v1/orgs/{org_id}/billing

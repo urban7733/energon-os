@@ -40,6 +40,7 @@ pub fn router() -> Router<AppState> {
             delete(orgs::revoke_api_key),
         )
         .route("/orgs/{org_id}/memories", get(orgs::list_org_memories))
+        .route("/orgs/{org_id}/memory-stats", get(orgs::org_memory_stats))
         .route(
             "/orgs/{org_id}/memories/{memory_id}",
             delete(orgs::delete_org_memory),

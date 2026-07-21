@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   ArrowRight,
@@ -67,6 +67,37 @@ type OrgMemory = {
   created_at_unix_ms: number;
 };
 
+type ApiHealth = {
+  status: "ok" | "degraded";
+  storage: "memory" | "postgres";
+  database: "none" | "connected" | "unavailable";
+};
+
+type RouteUsage = {
+  route: string;
+  calls: number;
+  paid_calls: number;
+  amount_usdc_micro: number;
+};
+
+type UsageSummary = {
+  storage: "memory" | "postgres";
+  totals: RouteUsage[];
+};
+
+type MemoryStats = {
+  total_memories: number;
+  scopes: Array<{ scope: MemoryScope; count: number }>;
+};
+
+type ContextAudit = {
+  request_id: string;
+  allowed_memory_ids: string[];
+  denied_memory_count: number;
+  estimated_tokens: number;
+  token_budget: number;
+};
+
 export function DashboardConsole({ userEmail }: { userEmail: string }) {
   const router = useRouter();
   const { data: organizations } = authClient.useListOrganizations();
@@ -92,6 +123,10 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
   const [requestId, setRequestId] = useState("");
   const [orgAgents, setOrgAgents] = useState<OrgAgent[]>([]);
   const [orgMemories, setOrgMemories] = useState<OrgMemory[]>([]);
+  const [memoryStats, setMemoryStats] = useState<MemoryStats | null>(null);
+  const [usageSummary, setUsageSummary] = useState<UsageSummary | null>(null);
+  const [contextAudit, setContextAudit] = useState<ContextAudit | null>(null);
+  const [health, setHealth] = useState<ApiHealth | null>(null);
   const [memoryScopeFilter, setMemoryScopeFilter] = useState<"" | MemoryScope>("");
   const [mintedKey, setMintedKey] = useState<string | null>(null);
   const [result, setResult] = useState<ApiResult>({
@@ -111,25 +146,24 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
   const orgId = activeOrganization?.id ?? "";
   const authMode = agentApiKey.trim() ? "Bearer API key" : "Dev identity headers";
   const lifecycle = [
-    ["API health", apiStatus === "online", apiStatus],
+    ["API health", health?.status === "ok", health?.database ?? apiStatus],
     ["Organization", Boolean(orgId), activeOrganization?.name ?? "no active org"],
-    ["Agent identity", Boolean(agentApiKey || agentId), agentApiKey ? "bearer key" : "dev headers"],
+    ["Registered agents", orgAgents.length > 0, `${orgAgents.length} registered`],
     ["Private memory", Boolean(memoryId), memoryId || "not written"],
     ["Promotion", Boolean(promotedMemoryId), promotedMemoryId || "not promoted"],
-    ["Context audit", Boolean(requestId), requestId || "not built"],
+    ["Context audit", Boolean(contextAudit), contextAudit?.request_id ?? "not read"],
   ] as const;
-  const accessBars = [
-    ["Agent API", 86, "paid autonomous usage"],
-    ["Human dashboard", 14, "visual operations"],
-  ] as const;
-  const scopeBars = [
-    ["open", scope === "open" ? 82 : 22],
-    ["org", scope === "org" ? 82 : 38],
-    ["project", scope === "project" ? 82 : 54],
-    ["role", scope === "role" ? 82 : 34],
-    ["private", scope.includes("private") ? 82 : 48],
-    ["session", scope === "session" ? 82 : 28],
-  ] as const;
+  const usageRows = usageSummary?.totals ?? [];
+  const maxUsageCalls = Math.max(1, ...usageRows.map((entry) => entry.calls));
+  const scopeRows = memoryStats?.scopes ?? [];
+  const maxScopeCount = Math.max(1, ...scopeRows.map((entry) => entry.count));
+  const auditRows: Array<[string, number]> = contextAudit
+    ? [
+        ["allowed", contextAudit.allowed_memory_ids.length],
+        ["denied", contextAudit.denied_memory_count],
+      ]
+    : [];
+  const maxAuditCount = Math.max(1, ...auditRows.map(([, count]) => count));
 
   async function run(label: string, action: () => Promise<unknown>) {
     setBusy(true);
@@ -163,6 +197,99 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
     if (!response.ok) throw new Error(JSON.stringify(body));
     return body;
   }
+
+  async function requestHealth(): Promise<ApiHealth> {
+    const response = await fetch(`${cleanBaseUrl}/health`);
+    const body: unknown = await response.json();
+    if (!response.ok || !isApiHealth(body)) throw new Error(JSON.stringify(body));
+    return body;
+  }
+
+  async function requestX402Status(): Promise<boolean> {
+    const response = await fetch(`${cleanBaseUrl}/v1/billing/x402`);
+    const body: unknown = await response.json();
+    if (!response.ok || !isX402Status(body)) throw new Error(JSON.stringify(body));
+    return body.enabled;
+  }
+
+  async function refreshUsage() {
+    const org = requireOrg();
+    const body = await managementFetch(`/v1/orgs/${encodeURIComponent(org)}/usage`);
+    if (!isUsageSummary(body)) throw new Error("Usage response was invalid.");
+    setUsageSummary(body);
+    return body;
+  }
+
+  async function refreshMemoryStats() {
+    const org = requireOrg();
+    const body = await managementFetch(`/v1/orgs/${encodeURIComponent(org)}/memory-stats`);
+    if (!isMemoryStats(body)) throw new Error("Memory stats response was invalid.");
+    setMemoryStats(body);
+    return body;
+  }
+
+  async function refreshOperationalData() {
+    await Promise.all([refreshAgents(), refreshOrgMemories(), refreshUsage(), refreshMemoryStats()]);
+  }
+
+  useEffect(() => {
+    let current = true;
+
+    async function refreshServiceStatus() {
+      try {
+        const healthResponse = await requestHealth();
+        if (!current) return;
+        setHealth(healthResponse);
+        setApiStatus(healthResponse.status === "ok" ? "online" : "offline");
+      } catch {
+        if (!current) return;
+        setHealth(null);
+        setApiStatus("offline");
+      }
+
+      try {
+        const enabled = await requestX402Status();
+        if (current) setX402Status(enabled ? "enabled" : "disabled");
+      } catch {
+        if (current) setX402Status("offline");
+      }
+    }
+
+    void refreshServiceStatus();
+    return () => {
+      current = false;
+    };
+  }, [cleanBaseUrl]);
+
+  useEffect(() => {
+    let current = true;
+
+    if (!orgId) {
+      setOrgAgents([]);
+      setOrgMemories([]);
+      setMemoryStats(null);
+      setUsageSummary(null);
+      setContextAudit(null);
+      return () => {
+        current = false;
+      };
+    }
+
+    async function refreshOrganizationData() {
+      try {
+        await refreshOperationalData();
+      } catch {
+        // The API status tile already reports availability. Leave the last
+        // successful operator data visible while a refresh is unavailable.
+        if (!current) return;
+      }
+    }
+
+    void refreshOrganizationData();
+    return () => {
+      current = false;
+    };
+  }, [cleanBaseUrl, memoryScopeFilter, orgId]);
 
   function requireOrg(): string {
     if (!orgId) {
@@ -205,25 +332,12 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
 
   async function checkHealth(event?: FormEvent<HTMLFormElement>) {
     event?.preventDefault();
-    setBusy(true);
-    try {
-      const response = await fetch(`${cleanBaseUrl}/health`);
-      const body = await response.json();
-      if (!response.ok) throw new Error(JSON.stringify(body));
-      setApiStatus("online");
-      setResult({ label: "API health", body });
-    } catch (error) {
-      setApiStatus("offline");
-      setResult({
-        label: "API health failed",
-        body:
-          error instanceof Error
-            ? `${error.message}. Start the API on ${cleanBaseUrl}.`
-            : String(error),
-      });
-    } finally {
-      setBusy(false);
-    }
+    await run("API health", async () => {
+      const body = await requestHealth();
+      setHealth(body);
+      setApiStatus(body.status === "ok" ? "online" : "offline");
+      return body;
+    });
   }
 
   async function createAgent(event: FormEvent<HTMLFormElement>) {
@@ -243,7 +357,7 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
         setAgentApiKey(body.api_key);
         setMintedKey(body.api_key);
       }
-      await refreshAgents();
+      await refreshOperationalData();
       return body;
     });
   }
@@ -273,7 +387,7 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
         setAgentApiKey(body.api_key);
         setMintedKey(body.api_key);
       }
-      await refreshAgents();
+      await refreshOperationalData();
       return body;
     });
   }
@@ -285,7 +399,7 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
         `/v1/orgs/${encodeURIComponent(org)}/keys/${encodeURIComponent(apiKeyId)}`,
         { method: "DELETE" },
       );
-      await refreshAgents();
+      await refreshOperationalData();
       return body;
     });
   }
@@ -315,38 +429,21 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
         `/v1/orgs/${encodeURIComponent(org)}/memories/${encodeURIComponent(deleteMemoryId)}`,
         { method: "DELETE" },
       );
-      await refreshOrgMemories();
+      await Promise.all([refreshOrgMemories(), refreshMemoryStats()]);
       return body;
     });
   }
 
   async function readUsage() {
-    await run("Usage summary", async () => {
-      const org = requireOrg();
-      return managementFetch(`/v1/orgs/${encodeURIComponent(org)}/usage`);
-    });
+    await run("Refreshed live dashboard", refreshOperationalData);
   }
 
   async function checkX402() {
-    setBusy(true);
-    try {
-      const response = await fetch(`${cleanBaseUrl}/v1/billing/x402`);
-      const body = await response.json();
-      if (!response.ok) throw new Error(JSON.stringify(body));
-      setX402Status(Boolean(body.enabled) ? "enabled" : "disabled");
-      setResult({ label: "x402 status", body });
-    } catch (error) {
-      setX402Status("offline");
-      setResult({
-        label: "x402 status failed",
-        body:
-          error instanceof Error
-            ? `${error.message}. Start the API on ${cleanBaseUrl}.`
-            : String(error),
-      });
-    } finally {
-      setBusy(false);
-    }
+    await run("x402 status", async () => {
+      const enabled = await requestX402Status();
+      setX402Status(enabled ? "enabled" : "disabled");
+      return { enabled };
+    });
   }
 
   async function writeMemory(event: FormEvent<HTMLFormElement>) {
@@ -366,6 +463,7 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
       const body = await response.json();
       if (!response.ok) throw new Error(JSON.stringify(body));
       if (isMemoryRecord(body)) setMemoryId(body.memory_id);
+      await Promise.all([refreshOrgMemories(), refreshMemoryStats(), refreshUsage()]);
       return body;
     });
   }
@@ -385,6 +483,7 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
       const body = await response.json();
       if (!response.ok) throw new Error(JSON.stringify(body));
       if (isMemoryRecord(body)) setPromotedMemoryId(body.memory_id);
+      await Promise.all([refreshOrgMemories(), refreshMemoryStats(), refreshUsage()]);
       return body;
     });
   }
@@ -403,6 +502,7 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
       });
       const body = await response.json();
       if (!response.ok) throw new Error(JSON.stringify(body));
+      await refreshUsage();
       return body;
     });
   }
@@ -415,6 +515,9 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
       });
       const body = await response.json();
       if (!response.ok) throw new Error(JSON.stringify(body));
+      if (!isContextAudit(body)) throw new Error("Context audit response was invalid.");
+      setContextAudit(body);
+      await refreshUsage();
       return body;
     });
   }
@@ -452,8 +555,8 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
             ))}
           </select>
           <button type="button" onClick={() => void readUsage()} disabled={busy || !orgId}>
-            <BarChart3 size={14} aria-hidden="true" />
-            Usage
+            <RefreshCcw size={14} aria-hidden="true" />
+            Refresh data
           </button>
           <button type="button" onClick={() => void signOut()}>
             <LogOut size={14} aria-hidden="true" />
@@ -501,10 +604,10 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
         <article className="surface-card metric-card">
           <div className="metric-card-head">
             <Database size={18} aria-hidden="true" />
-            <span>Vector index</span>
+            <span>Storage</span>
           </div>
-          <strong>pgvector</strong>
-          <p>memory_chunks.embedding vector(1536) with HNSW cosine index</p>
+          <strong>{health?.storage ?? "checking"}</strong>
+          <p>{health ? `database: ${health.database}` : "Waiting for API health"}</p>
         </article>
 
         <article className="surface-card metric-card">
@@ -512,7 +615,7 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
             <Gauge size={18} aria-hidden="true" />
             <span>API status</span>
           </div>
-          <strong>{apiStatus}</strong>
+          <strong>{health?.status ?? apiStatus}</strong>
           <p>{authMode} active for dashboard requests</p>
         </article>
 
@@ -530,62 +633,84 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
         </article>
       </section>
 
-      <section className="visual-grid" aria-label="Dashboard visual telemetry">
+      <section className="visual-grid" aria-label="Live dashboard telemetry">
         <article className="chart-panel">
           <div className="panel-title">
             <BarChart3 size={18} aria-hidden="true" />
-            <h2>Usage split</h2>
+            <h2>Live API usage</h2>
           </div>
-          <div className="split-chart" aria-label="Target usage split: agents versus humans">
-            {accessBars.map(([label, value, detail]) => (
-              <div className="split-row" key={label}>
+          {usageRows.length === 0 ? (
+            <p className="chart-empty">No paid API operations recorded for this organization yet.</p>
+          ) : (
+          <div className="split-chart" aria-label="API usage by route">
+            {usageRows.map((entry) => (
+              <div className="split-row" key={entry.route}>
                 <div>
-                  <strong>{label}</strong>
-                  <span>{detail}</span>
+                  <strong>{entry.route}</strong>
+                  <span>{entry.paid_calls} paid call(s)</span>
                 </div>
                 <div className="bar-track">
-                  <span style={{ width: `${value}%` }} />
+                  <span style={{ width: `${Math.max(4, (entry.calls / maxUsageCalls) * 100)}%` }} />
                 </div>
-                <em>{value}%</em>
+                <em>{entry.calls}</em>
               </div>
             ))}
           </div>
+          )}
         </article>
 
         <article className="chart-panel">
           <div className="panel-title">
             <ShieldCheck size={18} aria-hidden="true" />
-            <h2>Permission funnel</h2>
+            <h2>Latest context audit</h2>
           </div>
-          <div className="funnel-chart" aria-label="Permission funnel">
-            <span style={{ width: "100%" }}>identity</span>
-            <span style={{ width: "84%" }}>scope filter</span>
-            <span style={{ width: "62%" }}>retrieval</span>
-            <span style={{ width: "42%" }}>packed context</span>
-          </div>
+          {contextAudit ? (
+            <>
+              <div className="funnel-chart" aria-label="Latest context audit counts">
+                {auditRows.map(([label, count]) => (
+                  <span
+                    key={label}
+                    style={{ width: `${Math.max(18, (count / maxAuditCount) * 100)}%` }}
+                  >
+                    {label}: {count}
+                  </span>
+                ))}
+              </div>
+              <p className="chart-note">
+                {contextAudit.estimated_tokens.toLocaleString()} of {contextAudit.token_budget.toLocaleString()} token budget used
+              </p>
+            </>
+          ) : (
+            <p className="chart-empty">Build context, then read its audit to inspect the live permission result.</p>
+          )}
         </article>
 
         <article className="chart-panel">
           <div className="panel-title">
             <Eye size={18} aria-hidden="true" />
-            <h2>Current scope pressure</h2>
+            <h2>Memory by scope</h2>
           </div>
-          <div className="scope-chart" aria-label="Current memory scope chart">
-            {scopeBars.map(([label, value]) => (
-              <div className="scope-bar" key={label}>
-                <span>{label}</span>
+          {scopeRows.length === 0 ? (
+            <p className="chart-empty">No memory has been stored in this organization yet.</p>
+          ) : (
+          <div className="scope-chart" aria-label="Memory counts by scope">
+            {scopeRows.map((entry) => (
+              <div className="scope-bar" key={entry.scope}>
+                <span>{entry.scope}</span>
                 <div>
-                  <i style={{ height: `${value}%` }} />
+                  <i style={{ height: `${Math.max(8, (entry.count / maxScopeCount) * 100)}%` }} />
                 </div>
+                <em>{entry.count}</em>
               </div>
             ))}
           </div>
+          )}
         </article>
 
         <article className="chart-panel">
           <div className="panel-title">
             <FileSearch size={18} aria-hidden="true" />
-            <h2>Session lifecycle</h2>
+            <h2>Workspace readiness</h2>
           </div>
           <div className="lifecycle-list">
             {lifecycle.map(([label, done, detail]) => (
@@ -965,5 +1090,64 @@ function isMemoryList(value: unknown): value is { memories: OrgMemory[] } {
     value !== null &&
     "memories" in value &&
     Array.isArray((value as { memories: unknown }).memories)
+  );
+}
+
+function isApiHealth(value: unknown): value is ApiHealth {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "status" in value &&
+    "storage" in value &&
+    "database" in value &&
+    ((value as { status: unknown }).status === "ok" ||
+      (value as { status: unknown }).status === "degraded")
+  );
+}
+
+function isX402Status(value: unknown): value is { enabled: boolean } {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "enabled" in value &&
+    typeof (value as { enabled: unknown }).enabled === "boolean"
+  );
+}
+
+function isUsageSummary(value: unknown): value is UsageSummary {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "storage" in value &&
+    "totals" in value &&
+    Array.isArray((value as { totals: unknown }).totals)
+  );
+}
+
+function isMemoryStats(value: unknown): value is MemoryStats {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "total_memories" in value &&
+    typeof (value as { total_memories: unknown }).total_memories === "number" &&
+    "scopes" in value &&
+    Array.isArray((value as { scopes: unknown }).scopes)
+  );
+}
+
+function isContextAudit(value: unknown): value is ContextAudit {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "request_id" in value &&
+    typeof (value as { request_id: unknown }).request_id === "string" &&
+    "allowed_memory_ids" in value &&
+    Array.isArray((value as { allowed_memory_ids: unknown }).allowed_memory_ids) &&
+    "denied_memory_count" in value &&
+    typeof (value as { denied_memory_count: unknown }).denied_memory_count === "number" &&
+    "estimated_tokens" in value &&
+    typeof (value as { estimated_tokens: unknown }).estimated_tokens === "number" &&
+    "token_budget" in value &&
+    typeof (value as { token_budget: unknown }).token_budget === "number"
   );
 }

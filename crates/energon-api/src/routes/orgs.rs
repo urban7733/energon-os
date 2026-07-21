@@ -250,6 +250,45 @@ pub struct ListOrgMemoriesResponse {
     pub memories: Vec<OrgMemoryResponse>,
 }
 
+#[derive(Debug, Serialize)]
+pub struct MemoryScopeCountResponse {
+    pub scope: energon_core::MemoryScope,
+    pub count: i64,
+}
+
+#[derive(Debug, Serialize)]
+pub struct OrgMemoryStatsResponse {
+    pub org_id: String,
+    pub total_memories: i64,
+    pub scopes: Vec<MemoryScopeCountResponse>,
+}
+
+/// `GET /v1/orgs/{org_id}/memory-stats` — exact memory counts by scope for
+/// an operator dashboard, without paging through the underlying records.
+pub async fn org_memory_stats(
+    State(state): State<AppState>,
+    Path(org_id): Path<String>,
+    headers: HeaderMap,
+) -> Result<Json<OrgMemoryStatsResponse>, ApiError> {
+    authorize_operator(&state, &headers, &org_id).await?;
+    let pool = postgres_pool(&state)?;
+    let scopes = energon_db::memory::count_org_memories_by_scope(pool, &org_id)
+        .await?
+        .into_iter()
+        .map(|count| MemoryScopeCountResponse {
+            scope: count.scope,
+            count: count.count,
+        })
+        .collect::<Vec<_>>();
+    let total_memories = scopes.iter().map(|count| count.count).sum();
+
+    Ok(Json(OrgMemoryStatsResponse {
+        org_id,
+        total_memories,
+        scopes,
+    }))
+}
+
 /// `GET /v1/orgs/{org_id}/memories?scope=&limit=&offset=` — metadata plus a
 /// truncated content preview.
 pub async fn list_org_memories(

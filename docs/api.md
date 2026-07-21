@@ -153,6 +153,16 @@ curl "http://127.0.0.1:3001/v1/orgs/$ORG_ID/memories?scope=org&limit=50&offset=0
   -H "Authorization: Bearer $OPERATOR_JWT"
 ```
 
+### Memory Scope Counts
+
+Returns exact organization-wide counts by memory scope for the operator
+dashboard. It does not expose memory content.
+
+```bash
+curl http://127.0.0.1:3001/v1/orgs/$ORG_ID/memory-stats \
+  -H "Authorization: Bearer $OPERATOR_JWT"
+```
+
 ### Delete a Memory
 
 Deletes the memory and its chunks (cascade).

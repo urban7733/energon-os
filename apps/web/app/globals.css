@@ -1078,6 +1078,146 @@ pre {
   background: var(--ink);
 }
 
+.split-chart,
+.funnel-chart,
+.lifecycle-list {
+  display: grid;
+  gap: 10px;
+}
+
+.split-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(64px, 0.8fr) auto;
+  align-items: center;
+  gap: 10px;
+}
+
+.split-row > div:first-child {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+
+.split-row strong,
+.split-row span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.split-row strong,
+.scope-bar em,
+.lifecycle-item strong {
+  color: var(--ink);
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.split-row span,
+.chart-note,
+.chart-empty,
+.lifecycle-item p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.funnel-chart {
+  align-items: start;
+}
+
+.funnel-chart span {
+  min-width: 88px;
+  border: 1px solid var(--line);
+  background: var(--bg);
+  color: var(--text);
+  font-size: 10px;
+  line-height: 1;
+  padding: 8px;
+}
+
+.chart-note {
+  margin-top: 12px;
+}
+
+.chart-empty {
+  min-height: 78px;
+  display: grid;
+  align-content: center;
+  line-height: 1.55;
+}
+
+.scope-chart {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(42px, 1fr));
+  align-items: end;
+  gap: 8px;
+  min-height: 130px;
+}
+
+.scope-bar {
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  gap: 6px;
+  min-width: 0;
+}
+
+.scope-bar > span,
+.scope-bar > em {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.scope-bar > span {
+  color: var(--muted);
+  font-size: 9px;
+}
+
+.scope-bar > div {
+  display: flex;
+  min-height: 88px;
+  align-items: flex-end;
+  border: 1px solid var(--line);
+  background: var(--bg);
+}
+
+.scope-bar i {
+  width: 100%;
+  min-height: 2px;
+  background: var(--ink);
+}
+
+.scope-bar em {
+  font-style: normal;
+}
+
+.lifecycle-item {
+  display: grid;
+  grid-template-columns: 8px minmax(0, 1fr);
+  align-items: start;
+  gap: 9px;
+}
+
+.lifecycle-item > span {
+  width: 8px;
+  height: 8px;
+  margin-top: 5px;
+  border: 1px solid var(--line-strong);
+  background: var(--bg);
+}
+
+.lifecycle-item.active > span {
+  border-color: var(--ink);
+  background: var(--ink);
+}
+
+.lifecycle-item p {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .auth-shell {
   display: grid;
   min-height: 100vh;
