@@ -788,7 +788,6 @@ button:hover {
 
 .thesis-section {
   padding: 56px 0;
-  border-top: 1px solid var(--line);
 }
 
 .thesis-section p {
@@ -814,6 +813,80 @@ button:hover {
   letter-spacing: 0.06em;
   text-transform: uppercase;
   padding: 6px 10px;
+}
+
+/* ── Closing scene ── */
+
+.closing-scene {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  min-height: 800px;
+  overflow: clip;
+  align-items: center;
+  background: var(--bg);
+  color: var(--ink);
+}
+
+.closing-scene-media {
+  position: absolute;
+}
+
+.closing-scene-media {
+  z-index: -2;
+  right: -9%;
+  bottom: -13%;
+  width: min(860px, 64vw);
+  aspect-ratio: 1;
+  transform-origin: center center;
+}
+
+.closing-scene-image {
+  object-fit: contain;
+  object-position: center;
+  filter: contrast(1.08) brightness(0.86) grayscale(1);
+}
+
+.closing-scene-content {
+  width: min(1220px, calc(100% - 80px));
+  margin: 0 auto;
+  padding: 140px 0;
+  z-index: 1;
+}
+
+.closing-scene-kicker,
+.closing-scene-statement {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.closing-scene-kicker {
+  margin-bottom: 18px;
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.closing-scene h2 {
+  max-width: 1100px;
+  margin: 0;
+  color: #ffffff;
+  font-family: Impact, Haettenschweiler, "Arial Narrow Bold", sans-serif;
+  font-size: 160px;
+  font-weight: 900;
+  letter-spacing: 0;
+  line-height: 0.76;
+  text-transform: uppercase;
+}
+
+.closing-scene-statement {
+  max-width: 380px;
+  margin-top: 32px;
+  color: #ffffff;
+  font-size: 14px;
+  line-height: 1.45;
 }
 
 .footer {
@@ -1484,5 +1557,44 @@ pre {
   .billing-entitlement {
     grid-template-columns: 1fr;
     gap: 6px;
+  }
+
+  .closing-scene {
+    min-height: 680px;
+  }
+
+  .closing-scene-content {
+    width: min(100% - 40px, 680px);
+    padding: 56px 0 48px;
+  }
+
+  .closing-scene-media {
+    right: 50%;
+    bottom: -9%;
+    width: 630px;
+    margin-right: -315px;
+  }
+
+  .closing-scene h2 {
+    font-size: 88px;
+    line-height: 0.82;
+  }
+
+}
+
+@media (max-width: 540px) {
+  .closing-scene {
+    min-height: 540px;
+  }
+
+  .closing-scene h2 {
+    font-size: 56px;
+    line-height: 0.88;
+  }
+
+  .closing-scene-statement {
+    max-width: 290px;
+    margin-top: 22px;
+    font-size: 12px;
   }
 }

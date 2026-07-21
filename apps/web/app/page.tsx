@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ClosingScene } from "./closing-scene";
 import { paymentRails, pricingPlans, productBoundaries, site } from "../lib/site";
 
 const platformPillars = [
@@ -308,6 +309,8 @@ export default function HomePage() {
           </div>
         </div>
       </section>
+
+      <ClosingScene />
 
       <footer className="footer">
         <div className="container footer-content">
