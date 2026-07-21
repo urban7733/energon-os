@@ -2,17 +2,17 @@ export const site = {
   name: "Energon OS",
   url: process.env.NEXT_PUBLIC_SITE_URL ?? "https://energon.os",
   description:
-    "Permissioned memory infrastructure for AI agent swarms. Energon OS gives every AI agent the right memory without leaking private memory.",
-  shortClaim: "Right memory for every agent. No private memory leaks.",
+    "Private-by-default memory for AI agent swarms. Each agent keeps its own memory until you choose what to share.",
+  shortClaim: "Every agent starts private. You choose what the swarm shares.",
   category: "AI agent memory infrastructure",
   founder: "Urban Herak",
   apiBaseUrl: process.env.NEXT_PUBLIC_ENERGON_API_BASE_URL ?? "http://127.0.0.1:3001",
   longTermGoal:
     "A complete autonomous AI-native company operated by specialized agents, built across separate services and repositories.",
   companyStackNote:
-    "Product boundary. Memory infrastructure only. Agent behavior, count, and allocation stay with developers.",
+    "Energon manages memory access. You keep control of your agents, workflows, and decisions.",
   productBoundary:
-    "We do not run agents or workflows. Developers decide what their agents do; Energon controls which saved memories each agent may use.",
+    "We do not run your agents or workflows. Energon only controls which saved memories each agent may use.",
   roadmap:
     "Energon OS uses x402 as the first crypto payment gate for paid API calls. Future autonomous-company services can expand payment orchestration in separate repos.",
   boundary:

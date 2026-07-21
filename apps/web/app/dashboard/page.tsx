@@ -31,20 +31,20 @@ export default async function DashboardPage() {
           <span>Energon</span>
         </Link>
         <nav>
-          <a href="#agents">Agents</a>
-          <a href="#billing">Billing</a>
-          <a href="#org-agents">Org agents</a>
-          <a href="#org-memories">Org memory</a>
-          <a href="#memory">Memory</a>
-          <a href="#context">Context</a>
-          <a href="#audit">Audit</a>
+          <a href="#agents">Set up</a>
+          <a href="#billing">Plan</a>
+          <a href="#org-agents">Manage agents</a>
+          <a href="#org-memories">Saved memory</a>
+          <a href="#memory">Save a note</a>
+          <a href="#context">Build context</a>
+          <a href="#audit">Activity</a>
         </nav>
       </aside>
       <section className="dashboard-main">
         <header className="dashboard-header">
           <div>
-            <p className="eyebrow">Operator dashboard</p>
-            <h1>Memory control plane</h1>
+            <p className="eyebrow">Agent memory workspace</p>
+            <h1>Keep agent memory private. Share it when it helps.</h1>
           </div>
           <p>{site.shortClaim}</p>
         </header>

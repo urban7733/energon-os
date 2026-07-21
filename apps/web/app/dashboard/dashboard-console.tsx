@@ -564,7 +564,7 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
     <div className="dashboard-console">
       <div className="session-bar" aria-label="Session and organization">
         <span>
-          signed in as <strong>{userEmail}</strong>
+          Signed in: <strong>{userEmail}</strong>
         </span>
         <div className="session-actions">
           <select
@@ -573,7 +573,7 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
             value={orgId}
             onChange={(event) => void setActiveOrganization(event.target.value)}
           >
-            <option value="">no active org</option>
+            <option value="">Choose a workspace</option>
             {(organizations ?? []).map((organization) => (
               <option key={organization.id} value={organization.id}>
                 {organization.name}
@@ -582,7 +582,7 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
           </select>
           <button type="button" onClick={() => void readUsage()} disabled={busy || !orgId}>
             <RefreshCcw size={14} aria-hidden="true" />
-            Refresh data
+            Refresh workspace
           </button>
           <button type="button" onClick={() => void signOut()}>
             <LogOut size={14} aria-hidden="true" />
@@ -595,11 +595,11 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
         <article className="surface-card command-card">
           <div className="panel-title">
             <Bot size={18} aria-hidden="true" />
-            <h2>Agent surface</h2>
+            <h2>For your agents</h2>
           </div>
           <p>
-            Agents should call the API or SDK. They do not write directly into pgvector, because
-            direct DB access would skip identity, permission filtering, billing, and audit.
+            Each agent uses its own API key and starts with private memory. Energon decides what
+            that agent is allowed to read before it receives context.
           </p>
           <div className="route-map" aria-label="Agent request route">
             <span>agent</span>
@@ -615,22 +615,21 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
         <article className="surface-card command-card">
           <div className="panel-title">
             <Users size={18} aria-hidden="true" />
-            <h2>Human surface</h2>
+            <h2>For you</h2>
           </div>
           <p>
-            Humans use this dashboard for visual inspection: memory scopes, promotion state,
-            request audits, and operational health.
+            Create agents, approve what they can share, and review every context decision in one place.
           </p>
           <div className="human-readout">
-            <span>operator view</span>
-            <strong>visual audit layer</strong>
+            <span>your control</span>
+            <strong>private first, shared by approval</strong>
           </div>
         </article>
 
         <article className="surface-card metric-card">
           <div className="metric-card-head">
             <Database size={18} aria-hidden="true" />
-            <span>Storage</span>
+            <span>Memory storage</span>
           </div>
           <strong>{health?.storage ?? "checking"}</strong>
           <p>{health ? `database: ${health.database}` : "Waiting for API health"}</p>
@@ -639,22 +638,22 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
         <article className="surface-card metric-card">
           <div className="metric-card-head">
             <Gauge size={18} aria-hidden="true" />
-            <span>API status</span>
+            <span>Connection</span>
           </div>
           <strong>{health?.status ?? apiStatus}</strong>
-          <p>{authMode} active for dashboard requests</p>
+          <p>{authMode}</p>
         </article>
 
         <article className="surface-card metric-card">
           <div className="metric-card-head">
             <Coins size={18} aria-hidden="true" />
-            <span>x402 rail</span>
+            <span>Agent payments</span>
           </div>
           <strong>{x402Status}</strong>
-          <p>USDC payment gate for paid agent API calls</p>
+          <p>USDC on Base for paid memory actions</p>
           <button className="inline-action" type="button" disabled={busy} onClick={checkX402}>
             <Coins size={16} aria-hidden="true" />
-            Check x402
+            Check payments
           </button>
         </article>
       </section>
@@ -663,10 +662,10 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
         <article className="chart-panel">
           <div className="panel-title">
             <BarChart3 size={18} aria-hidden="true" />
-            <h2>Live API usage</h2>
+            <h2>Usage</h2>
           </div>
           {usageRows.length === 0 ? (
-            <p className="chart-empty">No paid API operations recorded for this organization yet.</p>
+            <p className="chart-empty">No paid memory actions yet.</p>
           ) : (
           <div className="split-chart" aria-label="API usage by route">
             {usageRows.map((entry) => (
@@ -688,7 +687,7 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
         <article className="chart-panel">
           <div className="panel-title">
             <ShieldCheck size={18} aria-hidden="true" />
-            <h2>Latest context audit</h2>
+            <h2>Why this context?</h2>
           </div>
           {contextAudit ? (
             <>
@@ -707,17 +706,17 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
               </p>
             </>
           ) : (
-            <p className="chart-empty">Build context, then read its audit to inspect the live permission result.</p>
+            <p className="chart-empty">Build context, then view its record to see what the agent could use.</p>
           )}
         </article>
 
         <article className="chart-panel">
           <div className="panel-title">
             <Eye size={18} aria-hidden="true" />
-            <h2>Memory by scope</h2>
+            <h2>Memory sharing</h2>
           </div>
           {scopeRows.length === 0 ? (
-            <p className="chart-empty">No memory has been stored in this organization yet.</p>
+            <p className="chart-empty">No memories saved in this workspace yet.</p>
           ) : (
           <div className="scope-chart" aria-label="Memory counts by scope">
             {scopeRows.map((entry) => (
@@ -736,7 +735,7 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
         <article className="chart-panel">
           <div className="panel-title">
             <FileSearch size={18} aria-hidden="true" />
-            <h2>Workspace readiness</h2>
+            <h2>Getting started</h2>
           </div>
           <div className="lifecycle-list">
             {lifecycle.map(([label, done, detail]) => (
@@ -753,26 +752,25 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
       </section>
 
       <div className="console-grid">
-      <BillingCheckout apiBaseUrl={cleanBaseUrl} orgId={orgId} />
       <section id="agents" className="ops-panel" aria-labelledby="agents-title">
         <div className="panel-title">
           <KeyRound size={18} aria-hidden="true" />
-          <h2 id="agents-title">Agent access</h2>
+          <h2 id="agents-title">1. Set up your workspace and agent</h2>
         </div>
         <form onSubmit={checkHealth}>
           <label>
-            API base URL
+            API address
             <input value={apiBaseUrl} onChange={(event) => setApiBaseUrl(event.target.value)} />
           </label>
           <button type="submit" disabled={busy}>
             <Gauge size={16} aria-hidden="true" />
-            Check API health
+            Check connection
           </button>
         </form>
         <div className="panel-divider" />
         <form onSubmit={createOrganization}>
           <label>
-            New organization name
+            New workspace name
             <input
               value={newOrgName}
               onChange={(event) => setNewOrgName(event.target.value)}
@@ -781,53 +779,55 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
           </label>
           <button type="submit" disabled={busy || !newOrgName.trim()}>
             <Users size={16} aria-hidden="true" />
-            Create organization
+            Create workspace
           </button>
         </form>
         <div className="panel-divider" />
         <form onSubmit={createAgent}>
           <div className="form-row">
             <label>
-              Agent ID
+              Agent name and ID
               <input value={agentId} onChange={(event) => setAgentId(event.target.value)} />
             </label>
             <label>
-              Org ID (active org)
-              <input value={orgId} readOnly placeholder="create an organization first" />
+              Current workspace
+              <input value={orgId} readOnly placeholder="create a workspace first" />
             </label>
           </div>
           <div className="form-row">
             <label>
-              Role
+              Role (optional)
               <input value={roleId} onChange={(event) => setRoleId(event.target.value)} />
             </label>
             <label>
-              Project
+              Project (optional)
               <input value={projectId} onChange={(event) => setProjectId(event.target.value)} />
             </label>
           </div>
           <button type="submit" disabled={busy || !orgId || !agentId.trim()}>
             <PackageCheck size={16} aria-hidden="true" />
-            Create agent + API key
+            Create agent and API key
           </button>
         </form>
         {mintedKey ? (
           <p className="key-once">
-            API key (shown once, store it now): <br />
+            Your agent's API key. Copy it now; it is shown only once: <br />
             {mintedKey}
           </p>
         ) : null}
       </section>
 
+      <BillingCheckout apiBaseUrl={cleanBaseUrl} orgId={orgId} />
+
       <section id="org-agents" className="ops-panel" aria-labelledby="org-agents-title">
         <div className="panel-title">
           <ListChecks size={18} aria-hidden="true" />
-          <h2 id="org-agents-title">Org agents and keys</h2>
+          <h2 id="org-agents-title">2. Manage agents and keys</h2>
         </div>
         <form onSubmit={listAgents}>
           <button type="submit" disabled={busy || !orgId}>
             <RefreshCcw size={16} aria-hidden="true" />
-            List agents
+            Refresh agents
           </button>
         </form>
         {orgAgents.length > 0 ? (
@@ -877,34 +877,34 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
       <section id="org-memories" className="ops-panel wide" aria-labelledby="org-memories-title">
         <div className="panel-title">
           <Database size={18} aria-hidden="true" />
-          <h2 id="org-memories-title">Org memories</h2>
+          <h2 id="org-memories-title">Saved memory in this workspace</h2>
         </div>
         <form onSubmit={listOrgMemories}>
           <div className="form-row">
             <label>
-              Scope filter
+              Show memories
               <select
                 value={memoryScopeFilter}
                 onChange={(event) => setMemoryScopeFilter(event.target.value as "" | MemoryScope)}
               >
-                <option value="">all scopes</option>
-                <option value="open">open</option>
-                <option value="org">org</option>
-                <option value="project">project</option>
-                <option value="role">role</option>
-                <option value="agent_private">agent_private</option>
-                <option value="user_private">user_private</option>
-                <option value="session">session</option>
+                <option value="">all memories</option>
+                <option value="open">shared with everyone</option>
+                <option value="org">shared with workspace</option>
+                <option value="project">shared with project</option>
+                <option value="role">shared with role</option>
+                <option value="agent_private">private to one agent</option>
+                <option value="user_private">private to one user</option>
+                <option value="session">private to this session</option>
               </select>
             </label>
             <label>
-              Active org
+              Current workspace
               <input value={orgId} readOnly />
             </label>
           </div>
           <button type="submit" disabled={busy || !orgId}>
             <RefreshCcw size={16} aria-hidden="true" />
-            List memories
+            Refresh memory
           </button>
         </form>
         {orgMemories.length > 0 ? (
@@ -931,7 +931,7 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
       <section id="memory" className="ops-panel" aria-labelledby="memory-title">
         <div className="panel-title">
           <ShieldCheck size={18} aria-hidden="true" />
-          <h2 id="memory-title">Memory write</h2>
+          <h2 id="memory-title">3. Save a private memory</h2>
         </div>
         <form onSubmit={writeMemory}>
           <label>
@@ -940,48 +940,48 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
               value={agentApiKey}
               onChange={(event) => setAgentApiKey(event.target.value)}
               type="password"
-              placeholder="created or rotated in Agent access"
+              placeholder="created or rotated above"
             />
           </label>
           <label>
-            Scope
+            Sharing
             <select value={scope} onChange={(event) => setScope(event.target.value as MemoryScope)}>
-              <option value="agent_private">agent_private</option>
+              <option value="agent_private">private to this agent</option>
             </select>
           </label>
           <label>
-            Memory
+            Private note
             <textarea value={memory} onChange={(event) => setMemory(event.target.value)} rows={5} />
           </label>
           <button type="submit" disabled={busy || !hasAgentApiKey}>
             <Send size={16} aria-hidden="true" />
-            Write memory
+            Save private memory
           </button>
         </form>
         <div className="panel-divider" />
         <form onSubmit={promoteMemory}>
           <div className="form-row">
             <label>
-              Source memory ID
+              Private memory ID to share
               <input value={memoryId} onChange={(event) => setMemoryId(event.target.value)} />
             </label>
             <label>
-              Target scope
+              Share with
               <select
                 value={promotionTargetScope}
                 onChange={(event) =>
                   setPromotionTargetScope(event.target.value as SharedMemoryScope)
                 }
               >
-                <option value="project">project</option>
-                <option value="org">org</option>
-                <option value="role">role</option>
-                <option value="open">open</option>
+                <option value="project">this project</option>
+                <option value="org">this workspace</option>
+                <option value="role">this role</option>
+                <option value="open">everyone approved by policy</option>
               </select>
             </label>
           </div>
           <label>
-            Promotion reason
+            Why share this note?
             <textarea
               value={promotionReason}
               onChange={(event) => setPromotionReason(event.target.value)}
@@ -990,7 +990,7 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
           </label>
           <button type="submit" disabled={busy || !memoryId || !hasAgentApiKey}>
             <ArrowUpRight size={16} aria-hidden="true" />
-            Promote private memory
+            Share this memory
           </button>
         </form>
       </section>
@@ -998,31 +998,31 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
       <section id="context" className="ops-panel wide" aria-labelledby="context-title">
         <div className="panel-title">
           <Send size={18} aria-hidden="true" />
-          <h2 id="context-title">Context build</h2>
+          <h2 id="context-title">4. Build safe context for an agent</h2>
         </div>
         <form onSubmit={buildContext}>
           <label>
-            Task
+            What does the agent need to do?
             <input value={task} onChange={(event) => setTask(event.target.value)} />
           </label>
           <button type="submit" disabled={busy || !hasAgentApiKey}>
             <ShieldCheck size={16} aria-hidden="true" />
-            Build context
+            Build safe context
           </button>
         </form>
         <form onSubmit={readAudit} className="audit-form">
           <label>
-            Request ID
+            Context request ID
             <input value={requestId} onChange={(event) => setRequestId(event.target.value)} />
           </label>
           <button type="submit" disabled={busy || !requestId || !hasAgentApiKey}>
             <KeyRound size={16} aria-hidden="true" />
-            Read audit
+            Show context record
           </button>
         </form>
         <form onSubmit={readPromotionAudit} className="audit-form">
           <label>
-            Promoted memory ID
+            Shared memory ID
             <input
               value={promotedMemoryId}
               onChange={(event) => setPromotedMemoryId(event.target.value)}
@@ -1030,7 +1030,7 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
           </label>
           <button type="submit" disabled={busy || !promotedMemoryId || !hasAgentApiKey}>
             <FileSearch size={16} aria-hidden="true" />
-            Read promotion audit
+            Show sharing record
           </button>
         </form>
       </section>
@@ -1038,7 +1038,7 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
       <section id="audit" className="result-panel" aria-live="polite" aria-label="API result">
         <div className="panel-title">
           <ShieldCheck size={18} aria-hidden="true" />
-          <h2>{result.label}</h2>
+          <h2>Recent activity: {result.label}</h2>
         </div>
         <pre>{JSON.stringify(result.body, null, 2)}</pre>
         {promotionAudit ? (

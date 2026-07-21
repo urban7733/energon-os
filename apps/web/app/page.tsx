@@ -2,16 +2,16 @@ import Link from "next/link";
 import { paymentRails, pricingPlans, productBoundaries, site } from "../lib/site";
 
 const platformPillars = [
-  ["Remember", "Save useful project knowledge once instead of repeating it in every prompt."],
-  ["Control", "Choose which agents can use each memory: private, project, role, or organization."],
-  ["Prove", "Every context build records what was included and what was denied."],
+  ["Private first", "Every agent starts with its own separate memory."],
+  ["Share on purpose", "Choose exactly which project, role, or workspace may use an approved memory."],
+  ["Always explainable", "Every context build records what was included and what stayed private."],
 ] as const;
 
 const flowSteps = [
-  ["01", "Save a fact", "an agent writes a useful note about its work"],
-  ["02", "Set access", "keep it private or share it with the right team"],
-  ["03", "Ask for context", "an agent requests what it needs for a task"],
-  ["04", "Get safe context", "Energon returns only allowed memory and an audit trail"],
+  ["01", "Keep it private", "an agent saves a note that only it can use"],
+  ["02", "Share with approval", "you choose whether a project, role, or workspace may use it"],
+  ["03", "Ask for context", "an agent requests help for one task"],
+  ["04", "Receive only what is allowed", "Energon returns the right notes and records the decision"],
 ] as const;
 
 const products = [
@@ -24,9 +24,9 @@ const products = [
 ] as const;
 
 const stats = [
-  ["1", "memory API for every agent"],
-  ["4", "steps from fact to context"],
-  ["100%", "auditable context builds"],
+  ["Private", "memory starts separate for every agent"],
+  ["Shared", "only after your approval"],
+  ["Audited", "every context decision is recorded"],
 ] as const;
 
 const scopes = [
@@ -86,12 +86,12 @@ export default function HomePage() {
       <div className="hero-wrap">
         <div className="container hero">
           <Link className="crumb" href="#boundary">
-            &lt; SAFE MEMORY FOR AI AGENTS
+            &lt; PRIVATE MEMORY FOR AI AGENT SWARMS
           </Link>
-          <h1 id="hero-title">Give every AI agent the context it needs. Nothing it should not see.</h1>
+          <h1 id="hero-title">Every AI agent keeps its own memory. Share only what your swarm needs.</h1>
           <p className="hero-lede">
-            Energon is a shared memory service for AI agents. Save a useful fact once, choose who
-            may use it, and return a small, auditable context pack for every task.
+            Energon gives every agent private memory by default. When a note becomes useful to
+            other agents, you approve exactly who can use it: one role, one project, or your whole workspace.
           </p>
           <div className="hero-actions">
             <Link className="primary-action" href="/dashboard">
@@ -106,7 +106,7 @@ export default function HomePage() {
 
           <div className="frame" aria-label="Context build pipeline">
             <div className="frame-header">
-              From one saved fact to safe context in four steps.
+              Keep each agent's memory separate, then share only what helps the swarm.
             </div>
             <div className="frame-body">
               <div className="flow-grid">
@@ -128,7 +128,7 @@ export default function HomePage() {
             </div>
           </div>
 
-          <p className="hero-boundary">Your agents stay in your own app. Energon only stores and returns permitted memory.</p>
+          <p className="hero-boundary">Your agents stay in your own app. Energon only returns memory they are allowed to see.</p>
         </div>
       </div>
 
@@ -154,8 +154,8 @@ export default function HomePage() {
         <div className="container">
           <div className="section-heading">
             <p className="eyebrow">What Energon does</p>
-            <h2>Your agents stay yours. Their useful memory becomes safe and reusable.</h2>
-            <p>Energon does not run your agents or workflows. It gives them a reliable shared memory layer with clear access rules.</p>
+            <h2>Your agents stay yours. Their private memory stays separate until you decide to share it.</h2>
+            <p>Energon does not run your agents or workflows. It gives them safe memory access with clear sharing rules.</p>
           </div>
           <div className="frame">
             <div className="frame-header">{site.companyStackNote}</div>
@@ -179,10 +179,10 @@ export default function HomePage() {
         <div className="container">
           <div className="section-heading">
             <p id="how-it-works" className="eyebrow">What is inside</p>
-            <h2>Everything an agent needs to remember safely across tasks.</h2>
+            <h2>Private memory for each agent. Shared memory for the right group.</h2>
             <p>
-              Start private. Share intentionally. Ask for context when an agent needs to work.
-              Inspect the audit trail when you need to know why a memory was used.
+              Start with separate memory for every agent. Share an approved note only with the
+              agents that need it. Inspect the record whenever you want to know why a note was used.
             </p>
           </div>
           <div className="product-grid">
@@ -200,10 +200,10 @@ export default function HomePage() {
         <div className="container api-section">
           <div>
             <p className="eyebrow">Developer platform</p>
-            <h2>One API call gives an agent the right context for its task.</h2>
+            <h2>One API call gives an agent only the memory it may use for a task.</h2>
             <p className="hero-lede">
-              Connect any agent with an API key. It writes memory, asks for a context pack, and
-              receives only the information you allow it to use.
+              Connect an agent with its own API key. It writes private memory, asks for a context
+              pack, and receives only the information you approved for it.
             </p>
             <div className="hero-actions">
               <Link className="primary-action" href="/dashboard">

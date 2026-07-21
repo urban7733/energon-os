@@ -159,25 +159,25 @@ export function BillingCheckout({ apiBaseUrl, orgId }: { apiBaseUrl: string; org
     <section id="billing" className="ops-panel wide" aria-labelledby="billing-title">
       <div className="panel-title">
         <CreditCard size={18} aria-hidden="true" />
-        <h2 id="billing-title">Plan billing</h2>
+        <h2 id="billing-title">Unlock a workspace plan</h2>
       </div>
       <p className="billing-copy">
-        Pay in USDC on Base. A confirmed transfer unlocks the active organization for 30 days.
+        Pay in USDC on Base to give this workspace included memory operations for 30 days.
       </p>
 
       {entitlement ? (
         <div className="billing-entitlement">
-          <span>active plan</span>
+          <span>current plan</span>
           <strong>{entitlement.plan_id}</strong>
           <span>
-            {entitlement.remaining_operations.toLocaleString()} of {entitlement.included_operations.toLocaleString()} operations remaining
+            {entitlement.remaining_operations.toLocaleString()} of {entitlement.included_operations.toLocaleString()} memory operations remaining
           </span>
           <span>renews manually after {new Date(entitlement.expires_at_unix_ms).toLocaleDateString()}</span>
         </div>
       ) : null}
 
       {!status?.configured ? (
-        <p className="billing-state">Base checkout is not configured for this environment yet.</p>
+        <p className="billing-state">Payments are not configured for this workspace yet.</p>
       ) : (
         <div className="billing-plans">
           {plans.map((plan) => (
