@@ -70,6 +70,12 @@ export const auth = betterAuth({
       maxAge: 60 * 5,
     },
   },
+  advanced: {
+    // Railway sets this single, edge-controlled client IP header.
+    ipAddress: {
+      ipAddressHeaders: ["x-real-ip"],
+    },
+  },
   plugins: [
     organization(),
     jwt({
