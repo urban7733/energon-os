@@ -315,6 +315,7 @@ GET    /v1/orgs/{org_id}/memory-stats
 DELETE /v1/orgs/{org_id}/memories/{memory_id}
 GET    /v1/orgs/{org_id}/usage
 GET    /v1/orgs/{org_id}/events/outbox
+GET    /v1/orgs/{org_id}/vault/obsidian.zip
 GET    /v1/orgs/{org_id}/role-policies
 PUT    /v1/orgs/{org_id}/role-policies/{role_id}
 GET    /v1/orgs/{org_id}/conflicts
@@ -359,14 +360,17 @@ low-level self-hosting contract is in [docs/api.md](docs/api.md).
 
 Humans can inspect agent memory as a real Obsidian-compatible vault. The API
 exports permission-filtered Markdown notes for agents, organizations, projects,
-roles, sessions, memories, context builds, and promotions. Notes use YAML
-frontmatter and Obsidian `[[wikilinks]]`, so Obsidian's graph view shows who
-wrote what, where it belongs, which context builds used it, and how private
-memory was promoted.
+roles, sessions, memories, context builds, and promotions. The operator export
+adds structured claims, conflict branches, and the hash-linked audit ledger.
+Notes use YAML frontmatter and Obsidian `[[wikilinks]]`, so Obsidian's graph
+view shows who wrote what, where it belongs, which context builds used it, and
+how private memory was promoted.
 
 The vault is a read-only human view. Energon OS remains the source of truth for
 permissions, Postgres storage, pgvector retrieval, and audit logs. The export
-must never bypass identity or permission filtering.
+must never bypass identity or permission filtering. In the operator-wide vault,
+private memory content is redacted while the node remains visible for graph
+inspection.
 
 ## Local Development
 

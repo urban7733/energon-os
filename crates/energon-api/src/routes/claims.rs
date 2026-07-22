@@ -66,6 +66,14 @@ pub async fn assert_claim(
             "evidence_memory_ids cannot contain more than 100 entries".to_owned(),
         ));
     }
+    let value_size = serde_json::to_vec(&request.value)
+        .map_err(|error| ApiError::BadRequest(format!("claim value is invalid JSON: {error}")))?
+        .len();
+    if value_size > 65_536 {
+        return Err(ApiError::BadRequest(
+            "claim value must not exceed 65536 bytes".to_owned(),
+        ));
+    }
 
     let payment = authorize_paid_usage(&state, &headers, &agent, PaidRoute::ClaimAssert).await?;
     record_usage(&state, &agent, PaidRoute::ClaimAssert, &payment).await;

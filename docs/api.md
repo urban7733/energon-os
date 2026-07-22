@@ -396,3 +396,22 @@ curl "http://127.0.0.1:3001/v1/vault/obsidian.zip?project_id=apex_verify&limit=5
 ```
 
 Open the extracted folder in Obsidian to use the native graph view.
+
+## Export Operator Obsidian Vault
+
+An authenticated operator can export a bounded, read-only organization graph.
+It includes memory nodes, context and promotion audits, structured claims,
+conflict branches, and the hash-linked decision ledger. Private agent, user,
+and session memory stays visible as a graph node but its Markdown content is
+redacted. The export never writes to Energon OS and requires Postgres.
+
+```bash
+curl "http://127.0.0.1:3001/v1/orgs/$ORG_ID/vault/obsidian.zip?limit=500" \
+  -H "Authorization: Bearer $OPERATOR_JWT" \
+  -o energon-operator-vault.zip
+```
+
+The dashboard's **Export graph** control invokes this same JWT-protected route.
+The route defaults to 500 nodes per collection and caps at 1,000; exported
+text fields are clipped to 64 KiB, so graph inspection cannot become a bulk
+database dump.

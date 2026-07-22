@@ -52,6 +52,10 @@ pub fn router() -> Router<AppState> {
         .route("/orgs/{org_id}/usage", get(orgs::org_usage))
         .route("/orgs/{org_id}/events/outbox", get(orgs::org_outbox_status))
         .route(
+            "/orgs/{org_id}/vault/obsidian.zip",
+            get(vault::export_org_obsidian_vault),
+        )
+        .route(
             "/orgs/{org_id}/role-policies",
             get(orgs::list_role_policies),
         )

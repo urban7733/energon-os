@@ -68,6 +68,18 @@ pub struct ClaimAssertion {
     pub conflict: Option<ClaimConflict>,
 }
 
+#[derive(Debug, Clone)]
+pub struct AuditChainEvent {
+    pub sequence: i64,
+    pub event_id: String,
+    pub event_type: String,
+    pub actor_agent_id: Option<String>,
+    pub payload: Value,
+    pub previous_hash: Option<String>,
+    pub event_hash: String,
+    pub created_at_unix_ms: i64,
+}
+
 pub async fn set_role_policy(
     pool: &PgPool,
     org_id: &str,
@@ -325,6 +337,78 @@ pub async fn list_conflicts(
     .await?;
 
     rows.into_iter().map(conflict_from_row).collect()
+}
+
+/// The operator vault includes the recorded claim candidates, including
+/// superseded branches, so an offline graph can explain a later decision.
+pub async fn list_claims_for_org(
+    pool: &PgPool,
+    org_id: &str,
+    limit: i64,
+) -> Result<Vec<ClaimRecord>, DbError> {
+    let rows = sqlx::query(
+        r#"
+        SELECT
+            claim_id, org_id, subject, predicate, value, confidence_bps,
+            authority_bps, score, asserted_by_agent_id, evidence_memory_ids,
+            state, conflict_id,
+            floor(extract(epoch from created_at) * 1000)::bigint AS created_at_unix_ms
+        FROM memory_claims
+        WHERE org_id = $1
+        ORDER BY created_at DESC
+        LIMIT $2
+        "#,
+    )
+    .bind(org_id)
+    .bind(limit.clamp(1, 5_000))
+    .fetch_all(pool)
+    .await?;
+
+    rows.into_iter().map(claim_from_row).collect()
+}
+
+/// Hash-linked audit events, ordered from the first event to the latest so an
+/// exported Obsidian vault can reproduce the visible decision path.
+pub async fn list_audit_chain_events(
+    pool: &PgPool,
+    org_id: &str,
+    limit: i64,
+) -> Result<Vec<AuditChainEvent>, DbError> {
+    let rows = sqlx::query(
+        r#"
+        SELECT
+            sequence,
+            event_id,
+            event_type,
+            actor_agent_id,
+            payload,
+            previous_hash,
+            event_hash,
+            floor(extract(epoch from created_at) * 1000)::bigint AS created_at_unix_ms
+        FROM (
+            SELECT
+                sequence,
+                event_id,
+                event_type,
+                actor_agent_id,
+                payload,
+                previous_hash,
+                event_hash,
+                created_at
+            FROM audit_chain_events
+            WHERE org_id = $1
+            ORDER BY sequence DESC
+            LIMIT $2
+        ) AS recent_events
+        ORDER BY sequence ASC
+        "#,
+    )
+    .bind(org_id)
+    .bind(limit.clamp(1, 5_000))
+    .fetch_all(pool)
+    .await?;
+
+    rows.into_iter().map(audit_chain_event_from_row).collect()
 }
 
 pub async fn resolve_conflict(
@@ -719,6 +803,19 @@ fn conflict_from_row(row: sqlx::postgres::PgRow) -> Result<ClaimConflict, DbErro
         resolved_by_user_id: row.try_get("resolved_by_user_id")?,
         created_at_unix_ms: row.try_get("created_at_unix_ms")?,
         resolved_at_unix_ms: row.try_get("resolved_at_unix_ms")?,
+    })
+}
+
+fn audit_chain_event_from_row(row: sqlx::postgres::PgRow) -> Result<AuditChainEvent, DbError> {
+    Ok(AuditChainEvent {
+        sequence: row.try_get("sequence")?,
+        event_id: row.try_get("event_id")?,
+        event_type: row.try_get("event_type")?,
+        actor_agent_id: row.try_get("actor_agent_id")?,
+        payload: row.try_get("payload")?,
+        previous_hash: row.try_get("previous_hash")?,
+        event_hash: row.try_get("event_hash")?,
+        created_at_unix_ms: row.try_get("created_at_unix_ms")?,
     })
 }
 

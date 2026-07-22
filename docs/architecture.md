@@ -157,3 +157,12 @@ not on the current request path. They should be introduced only after measured
 workload data identifies a real bottleneck; at one million daily operations,
 the average request rate is roughly 12 per second, where durable Postgres plus
 JetStream is the appropriate operational baseline.
+
+## Read-Only Operator Graph
+
+Operators can export a bounded Obsidian ZIP for offline inspection. The export
+contains Markdown nodes with YAML frontmatter and wikilinks for memory,
+context, promotions, claims, conflicts, and the audit hash chain. It is a
+read-only projection created through authenticated API queries, never a
+database replica. Private memory is represented for graph continuity but its
+content is redacted from the organization-wide export.

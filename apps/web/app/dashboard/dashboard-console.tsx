@@ -8,6 +8,7 @@ import {
   Bot,
   Coins,
   Database,
+  Download,
   FileSearch,
   Gauge,
   GitFork,
@@ -583,6 +584,32 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
     });
   }
 
+  async function downloadOperatorVault() {
+    await run("Downloaded operator vault", async () => {
+      const org = requireOrg();
+      const token = await fetchApiToken();
+      const response = await fetch(
+        `${cleanBaseUrl}/v1/orgs/${encodeURIComponent(org)}/vault/obsidian.zip`,
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+      if (!response.ok) {
+        throw new Error(await response.text());
+      }
+      const filename = response.headers
+        .get("content-disposition")
+        ?.match(/filename="([^"]+)"/)?.[1] ?? "energon-operator-vault.zip";
+      const objectUrl = URL.createObjectURL(await response.blob());
+      const link = document.createElement("a");
+      link.href = objectUrl;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(objectUrl), 0);
+      return { filename };
+    });
+  }
+
   async function writeMemory(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     await run("Wrote memory", async () => {
@@ -699,6 +726,10 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
           <button type="button" onClick={() => void readUsage()} disabled={busy || !orgId}>
             <RefreshCcw size={14} aria-hidden="true" />
             Refresh workspace
+          </button>
+          <button type="button" onClick={() => void downloadOperatorVault()} disabled={busy || !orgId}>
+            <Download size={14} aria-hidden="true" />
+            Export graph
           </button>
           <button type="button" onClick={() => void signOut()}>
             <LogOut size={14} aria-hidden="true" />
