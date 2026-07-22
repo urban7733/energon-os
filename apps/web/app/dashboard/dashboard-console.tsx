@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import {
   ArrowRight,
@@ -27,6 +28,11 @@ import { authClient, fetchApiToken } from "../../lib/auth-client";
 import { site } from "../../lib/site";
 import { AnalyticsDeck } from "../../components/dashboard/analytics-deck";
 import { BillingCheckout } from "./billing-checkout";
+
+const MemoryAtlas = dynamic(() => import("../../components/dashboard/memory-atlas"), {
+  ssr: false,
+  loading: () => <div className="memory-atlas-loading" aria-label="Loading Memory Atlas" />,
+});
 
 type ApiResult = {
   label: string;
@@ -544,7 +550,7 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
 
   async function refreshOrgMemories() {
     const org = requireOrg();
-    const query = new URLSearchParams({ limit: "50", offset: "0" });
+    const query = new URLSearchParams({ limit: "120", offset: "0" });
     if (memoryScopeFilter) query.set("scope", memoryScopeFilter);
     const body = await managementFetch(
       `/v1/orgs/${encodeURIComponent(org)}/memories?${query.toString()}`,
@@ -804,6 +810,15 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
           </button>
         </article>
       </section>
+
+      <MemoryAtlas
+        organizationName={activeOrganization?.name ?? "Active workspace"}
+        agents={orgAgents}
+        memories={orgMemories}
+        totalMemories={memoryStats?.total_memories ?? 0}
+        rolePolicies={rolePolicies}
+        conflicts={claimConflicts}
+      />
 
       <AnalyticsDeck
         usage={usageRows}

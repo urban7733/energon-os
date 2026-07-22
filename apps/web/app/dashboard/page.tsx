@@ -31,6 +31,7 @@ export default async function DashboardPage() {
           <span>Energon</span>
         </Link>
         <nav>
+          <a href="#atlas">Memory Atlas</a>
           <a href="#overview">Analytics</a>
           <a href="#agents">Set up</a>
           <a href="#org-agents">Agents and keys</a>
