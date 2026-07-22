@@ -828,25 +828,6 @@ button:hover {
   color: var(--ink);
 }
 
-.closing-scene-media {
-  position: absolute;
-}
-
-.closing-scene-media {
-  z-index: -2;
-  right: -9%;
-  bottom: -13%;
-  width: min(860px, 64vw);
-  aspect-ratio: 1;
-  transform-origin: center center;
-}
-
-.closing-scene-image {
-  object-fit: contain;
-  object-position: center;
-  filter: contrast(1.08) brightness(0.86) grayscale(1);
-}
-
 .closing-scene-content {
   width: min(1220px, calc(100% - 80px));
   margin: 0 auto;
@@ -2420,13 +2401,6 @@ pre {
   .closing-scene-content {
     width: min(100% - 40px, 680px);
     padding: 56px 0 48px;
-  }
-
-  .closing-scene-media {
-    right: 50%;
-    bottom: -9%;
-    width: 630px;
-    margin-right: -315px;
   }
 
   .closing-scene h2 {

@@ -1,13 +1,11 @@
 "use client";
 
-import Image from "next/image";
 import { useLayoutEffect, useRef } from "react";
 import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 
 export function ClosingScene() {
   const sectionRef = useRef<HTMLElement>(null);
-  const imageRef = useRef<HTMLDivElement>(null);
   const eyebrowRef = useRef<HTMLParagraphElement>(null);
   const titleRef = useRef<HTMLHeadingElement>(null);
   const statementRef = useRef<HTMLParagraphElement>(null);
@@ -20,19 +18,6 @@ export function ClosingScene() {
     gsap.registerPlugin(ScrollTrigger);
 
     const context = gsap.context(() => {
-      gsap.to(imageRef.current, {
-        scale: 1.04,
-        yPercent: -14,
-        ease: "none",
-        scrollTrigger: {
-          trigger: sectionRef.current,
-          start: "top bottom",
-          end: "bottom top",
-          scrub: 1.25,
-          invalidateOnRefresh: true,
-        },
-      });
-
       gsap
         .timeline({
           scrollTrigger: {
@@ -68,16 +53,6 @@ export function ClosingScene() {
 
   return (
     <section className="closing-scene" ref={sectionRef} aria-labelledby="closing-scene-title">
-      <div className="closing-scene-media" ref={imageRef} aria-hidden="true">
-        <Image
-          className="closing-scene-image"
-          src="/energonospic.png"
-          alt=""
-          fill
-          sizes="100vw"
-          quality={92}
-        />
-      </div>
       <div className="closing-scene-content">
         <p className="closing-scene-kicker" ref={eyebrowRef}>
           Memory, with boundaries.
