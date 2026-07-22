@@ -89,6 +89,10 @@ impl AppState {
     }
 
     pub async fn from_env() -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
+        if is_production() {
+            validate_production_environment()?;
+        }
+
         let x402 = X402Config::from_env()
             .map_err(|message| std::io::Error::new(std::io::ErrorKind::InvalidInput, message))?;
         let billing = BaseCheckoutConfig::from_env(&x402)
@@ -98,6 +102,9 @@ impl AppState {
             .ok()
             .filter(|value| !value.trim().is_empty())
         else {
+            if is_production() {
+                return Err(config_error("DATABASE_URL must be set in production"));
+            }
             tracing::info!("DATABASE_URL is not set; using in-memory storage");
             return Ok(Self::new_with_x402(x402, billing));
         };
@@ -174,6 +181,45 @@ fn retrieval_candidate_limit() -> i64 {
         .unwrap_or(500)
 }
 
+pub fn is_production() -> bool {
+    is_production_value(env::var("ENERGON_ENV").ok().as_deref())
+}
+
+fn is_production_value(value: Option<&str>) -> bool {
+    value.is_some_and(|value| value.trim().eq_ignore_ascii_case("production"))
+}
+
+fn validate_production_environment() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    required_env("DATABASE_URL")?;
+    required_env("ENERGON_API_KEY_PEPPER")?;
+    required_env("ENERGON_JWKS_URL")?;
+    required_env("ENERGON_WEB_ORIGIN")?;
+
+    if env_flag("ENERGON_DEV_AUTH") {
+        return Err(config_error(
+            "ENERGON_DEV_AUTH must not be enabled in production",
+        ));
+    }
+
+    if env_flag("ENERGON_X402_ACCEPT_UNVERIFIED") {
+        return Err(config_error(
+            "ENERGON_X402_ACCEPT_UNVERIFIED must not be enabled in production",
+        ));
+    }
+
+    Ok(())
+}
+
+fn env_flag(name: &str) -> bool {
+    env::var(name)
+        .ok()
+        .is_some_and(|value| value == "1" || value.eq_ignore_ascii_case("true"))
+}
+
+fn config_error(message: impl Into<String>) -> Box<dyn std::error::Error + Send + Sync> {
+    std::io::Error::new(std::io::ErrorKind::InvalidInput, message.into()).into()
+}
+
 fn required_env(name: &'static str) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
     env::var(name)
         .ok()
@@ -181,7 +227,7 @@ fn required_env(name: &'static str) -> Result<String, Box<dyn std::error::Error 
         .ok_or_else(|| {
             std::io::Error::new(
                 std::io::ErrorKind::InvalidInput,
-                format!("{name} must be set when DATABASE_URL is configured"),
+                format!("{name} must be set"),
             )
             .into()
         })
@@ -203,4 +249,17 @@ pub fn now_unix_ms() -> u128 {
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default()
         .as_millis()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::is_production_value;
+
+    #[test]
+    fn production_mode_requires_an_explicit_value() {
+        assert!(is_production_value(Some("production")));
+        assert!(is_production_value(Some("PRODUCTION")));
+        assert!(!is_production_value(Some("development")));
+        assert!(!is_production_value(None));
+    }
 }

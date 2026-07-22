@@ -46,12 +46,12 @@ const relationships = [
   ["Audit", "a record of every context decision"],
 ] as const;
 
-const apiRoutes = [
-  ["POST", "/v1/context/build"],
-  ["POST", "/v1/memory/write"],
-  ["POST", "/v1/memory/promote"],
-  ["GET", "/v1/audit/context/{id}"],
-  ["auth", "Authorization: Bearer eos_live_..."],
+const sdkOperations = [
+  ["SDK", "swarm.runtime()"],
+  ["SDK", "memory.remember()"],
+  ["SDK", "memory.share()"],
+  ["SDK", "context.build()"],
+  ["auth", "agent API key, kept server-side"],
 ] as const;
 
 export default function HomePage() {
@@ -65,7 +65,7 @@ export default function HomePage() {
         <nav className="nav-links" aria-label="Main links">
           <a href="#boundary">Boundary</a>
           <a href="#products">Platform</a>
-          <a href="#api">API</a>
+          <a href="#sdk">SDK</a>
           <a href="#scopes">Memory</a>
           <a href="#pricing">Pricing</a>
         </nav>
@@ -120,11 +120,11 @@ export default function HomePage() {
                 ))}
               </div>
               <div className="code-block">
-                <em>POST /v1/context/build</em>
+                <em>context.build()</em>
                 {"\n"}
-                agent: researcher-17 · project: launch · task: prepare the brief
+                authenticated agent → permission filter → relevant memory
                 {"\n"}
-                → allowed_context_pack.json + audit record
+                → context pack + audit record
               </div>
             </div>
           </div>
@@ -197,26 +197,26 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section id="api" className="section">
+      <section id="sdk" className="section">
         <div className="container api-section">
           <div>
             <p className="eyebrow">Developer platform</p>
-            <h2>One API call gives an agent only the memory it may use for a task.</h2>
+            <h2>One SDK call gives an agent only the memory it may use for a task.</h2>
             <p className="hero-lede">
-              Connect an agent with its own API key. It writes private memory, asks for a context
-              pack, and receives only the information you approved for it.
+              Connect the SDK to an agent runtime. The control plane derives its identity, keeps
+              memory private first, and returns only the context that agent is allowed to use.
             </p>
             <div className="hero-actions">
               <Link className="primary-action" href="/dashboard">
-                Try the API
+                Open dashboard
               </Link>
               <Link className="secondary-action" href="/llms-full.txt">
                 llms-full.txt
               </Link>
             </div>
           </div>
-          <div className="api-panel" aria-label="API routes">
-            {apiRoutes.map(([method, route]) => (
+          <div className="api-panel" aria-label="SDK operations">
+            {sdkOperations.map(([method, route]) => (
               <div className="api-row" key={route}>
                 <span>{method}</span>
                 <strong>{route}</strong>

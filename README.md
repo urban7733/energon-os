@@ -122,11 +122,12 @@ Base-USDC purchase that unlocks an organization for 30 days after the API
 verifies the transfer. Real wallet custody, private keys, treasury automation,
 accounting, and recurring-debit orchestration stay outside this memory core.
 
-## API-First Product Model
+## SDK-First Product Model
 
 The primary users of Energon OS are agents, not humans clicking through a UI.
 The dashboard is an operator surface for setup, inspection, and audits. The core
-product surface is the API and future SDKs that autonomous agents call directly.
+product surface is the SDK that autonomous agent runtimes call directly. The
+HTTP API is the versioned control-plane transport behind that SDK.
 
 The long-term scale goal is that billions of external agents can use Energon as
 their permissioned memory layer. Every design decision should preserve that
@@ -134,7 +135,8 @@ shape:
 
 ```txt
 Autonomous agents
-  -> Energon API/SDK
+  -> Energon SDK
+  -> Energon control plane
   -> permissioned memory and context
   -> audited context pack
   -> autonomous agents
@@ -246,7 +248,7 @@ sqlx for explicit SQL access
 Cedar policies for authorization rules
 Cloudflare R2 / MinIO for large document storage
 OpenAI embeddings behind a provider interface
-TypeScript and Python SDKs later
+Official TypeScript SDK for agent runtimes
 Next.js/Bun landing page and operator dashboard
 ```
 
@@ -254,21 +256,43 @@ Current repository state:
 
 ```txt
 crates/energon-core   pure domain logic for memory, permissions, retrieval, packing
-crates/energon-api    Axum API with dev identity headers and pluggable storage
+crates/energon-api    Rust control plane with dev identity headers and pluggable storage
 crates/energon-db     Postgres/sqlx repositories for identity, memory, and audit
 crates/energon-worker async worker for OpenAI embeddings into pgvector chunks
 migrations/           Postgres schema for identity, memory, chunks, and audit
 policies/             Cedar policy starting point
 apps/web              Next.js site + Better Auth (email/password + optional GitHub, orgs, JWT/JWKS)
+packages/sdk-typescript official server-side TypeScript SDK for agent runtimes
 ```
 
-## Production API
+## Swarm Control Plane
+
+The Rust service is the Energon control plane. Product integrations should use
+the official SDK, which holds the stable agent-facing contract and prevents
+applications from sending identity fields that an agent must not control.
+
+```ts
+import { Energon } from "@energon/sdk";
+
+const energon = new Energon({
+  baseUrl: process.env.ENERGON_API_URL!,
+  apiKey: process.env.ENERGON_AGENT_API_KEY!,
+});
+
+await energon.memory.remember({ content: "Private verified finding." });
+const context = await energon.context.build({ task: "plan next action" });
+```
+
+The HTTP endpoints below are the internal control-plane contract used by the
+SDK and by self-hosted deployments. They remain versioned and supported, but
+application code should prefer the SDK surface.
 
 Agent endpoints (bearer `eos_live_...` API keys):
 
 ```txt
 GET  /health
 GET  /v1/billing/x402
+GET  /v1/swarm/runtime
 POST /v1/memory/write
 POST /v1/context/build
 POST /v1/memory/promote
@@ -322,7 +346,8 @@ curl -X POST http://127.0.0.1:3001/v1/admin/agents \
   }'
 ```
 
-Full API examples are in [docs/api.md](docs/api.md).
+The SDK guide is in [docs/sdk-typescript.md](docs/sdk-typescript.md). The
+low-level self-hosting contract is in [docs/api.md](docs/api.md).
 
 ## Obsidian Vault Export
 
@@ -425,6 +450,7 @@ real public launch, the remaining non-code production work is:
 1. Deploy API, worker, and web app with real secrets.
 2. Configure backups, monitoring, and log aggregation.
 3. Run load tests against realistic memory volume.
-4. Generate public SDKs from the stabilized API.
+4. Publish the verified TypeScript SDK and add the Python SDK from the same
+   versioned control-plane contract.
 5. Configure a production Base RPC provider, receiving wallet and mainnet USDC
    variables before enabling real payments (see docs/crypto-payments.md).

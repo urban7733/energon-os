@@ -4,6 +4,7 @@ services:
     container_name: energon-api
     command: energon-api
     environment:
+      ENERGON_ENV: development
       ENERGON_BIND_ADDR: 0.0.0.0:3000
       DATABASE_URL: postgres://energon:energon@postgres:5432/energon
       ENERGON_API_KEY_PEPPER: change-me-dev-pepper

@@ -31,13 +31,12 @@ export default async function DashboardPage() {
           <span>Energon</span>
         </Link>
         <nav>
+          <a href="#overview">Analytics</a>
           <a href="#agents">Set up</a>
-          <a href="#billing">Plan</a>
-          <a href="#org-agents">Manage agents</a>
-          <a href="#org-memories">Saved memory</a>
-          <a href="#memory">Save a note</a>
-          <a href="#context">Build context</a>
-          <a href="#audit">Activity</a>
+          <a href="#org-agents">Agents and keys</a>
+          <a href="#memory">Memory</a>
+          <a href="#context">Context and audit</a>
+          <a href="#billing">Billing</a>
         </nav>
       </aside>
       <section className="dashboard-main">

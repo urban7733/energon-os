@@ -26,6 +26,7 @@ public domain such as `api.energon.os` and set:
 
 ```txt
 DATABASE_URL=${{Postgres.DATABASE_URL}}
+ENERGON_ENV=production
 # Railway provides PORT automatically; the API uses it when ENERGON_BIND_ADDR is unset.
 ENERGON_API_KEY_PEPPER=<openssl rand -hex 32>
 ENERGON_ADMIN_TOKEN=<openssl rand -hex 32>

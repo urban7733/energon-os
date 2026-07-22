@@ -5,11 +5,9 @@ import { useRouter } from "next/navigation";
 import {
   ArrowRight,
   ArrowUpRight,
-  BarChart3,
   Bot,
   Coins,
   Database,
-  Eye,
   FileSearch,
   Gauge,
   KeyRound,
@@ -24,6 +22,7 @@ import {
 } from "lucide-react";
 import { authClient, fetchApiToken } from "../../lib/auth-client";
 import { site } from "../../lib/site";
+import { AnalyticsDeck } from "../../components/dashboard/analytics-deck";
 import { BillingCheckout } from "./billing-checkout";
 
 type ApiResult = {
@@ -114,20 +113,18 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
   const [apiBaseUrl, setApiBaseUrl] = useState(site.apiBaseUrl);
   const [agentApiKey, setAgentApiKey] = useState("");
   const [agentId, setAgentId] = useState("");
-  const [roleId, setRoleId] = useState("strategist");
-  const [projectId, setProjectId] = useState("apex_verify");
+  const [agentName, setAgentName] = useState("");
+  const [roleId, setRoleId] = useState("");
+  const [projectId, setProjectId] = useState("");
   const [newOrgName, setNewOrgName] = useState("");
   const [scope, setScope] = useState<MemoryScope>("agent_private");
   const [memoryId, setMemoryId] = useState("");
   const [promotedMemoryId, setPromotedMemoryId] = useState("");
-  const [promotionTargetScope, setPromotionTargetScope] = useState<SharedMemoryScope>("project");
-  const [promotionReason, setPromotionReason] = useState(
-    "Approved for shared investor positioning.",
-  );
-  const [memory, setMemory] = useState(
-    "Do not position Apex Verify as just another social app. Investor outreach should frame it as trust infrastructure.",
-  );
-  const [task, setTask] = useState("prepare investor outreach");
+  const [promotionTargetScope, setPromotionTargetScope] = useState<"" | SharedMemoryScope>("");
+  const [promotionReason, setPromotionReason] = useState("");
+  const [memory, setMemory] = useState("");
+  const [memoryTags, setMemoryTags] = useState("");
+  const [task, setTask] = useState("");
   const [requestId, setRequestId] = useState("");
   const [orgAgents, setOrgAgents] = useState<OrgAgent[]>([]);
   const [orgMemories, setOrgMemories] = useState<OrgMemory[]>([]);
@@ -139,11 +136,8 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
   const [memoryScopeFilter, setMemoryScopeFilter] = useState<"" | MemoryScope>("");
   const [mintedKey, setMintedKey] = useState<string | null>(null);
   const [result, setResult] = useState<ApiResult>({
-    label: "Ready",
-    body: {
-      status: "Waiting for an action",
-      apiBaseUrl: site.apiBaseUrl,
-    },
+    label: "No activity yet",
+    body: null,
   });
   const [apiStatus, setApiStatus] = useState<"unchecked" | "online" | "offline">("unchecked");
   const [x402Status, setX402Status] = useState<"unchecked" | "enabled" | "disabled" | "offline">(
@@ -164,16 +158,7 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
     ["Context audit", Boolean(contextAudit), contextAudit?.request_id ?? "not read"],
   ] as const;
   const usageRows = usageSummary?.totals ?? [];
-  const maxUsageCalls = Math.max(1, ...usageRows.map((entry) => entry.calls));
   const scopeRows = memoryStats?.scopes ?? [];
-  const maxScopeCount = Math.max(1, ...scopeRows.map((entry) => entry.count));
-  const auditRows: Array<[string, number]> = contextAudit
-    ? [
-        ["allowed", contextAudit.allowed_memory_ids.length],
-        ["denied", contextAudit.denied_memory_count],
-      ]
-    : [];
-  const maxAuditCount = Math.max(1, ...auditRows.map(([, count]) => count));
 
   async function run(label: string, action: () => Promise<unknown>) {
     setBusy(true);
@@ -304,7 +289,10 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
 
   useEffect(() => {
     if (!orgId) return;
-    setAgentId(`agent_${orgId.replace(/[^a-z0-9]/gi, "").slice(-12)}`);
+    setAgentId("");
+    setAgentName("");
+    setRoleId("");
+    setProjectId("");
     setAgentApiKey("");
     setMintedKey(null);
     setMemoryId("");
@@ -368,13 +356,15 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
     event.preventDefault();
     await run("Created agent", async () => {
       const org = requireOrg();
+      const cleanAgentId = agentId.trim();
+      if (!cleanAgentId) throw new Error("Agent ID is required.");
       const body = await managementFetch(`/v1/orgs/${encodeURIComponent(org)}/agents`, {
         method: "POST",
         body: JSON.stringify({
-          agent_id: agentId,
-          role_id: roleId || null,
-          project_id: projectId || null,
-          name: `${agentId} operator`,
+          agent_id: cleanAgentId,
+          role_id: roleId.trim() || null,
+          project_id: projectId.trim() || null,
+          name: agentName.trim() || cleanAgentId,
         }),
       });
       if (isKeyGrant(body)) {
@@ -473,15 +463,15 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
   async function writeMemory(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     await run("Wrote memory", async () => {
+      const content = memory.trim();
+      if (!content) throw new Error("Private memory content is required.");
       const response = await fetch(`${cleanBaseUrl}/v1/memory/write`, {
         method: "POST",
         headers: agentRequestHeaders(agentApiKey),
         body: JSON.stringify({
           scope,
-          content: memory,
-          tags: ["positioning", "investor", "trust"],
-          project_id: projectId,
-          role_id: roleId,
+          content,
+          tags: parseTags(memoryTags),
         }),
       });
       const body = await response.json();
@@ -495,6 +485,8 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
   async function promoteMemory(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     await run("Promoted memory", async () => {
+      if (!promotionTargetScope) throw new Error("Choose a scope for shared memory.");
+      if (!promotionReason.trim()) throw new Error("A reason for sharing is required.");
       const response = await fetch(`${cleanBaseUrl}/v1/memory/promote`, {
         method: "POST",
         headers: agentRequestHeaders(agentApiKey),
@@ -515,12 +507,13 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
   async function buildContext(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     await run("Built context", async () => {
+      const cleanTask = task.trim();
+      if (!cleanTask) throw new Error("Describe the task before building context.");
       const response = await fetch(`${cleanBaseUrl}/v1/context/build`, {
         method: "POST",
         headers: agentRequestHeaders(agentApiKey),
         body: JSON.stringify({
-          task,
-          project_id: projectId,
+          task: cleanTask,
           token_budget: 6000,
         }),
       });
@@ -658,98 +651,14 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
         </article>
       </section>
 
-      <section className="visual-grid" aria-label="Live dashboard telemetry">
-        <article className="chart-panel">
-          <div className="panel-title">
-            <BarChart3 size={18} aria-hidden="true" />
-            <h2>Usage</h2>
-          </div>
-          {usageRows.length === 0 ? (
-            <p className="chart-empty">No paid memory actions yet.</p>
-          ) : (
-          <div className="split-chart" aria-label="API usage by route">
-            {usageRows.map((entry) => (
-              <div className="split-row" key={entry.route}>
-                <div>
-                  <strong>{entry.route}</strong>
-                  <span>{entry.paid_calls} paid call(s)</span>
-                </div>
-                <div className="bar-track">
-                  <span style={{ width: `${Math.max(4, (entry.calls / maxUsageCalls) * 100)}%` }} />
-                </div>
-                <em>{entry.calls}</em>
-              </div>
-            ))}
-          </div>
-          )}
-        </article>
-
-        <article className="chart-panel">
-          <div className="panel-title">
-            <ShieldCheck size={18} aria-hidden="true" />
-            <h2>Why this context?</h2>
-          </div>
-          {contextAudit ? (
-            <>
-              <div className="funnel-chart" aria-label="Latest context audit counts">
-                {auditRows.map(([label, count]) => (
-                  <span
-                    key={label}
-                    style={{ width: `${Math.max(18, (count / maxAuditCount) * 100)}%` }}
-                  >
-                    {label}: {count}
-                  </span>
-                ))}
-              </div>
-              <p className="chart-note">
-                {contextAudit.estimated_tokens.toLocaleString()} of {contextAudit.token_budget.toLocaleString()} token budget used
-              </p>
-            </>
-          ) : (
-            <p className="chart-empty">Build context, then view its record to see what the agent could use.</p>
-          )}
-        </article>
-
-        <article className="chart-panel">
-          <div className="panel-title">
-            <Eye size={18} aria-hidden="true" />
-            <h2>Memory sharing</h2>
-          </div>
-          {scopeRows.length === 0 ? (
-            <p className="chart-empty">No memories saved in this workspace yet.</p>
-          ) : (
-          <div className="scope-chart" aria-label="Memory counts by scope">
-            {scopeRows.map((entry) => (
-              <div className="scope-bar" key={entry.scope}>
-                <span>{entry.scope}</span>
-                <div>
-                  <i style={{ height: `${Math.max(8, (entry.count / maxScopeCount) * 100)}%` }} />
-                </div>
-                <em>{entry.count}</em>
-              </div>
-            ))}
-          </div>
-          )}
-        </article>
-
-        <article className="chart-panel">
-          <div className="panel-title">
-            <FileSearch size={18} aria-hidden="true" />
-            <h2>Getting started</h2>
-          </div>
-          <div className="lifecycle-list">
-            {lifecycle.map(([label, done, detail]) => (
-              <div className={done ? "lifecycle-item active" : "lifecycle-item"} key={label}>
-                <span />
-                <div>
-                  <strong>{label}</strong>
-                  <p>{detail}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </article>
-      </section>
+      <AnalyticsDeck
+        usage={usageRows}
+        scopes={scopeRows}
+        totalMemories={memoryStats?.total_memories ?? 0}
+        agentCount={orgAgents.length}
+        contextAudit={contextAudit}
+        lifecycle={lifecycle}
+      />
 
       <div className="console-grid">
       <section id="agents" className="ops-panel" aria-labelledby="agents-title">
@@ -774,7 +683,6 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
             <input
               value={newOrgName}
               onChange={(event) => setNewOrgName(event.target.value)}
-              placeholder="acme swarm"
             />
           </label>
           <button type="submit" disabled={busy || !newOrgName.trim()}>
@@ -786,9 +694,15 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
         <form onSubmit={createAgent}>
           <div className="form-row">
             <label>
-              Agent name and ID
+              Agent name (optional)
+              <input value={agentName} onChange={(event) => setAgentName(event.target.value)} />
+            </label>
+            <label>
+              Agent ID
               <input value={agentId} onChange={(event) => setAgentId(event.target.value)} />
             </label>
+          </div>
+          <div className="form-row">
             <label>
               Current workspace
               <input value={orgId} readOnly placeholder="create a workspace first" />
@@ -951,9 +865,13 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
           </label>
           <label>
             Private note
-            <textarea value={memory} onChange={(event) => setMemory(event.target.value)} rows={5} />
+            <textarea value={memory} onChange={(event) => setMemory(event.target.value)} rows={5} required />
           </label>
-          <button type="submit" disabled={busy || !hasAgentApiKey}>
+          <label>
+            Tags (optional, comma-separated)
+            <input value={memoryTags} onChange={(event) => setMemoryTags(event.target.value)} />
+          </label>
+          <button type="submit" disabled={busy || !hasAgentApiKey || !memory.trim()}>
             <Send size={16} aria-hidden="true" />
             Save private memory
           </button>
@@ -970,9 +888,10 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
               <select
                 value={promotionTargetScope}
                 onChange={(event) =>
-                  setPromotionTargetScope(event.target.value as SharedMemoryScope)
+                  setPromotionTargetScope(event.target.value as "" | SharedMemoryScope)
                 }
               >
+                <option value="" disabled>choose a scope</option>
                 <option value="project">this project</option>
                 <option value="org">this workspace</option>
                 <option value="role">this role</option>
@@ -986,9 +905,13 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
               value={promotionReason}
               onChange={(event) => setPromotionReason(event.target.value)}
               rows={3}
+              required
             />
           </label>
-          <button type="submit" disabled={busy || !memoryId || !hasAgentApiKey}>
+          <button
+            type="submit"
+            disabled={busy || !memoryId || !promotionTargetScope || !promotionReason.trim() || !hasAgentApiKey}
+          >
             <ArrowUpRight size={16} aria-hidden="true" />
             Share this memory
           </button>
@@ -1003,9 +926,9 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
         <form onSubmit={buildContext}>
           <label>
             What does the agent need to do?
-            <input value={task} onChange={(event) => setTask(event.target.value)} />
+            <input value={task} onChange={(event) => setTask(event.target.value)} required />
           </label>
-          <button type="submit" disabled={busy || !hasAgentApiKey}>
+          <button type="submit" disabled={busy || !hasAgentApiKey || !task.trim()}>
             <ShieldCheck size={16} aria-hidden="true" />
             Build safe context
           </button>
@@ -1062,6 +985,13 @@ function agentRequestHeaders(apiKey: string) {
     "content-type": "application/json",
     Authorization: `Bearer ${cleanApiKey}`,
   };
+}
+
+function parseTags(value: string) {
+  return value
+    .split(",")
+    .map((tag) => tag.trim())
+    .filter(Boolean);
 }
 
 function isContextPack(value: unknown): value is { request_id: string } {

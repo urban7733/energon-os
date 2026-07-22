@@ -1,4 +1,7 @@
-# Energon OS API
+# Energon OS Control-Plane Contract
+
+Application code should use `@energon/sdk`. This document defines the
+versioned HTTP contract used by the SDK and self-hosted deployments.
 
 Base URL:
 
@@ -30,6 +33,35 @@ Without payment, the API responds with `402 Payment Required` and a
 All routes are rate limited per API key (or client IP) with a token bucket
 (default 20 rps, burst 40). Exhausted buckets receive `429 Too Many Requests`.
 Request bodies are limited to 1 MiB by default.
+
+## Swarm Runtime Handshake
+
+The SDK calls this endpoint to verify the authenticated agent's effective swarm
+identity and the guarantees active on this control-plane version. The response
+does not accept caller-supplied identity fields.
+
+```bash
+curl http://127.0.0.1:3001/v1/swarm/runtime \
+  -H "Authorization: Bearer $ENERGON_AGENT_API_KEY"
+```
+
+```json
+{
+  "contract_version": "v1",
+  "swarm_id": "org_...",
+  "agent": {
+    "agent_id": "agent_...",
+    "role_id": "research",
+    "project_id": "project_..."
+  },
+  "guarantees": {
+    "permission_filter_before_retrieval": true,
+    "private_memory_by_default": true,
+    "explicit_shared_promotion": true,
+    "context_audit": true
+  }
+}
+```
 
 ## x402 Billing Status
 

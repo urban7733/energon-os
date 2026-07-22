@@ -14,6 +14,7 @@ COPY --from=builder /app/target/release/energon-api /usr/local/bin/energon-api
 COPY --from=builder /app/target/release/energon-worker /usr/local/bin/energon-worker
 
 ENV ENERGON_BIND_ADDR=0.0.0.0:3000
+ENV ENERGON_ENV=production
 EXPOSE 3000
 
 # Set ENERGON_PROCESS=energon-worker for the private embedding worker service.

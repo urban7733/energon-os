@@ -1,10 +1,13 @@
 # Energon OS Architecture
 
-Energon OS is a memory and context control plane for external AI agents.
+Energon OS is swarm infrastructure: a memory and context control plane for
+external AI agents. The SDK is the primary integration surface; the control
+plane enforces identity, permissions, persistence, and audits behind it.
 
 ```txt
-External Agent
-  -> Energon API
+External Agent Runtime
+  -> @energon/sdk
+  -> Energon Control Plane
   -> Agent Identity
   -> Permission Filter
   -> Candidate Retrieval
@@ -14,11 +17,10 @@ External Agent
   -> Context Pack
 ```
 
-The API is the primary product surface. Humans may use the dashboard to operate
-and inspect the system, but autonomous agents should integrate through the API or
-SDKs. The long-term architecture target is massive autonomous usage: fleets of
-agents, and eventually billions of agent calls, asking Energon for allowed memory
-without Energon becoming their runtime.
+The TypeScript SDK is the primary product surface. Humans may use the dashboard
+to operate and inspect the system, but autonomous runtimes use the SDK. The
+long-term architecture target is massive autonomous usage: fleets of agents
+asking Energon for allowed memory without Energon becoming their runtime.
 
 Energon is not the system of record for external agent files or raw tool outputs.
 An agent may browse the internet, coordinate research, inspect customer systems,
@@ -28,8 +30,9 @@ agent writes as memory or asks to retrieve as context.
 ```txt
 External agent runtime
   owns tools, files, browser state, raw notes
-  -> writes selected memory to Energon
-  -> requests allowed context from Energon
+  -> @energon/sdk
+  -> writes selected memory to the control plane
+  -> requests allowed context from the control plane
 
 Energon OS
   owns identity, relationships, permissions, memory records, context packs, audits
@@ -70,8 +73,13 @@ source memory, promoted memory, agent, org, target scope, and timestamp.
 ## Runtime Components
 
 ```txt
+packages/sdk-typescript
+  Official server-side SDK. Exposes memory, context, audit, and runtime
+  operations without allowing application code to forge agent identity.
+
 energon-api
-  Public HTTP API. Authenticates agents, writes memory, builds context, records audit logs.
+  Control-plane transport. Authenticates agents, writes memory, builds context,
+  records audit logs, and provides the versioned contract used by SDKs.
 
 energon-core
   Pure domain logic. Memory scopes, permission checks, retrieval scoring, context packing.
@@ -93,11 +101,12 @@ ENERGON_RETRIEVAL_CANDIDATE_LIMIT=500
 
 This keeps request work bounded while preserving the key security invariant: the core still rejects any memory that fails the permission check.
 
-The scale direction is API-first and agent-native:
+The scale direction is SDK-first and agent-native:
 
 ```txt
 many autonomous agents
-  -> authenticated API requests
+  -> versioned SDK operations
+  -> authenticated control-plane requests
   -> bounded candidate selection
   -> core permission verification
   -> packed context

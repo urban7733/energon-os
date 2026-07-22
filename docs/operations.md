@@ -3,6 +3,7 @@
 ## Required Production Environment
 
 ```txt
+ENERGON_ENV=production    enables fail-closed production startup validation
 DATABASE_URL              shared by API, worker, and web (Better Auth)
 ENERGON_API_KEY_PEPPER    peppers agent API key hashes
 ENERGON_JWKS_URL          Better Auth JWKS endpoint for operator JWTs
@@ -63,7 +64,9 @@ Run:
 energon-api
 ```
 
-The API refuses Postgres-backed startup unless `ENERGON_API_KEY_PEPPER` is configured.
+With `ENERGON_ENV=production`, the API refuses to start unless Postgres, the API-key
+pepper, Better Auth JWKS URL, and the web CORS origin are configured. It also rejects
+`ENERGON_DEV_AUTH` and `ENERGON_X402_ACCEPT_UNVERIFIED` in that mode.
 
 Health / readiness:
 
