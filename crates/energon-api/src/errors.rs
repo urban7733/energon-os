@@ -28,6 +28,13 @@ impl From<energon_db::DbError> for ApiError {
             energon_db::DbError::AgentIdAlreadyInUse(agent_id) => {
                 ApiError::BadRequest(format!("agent id is already registered: {agent_id}"))
             }
+            energon_db::DbError::ClaimConflictNotFound(conflict_id) => {
+                ApiError::NotFound(format!("claim conflict not found: {conflict_id}"))
+            }
+            energon_db::DbError::InvalidConflictResolution(message) => {
+                ApiError::BadRequest(message)
+            }
+            energon_db::DbError::InvalidClaimEvidence(message) => ApiError::BadRequest(message),
             error => ApiError::Internal(format!("database error: {error}")),
         }
     }

@@ -61,6 +61,51 @@ test("write failures are surfaced without unsafe automatic retries", async () =>
   expect(calls).toBe(1);
 });
 
+test("claims.assert sends structured evidence without client-supplied authority", async () => {
+  let capturedRequest: Request | undefined;
+  const client = new Energon({
+    baseUrl: "https://api.energon.test",
+    apiKey: "eos_live_test",
+    fetch: async (input, init) => {
+      capturedRequest = new Request(input, init);
+      return Response.json({
+        claim: {
+          claim_id: "claim_1",
+          subject: "vendor:acme",
+          predicate: "security_status",
+          value: { status: "review_required" },
+          confidence_bps: 8700,
+          authority_bps: 5000,
+          score: 43500000,
+          state: "accepted",
+          conflict_id: null,
+          created_at_unix_ms: 1,
+        },
+        resolution: "accepted",
+        conflict_id: null,
+      });
+    },
+  });
+
+  const result = await client.claims.assert({
+    subject: " vendor:acme ",
+    predicate: "security_status",
+    value: { status: "review_required" },
+    confidenceBps: 8700,
+    evidenceMemoryIds: [" mem_1 ", "mem_1"],
+  });
+
+  expect(result.claim.claim_id).toBe("claim_1");
+  expect(capturedRequest?.url).toBe("https://api.energon.test/v1/claims/assert");
+  expect(await capturedRequest?.json()).toEqual({
+    subject: "vendor:acme",
+    predicate: "security_status",
+    value: { status: "review_required" },
+    confidence_bps: 8700,
+    evidence_memory_ids: ["mem_1"],
+  });
+});
+
 test("swarm.runtime returns the authenticated agent contract", async () => {
   const client = new Energon({
     baseUrl: "https://api.energon.test",

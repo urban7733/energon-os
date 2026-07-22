@@ -88,7 +88,8 @@ energon-db
   Explicit sqlx repositories for Postgres identity, memory, chunks, and audits.
 
 energon-worker
-  Async indexing worker. Fills pgvector embeddings for memory chunks when OpenAI credentials are configured.
+  Async indexing worker. Fills pgvector embeddings for memory chunks and publishes
+  durable Protobuf control-plane events from the Postgres outbox to JetStream.
 ```
 
 ## Scale Path
@@ -116,3 +117,43 @@ many autonomous agents
 The system should scale by improving identity, storage partitioning, retrieval
 indexes, caching, queueing, and SDK ergonomics. It should not scale by absorbing
 agent runtime responsibilities into this repository.
+
+## Durable Events
+
+Every memory write, explicit promotion, context build, claim assertion, and
+conflict resolution writes a versioned binary Protobuf envelope to
+`event_outbox` inside the same Postgres transaction as the domain mutation. The
+worker leases those rows with `SKIP LOCKED`,
+publishes them to the `ENERGON_EVENTS` JetStream stream with `Nats-Msg-Id`
+deduplication, then records delivery. A failed publish releases the lease with
+bounded exponential retry. Operators can inspect only aggregate delivery state
+at `GET /v1/orgs/{org_id}/events/outbox`.
+
+## Claims and Conflict Resolution
+
+Free-form memory preserves agent context. Structured claims preserve a single
+decision candidate about a subject and predicate. They deliberately use a
+different storage path so the system never treats a natural-language note as a
+trusted global fact.
+
+```txt
+agent assertion: value + evidence + confidence
+  -> server derives role authority from swarm_role_policies
+  -> score = confidence * authority
+  -> PostgreSQL advisory lock for (org, subject, predicate)
+  -> accept, supersede, or retain both branches as contested
+  -> append hash-linked audit event in the same transaction
+```
+
+An incoming claim replaces the accepted fact only when its server-derived score
+is at least 10% stronger. Close contradictions remain in `claim_conflicts` for
+an authenticated operator to resolve. The accepted and rejected branch states,
+the operator identity, reason, timestamp, prior hash, and event hash are
+persisted together. This is a transactional single-region conflict policy, not
+a claim that the current product is a multi-region CRDT replication system.
+
+CRDT replication, FlatBuffers, gRPC/QUIC, `io_uring`, and shared-memory IPC are
+not on the current request path. They should be introduced only after measured
+workload data identifies a real bottleneck; at one million daily operations,
+the average request rate is roughly 12 per second, where durable Postgres plus
+JetStream is the appropriate operational baseline.

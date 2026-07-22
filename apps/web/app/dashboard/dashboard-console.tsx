@@ -10,6 +10,7 @@ import {
   Database,
   FileSearch,
   Gauge,
+  GitFork,
   KeyRound,
   ListChecks,
   LogOut,
@@ -17,6 +18,7 @@ import {
   RefreshCcw,
   Send,
   ShieldCheck,
+  Scale,
   Trash2,
   Users,
 } from "lucide-react";
@@ -89,6 +91,36 @@ type MemoryStats = {
   scopes: Array<{ scope: MemoryScope; count: number }>;
 };
 
+type OutboxStatus = {
+  storage: "memory" | "postgres";
+  pending: number;
+  leased: number;
+  published: number;
+  retrying: number;
+};
+
+type RolePolicy = {
+  role_id: string;
+  authority_bps: number;
+  can_resolve_conflicts: boolean;
+  policy_version: number;
+  updated_at_unix_ms: number;
+};
+
+type ClaimConflict = {
+  conflict_id: string;
+  subject: string;
+  predicate: string;
+  incumbent_claim_id: string;
+  challenger_claim_id: string;
+  status: "contested" | "resolved";
+  resolved_claim_id: string | null;
+  resolution_reason: string | null;
+  resolved_by_user_id: string | null;
+  created_at_unix_ms: number;
+  resolved_at_unix_ms: number | null;
+};
+
 type ContextAudit = {
   request_id: string;
   allowed_memory_ids: string[];
@@ -130,10 +162,17 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
   const [orgMemories, setOrgMemories] = useState<OrgMemory[]>([]);
   const [memoryStats, setMemoryStats] = useState<MemoryStats | null>(null);
   const [usageSummary, setUsageSummary] = useState<UsageSummary | null>(null);
+  const [outboxStatus, setOutboxStatus] = useState<OutboxStatus | null>(null);
+  const [rolePolicies, setRolePolicies] = useState<RolePolicy[]>([]);
+  const [claimConflicts, setClaimConflicts] = useState<ClaimConflict[]>([]);
   const [contextAudit, setContextAudit] = useState<ContextAudit | null>(null);
   const [promotionAudit, setPromotionAudit] = useState<PromotionAudit | null>(null);
   const [health, setHealth] = useState<ApiHealth | null>(null);
   const [memoryScopeFilter, setMemoryScopeFilter] = useState<"" | MemoryScope>("");
+  const [policyRoleId, setPolicyRoleId] = useState("");
+  const [policyAuthorityBps, setPolicyAuthorityBps] = useState("5000");
+  const [policyCanResolve, setPolicyCanResolve] = useState(false);
+  const [conflictReason, setConflictReason] = useState("");
   const [mintedKey, setMintedKey] = useState<string | null>(null);
   const [result, setResult] = useState<ApiResult>({
     label: "No activity yet",
@@ -223,8 +262,42 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
     return body;
   }
 
+  async function refreshOutboxStatus() {
+    const org = requireOrg();
+    const body = await managementFetch(`/v1/orgs/${encodeURIComponent(org)}/events/outbox`);
+    if (!isOutboxStatus(body)) throw new Error("Outbox response was invalid.");
+    setOutboxStatus(body);
+    return body;
+  }
+
+  async function refreshRolePolicies() {
+    const org = requireOrg();
+    const body = await managementFetch(`/v1/orgs/${encodeURIComponent(org)}/role-policies`);
+    if (!isRolePolicyList(body)) throw new Error("Role policy response was invalid.");
+    setRolePolicies(body.policies);
+    return body;
+  }
+
+  async function refreshClaimConflicts() {
+    const org = requireOrg();
+    const body = await managementFetch(
+      `/v1/orgs/${encodeURIComponent(org)}/conflicts?include_resolved=true`,
+    );
+    if (!isClaimConflictList(body)) throw new Error("Claim conflict response was invalid.");
+    setClaimConflicts(body.conflicts);
+    return body;
+  }
+
   async function refreshOperationalData() {
-    await Promise.all([refreshAgents(), refreshOrgMemories(), refreshUsage(), refreshMemoryStats()]);
+    await Promise.all([
+      refreshAgents(),
+      refreshOrgMemories(),
+      refreshUsage(),
+      refreshMemoryStats(),
+      refreshOutboxStatus(),
+      refreshRolePolicies(),
+      refreshClaimConflicts(),
+    ]);
   }
 
   useEffect(() => {
@@ -264,6 +337,9 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
       setOrgMemories([]);
       setMemoryStats(null);
       setUsageSummary(null);
+      setOutboxStatus(null);
+      setRolePolicies([]);
+      setClaimConflicts([]);
       setContextAudit(null);
       setPromotionAudit(null);
       return () => {
@@ -414,6 +490,53 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
         { method: "DELETE" },
       );
       await refreshOperationalData();
+      return body;
+    });
+  }
+
+  async function saveRolePolicy(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    await run("Updated role policy", async () => {
+      const org = requireOrg();
+      const role = policyRoleId.trim();
+      const authority = Number(policyAuthorityBps);
+      if (!role) throw new Error("Role ID is required.");
+      if (!Number.isInteger(authority) || authority < 0 || authority > 10_000) {
+        throw new Error("Authority must be an integer from 0 to 10000.");
+      }
+      const body = await managementFetch(
+        `/v1/orgs/${encodeURIComponent(org)}/role-policies/${encodeURIComponent(role)}`,
+        {
+          method: "PUT",
+          body: JSON.stringify({
+            authority_bps: authority,
+            can_resolve_conflicts: policyCanResolve,
+          }),
+        },
+      );
+      setPolicyRoleId("");
+      await refreshRolePolicies();
+      return body;
+    });
+  }
+
+  async function resolveClaimConflict(conflict: ClaimConflict, acceptedClaimId: string) {
+    await run("Resolved claim conflict", async () => {
+      const org = requireOrg();
+      const reason = conflictReason.trim();
+      if (!reason) throw new Error("Add a decision reason before resolving a conflict.");
+      const body = await managementFetch(
+        `/v1/orgs/${encodeURIComponent(org)}/conflicts/${encodeURIComponent(conflict.conflict_id)}/resolve`,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            accepted_claim_id: acceptedClaimId,
+            reason,
+          }),
+        },
+      );
+      setConflictReason("");
+      await refreshClaimConflicts();
       return body;
     });
   }
@@ -657,6 +780,7 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
         totalMemories={memoryStats?.total_memories ?? 0}
         agentCount={orgAgents.length}
         contextAudit={contextAudit}
+        outbox={outboxStatus}
         lifecycle={lifecycle}
       />
 
@@ -840,6 +964,110 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
             ))}
           </div>
         ) : null}
+      </section>
+
+      <section id="conflicts" className="ops-panel wide" aria-labelledby="conflicts-title">
+        <div className="panel-title">
+          <Scale size={18} aria-hidden="true" />
+          <h2 id="conflicts-title">Authority and conflict resolution</h2>
+        </div>
+        <p className="panel-copy">
+          Agents submit evidence and confidence. You set role authority, while close contradictions
+          remain as separate branches until an operator resolves them.
+        </p>
+        <form onSubmit={saveRolePolicy}>
+          <div className="form-row">
+            <label>
+              Role ID
+              <input
+                value={policyRoleId}
+                onChange={(event) => setPolicyRoleId(event.target.value)}
+                placeholder="researcher"
+              />
+            </label>
+            <label>
+              Authority (0 to 10000)
+              <input
+                value={policyAuthorityBps}
+                onChange={(event) => setPolicyAuthorityBps(event.target.value)}
+                inputMode="numeric"
+              />
+            </label>
+          </div>
+          <label className="policy-checkbox">
+            <input
+              type="checkbox"
+              checked={policyCanResolve}
+              onChange={(event) => setPolicyCanResolve(event.target.checked)}
+            />
+            May resolve delegated conflicts
+          </label>
+          <button type="submit" disabled={busy || !orgId || !policyRoleId.trim()}>
+            <Scale size={16} aria-hidden="true" />
+            Save role policy
+          </button>
+        </form>
+        {rolePolicies.length > 0 ? (
+          <div className="data-table" aria-label="Role authority policies">
+            {rolePolicies.map((policy) => (
+              <div className="data-table-row" key={policy.role_id}>
+                <strong>{policy.role_id}</strong>
+                <span>{policy.authority_bps} authority</span>
+                <span>{policy.can_resolve_conflicts ? "can resolve" : "assert only"}</span>
+              </div>
+            ))}
+          </div>
+        ) : null}
+        <div className="panel-divider" />
+        <label>
+          Decision reason for the next resolution
+          <textarea
+            value={conflictReason}
+            onChange={(event) => setConflictReason(event.target.value)}
+            rows={2}
+            placeholder="Explain why this branch is the verified result."
+          />
+        </label>
+        {claimConflicts.length > 0 ? (
+          <div className="conflict-list" aria-label="Claim conflicts">
+            {claimConflicts.map((conflict) => (
+              <article className="conflict-item" key={conflict.conflict_id}>
+                <div>
+                  <span className={`conflict-state ${conflict.status}`}>{conflict.status}</span>
+                  <strong>{conflict.subject} / {conflict.predicate}</strong>
+                  <p>{conflict.conflict_id}</p>
+                </div>
+                {conflict.status === "contested" ? (
+                  <div className="conflict-actions">
+                    <button
+                      type="button"
+                      disabled={busy || !conflictReason.trim()}
+                      onClick={() => void resolveClaimConflict(conflict, conflict.incumbent_claim_id)}
+                    >
+                      Accept incumbent
+                    </button>
+                    <button
+                      type="button"
+                      disabled={busy || !conflictReason.trim()}
+                      onClick={() => void resolveClaimConflict(conflict, conflict.challenger_claim_id)}
+                    >
+                      Accept challenger
+                    </button>
+                  </div>
+                ) : (
+                  <span className="conflict-resolution">
+                    accepted {conflict.resolved_claim_id ?? "branch"}
+                  </span>
+                )}
+              </article>
+            ))}
+          </div>
+        ) : (
+          <div className="empty-operator-state">
+            <GitFork size={18} aria-hidden="true" />
+            <p>No conflicting claims have been asserted in this workspace.</p>
+          </div>
+        )}
       </section>
 
       <section id="memory" className="ops-panel" aria-labelledby="memory-title">
@@ -1078,6 +1306,42 @@ function isMemoryStats(value: unknown): value is MemoryStats {
     typeof (value as { total_memories: unknown }).total_memories === "number" &&
     "scopes" in value &&
     Array.isArray((value as { scopes: unknown }).scopes)
+  );
+}
+
+function isOutboxStatus(value: unknown): value is OutboxStatus {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "storage" in value &&
+    ((value as { storage: unknown }).storage === "memory" ||
+      (value as { storage: unknown }).storage === "postgres") &&
+    "pending" in value &&
+    typeof (value as { pending: unknown }).pending === "number" &&
+    "leased" in value &&
+    typeof (value as { leased: unknown }).leased === "number" &&
+    "published" in value &&
+    typeof (value as { published: unknown }).published === "number" &&
+    "retrying" in value &&
+    typeof (value as { retrying: unknown }).retrying === "number"
+  );
+}
+
+function isRolePolicyList(value: unknown): value is { policies: RolePolicy[] } {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "policies" in value &&
+    Array.isArray((value as { policies: unknown }).policies)
+  );
+}
+
+function isClaimConflictList(value: unknown): value is { conflicts: ClaimConflict[] } {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "conflicts" in value &&
+    Array.isArray((value as { conflicts: unknown }).conflicts)
   );
 }
 

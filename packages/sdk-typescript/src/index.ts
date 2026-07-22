@@ -9,6 +9,7 @@ export const SDK_VERSION = "0.1.0";
 
 export type MemoryScope = "open" | "org" | "project" | "role" | "agent_private" | "user_private" | "session";
 export type SharedMemoryScope = Extract<MemoryScope, "open" | "org" | "project" | "role">;
+export type ClaimValue = null | boolean | number | string | ClaimValue[] | { [key: string]: ClaimValue };
 
 export interface AgentMemory {
   memory_id: string;
@@ -84,6 +85,25 @@ export interface SwarmRuntime {
   capabilities: string[];
 }
 
+export interface SwarmClaim {
+  claim_id: string;
+  subject: string;
+  predicate: string;
+  value: ClaimValue;
+  confidence_bps: number;
+  authority_bps: number;
+  score: number;
+  state: "accepted" | "contested";
+  conflict_id: string | null;
+  created_at_unix_ms: number;
+}
+
+export interface ClaimAssertion {
+  claim: SwarmClaim;
+  resolution: "accepted" | "contested" | "same_value";
+  conflict_id: string | null;
+}
+
 export interface RememberInput {
   content: string;
   tags?: string[];
@@ -101,6 +121,15 @@ export interface BuildContextInput {
   /** Uses the authenticated agent's project when omitted. */
   projectId?: string;
   tokenBudget?: number;
+}
+
+export interface AssertClaimInput {
+  subject: string;
+  predicate: string;
+  value: ClaimValue;
+  /** Agent confidence from 0 to 10,000. Authority is server-owned. */
+  confidenceBps: number;
+  evidenceMemoryIds?: string[];
 }
 
 export interface PaymentSignatureProvider {
@@ -187,6 +216,10 @@ export class Energon {
     runtime: (options?: RequestOptions) => Promise<SwarmRuntime>;
   };
 
+  readonly claims: {
+    assert: (input: AssertClaimInput, options?: RequestOptions) => Promise<ClaimAssertion>;
+  };
+
   private readonly baseUrl: string;
   private readonly apiKey: string;
   private readonly paymentSignature?: PaymentSignatureProvider;
@@ -227,6 +260,9 @@ export class Energon {
         options: requestOptions,
       }),
     };
+    this.claims = {
+      assert: (input, requestOptions) => this.assertClaim(input, requestOptions),
+    };
   }
 
   private async remember(input: RememberInput, options?: RequestOptions): Promise<AgentMemory> {
@@ -237,6 +273,27 @@ export class Energon {
         content: requiredText(input.content, "content"),
         tags: normalizeTags(input.tags),
         source: optionalText(input.source),
+      },
+      options,
+    });
+  }
+
+  private async assertClaim(
+    input: AssertClaimInput,
+    options?: RequestOptions,
+  ): Promise<ClaimAssertion> {
+    if (!Number.isInteger(input.confidenceBps) || input.confidenceBps < 0 || input.confidenceBps > 10_000) {
+      throw new TypeError("confidenceBps must be an integer from 0 to 10000.");
+    }
+
+    return this.request("/v1/claims/assert", {
+      method: "POST",
+      body: {
+        subject: requiredText(input.subject, "subject"),
+        predicate: requiredText(input.predicate, "predicate"),
+        value: input.value,
+        confidence_bps: input.confidenceBps,
+        evidence_memory_ids: normalizeIds(input.evidenceMemoryIds),
       },
       options,
     });
@@ -380,6 +437,11 @@ function optionalText(value: string | undefined): string | undefined {
 
 function normalizeTags(tags: string[] | undefined): string[] {
   return (tags ?? []).map((tag) => tag.trim()).filter(Boolean);
+}
+
+function normalizeIds(ids: string[] | undefined): string[] {
+  if (!ids) return [];
+  return [...new Set(ids.map((id) => requiredText(id, "evidenceMemoryIds item")))];
 }
 
 function isSharedScope(scope: string): scope is SharedMemoryScope {

@@ -1,13 +1,16 @@
-use energon_core::{AgentIdentity, MemoryRecord, MemoryScope, PromotionAuditRecord};
+use energon_core::{
+    AgentIdentity, ControlPlaneEvent, MemoryRecord, MemoryScope, PromotionAuditRecord,
+};
 use sqlx::{PgPool, Postgres, Row, Transaction, postgres::PgRow};
 
-use crate::{DbError, audit, errors::i64_to_u128, identity};
+use crate::{DbError, audit, errors::i64_to_u128, event_outbox, identity};
 
 pub async fn insert_memory(pool: &PgPool, record: &MemoryRecord) -> Result<(), DbError> {
     identity::ensure_memory_record_refs(pool, record).await?;
 
     let mut tx = pool.begin().await?;
     insert_memory_in_tx(&mut tx, record).await?;
+    event_outbox::enqueue_in_tx(&mut tx, &ControlPlaneEvent::memory_written(record)).await?;
     tx.commit().await?;
 
     Ok(())
@@ -23,6 +26,8 @@ pub async fn insert_promoted_memory(
     let mut tx = pool.begin().await?;
     insert_memory_in_tx(&mut tx, record).await?;
     audit::insert_promotion_audit_in_tx(&mut tx, promotion).await?;
+    event_outbox::enqueue_in_tx(&mut tx, &ControlPlaneEvent::memory_written(record)).await?;
+    event_outbox::enqueue_in_tx(&mut tx, &ControlPlaneEvent::memory_promoted(promotion)).await?;
     tx.commit().await?;
 
     Ok(())

@@ -10,6 +10,12 @@ pub enum DbError {
     InvalidMemoryScope(String),
     #[error("database integer is out of range for field: {0}")]
     IntegerOutOfRange(&'static str),
+    #[error("claim conflict not found: {0}")]
+    ClaimConflictNotFound(String),
+    #[error("invalid conflict resolution: {0}")]
+    InvalidConflictResolution(String),
+    #[error("invalid claim evidence: {0}")]
+    InvalidClaimEvidence(String),
 }
 
 pub fn i64_to_u128(value: i64, field: &'static str) -> Result<u128, DbError> {

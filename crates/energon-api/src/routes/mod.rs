@@ -1,6 +1,6 @@
 use axum::{
     Router,
-    routing::{delete, get, post},
+    routing::{delete, get, post, put},
 };
 
 use crate::state::AppState;
@@ -8,6 +8,7 @@ use crate::state::AppState;
 pub mod admin;
 pub mod audit;
 pub mod billing;
+pub mod claims;
 pub mod context;
 pub mod health;
 pub mod memory;
@@ -23,6 +24,7 @@ pub fn router() -> Router<AppState> {
         .route("/memory/write", post(memory::write_memory))
         .route("/memory/promote", post(memory::promote_memory))
         .route("/context/build", post(context::build_context))
+        .route("/claims/assert", post(claims::assert_claim))
         .route("/vault/obsidian.zip", get(vault::export_obsidian_vault))
         .route("/audit/context/{request_id}", get(audit::get_context_audit))
         .route(
@@ -48,6 +50,20 @@ pub fn router() -> Router<AppState> {
             delete(orgs::delete_org_memory),
         )
         .route("/orgs/{org_id}/usage", get(orgs::org_usage))
+        .route("/orgs/{org_id}/events/outbox", get(orgs::org_outbox_status))
+        .route(
+            "/orgs/{org_id}/role-policies",
+            get(orgs::list_role_policies),
+        )
+        .route(
+            "/orgs/{org_id}/role-policies/{role_id}",
+            put(orgs::set_role_policy),
+        )
+        .route("/orgs/{org_id}/conflicts", get(orgs::list_conflicts))
+        .route(
+            "/orgs/{org_id}/conflicts/{conflict_id}/resolve",
+            post(orgs::resolve_conflict),
+        )
         .route("/orgs/{org_id}/billing", get(billing::get_billing_status))
         .route(
             "/orgs/{org_id}/billing/checkout",

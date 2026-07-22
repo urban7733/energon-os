@@ -48,6 +48,14 @@ const context = await energon.context.build({
   task: "Handle a checkout request for this customer.",
   tokenBudget: 1_500,
 });
+
+await energon.claims.assert({
+  subject: "customer:123",
+  predicate: "regional_eligibility",
+  value: { approved: true, region: "CH" },
+  confidenceBps: 9_100,
+  evidenceMemoryIds: [privateMemory.memory_id],
+});
 ```
 
 ## Guarantees
@@ -58,6 +66,7 @@ The SDK purposely exposes high-level swarm operations:
 memory.remember()     private memory for the authenticated agent
 memory.share()        explicit, audited promotion to a shared scope
 context.build()       permission-filtered context pack
+claims.assert()       structured claim with evidence and agent confidence
 audit.context()       inspect the context decision
 audit.promotion()     inspect a sharing decision
 swarm.runtime()       validate agent identity and active control-plane guarantees
@@ -72,6 +81,11 @@ initial attempt for transient network and availability failures.
 When x402 is enabled, supply `paymentSignature` so the client obtains a fresh
 payment payload immediately before each request. A `402` becomes an
 `EnergonError` whose `paymentRequired` field contains the server challenge.
+
+Claim authority is intentionally absent from `claims.assert()`: it is derived
+from the active agent role's operator-managed policy. A close contradiction
+returns `resolution: "contested"` and a `conflict_id`; the human operator then
+resolves the two persisted branches in the dashboard.
 
 ## Publishing
 

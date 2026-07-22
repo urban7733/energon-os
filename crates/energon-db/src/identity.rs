@@ -112,6 +112,16 @@ pub async fn ensure_org_exists(pool: &PgPool, org_id: &str) -> Result<(), DbErro
     Ok(())
 }
 
+/// Ensure a role exists before an operator creates its authority policy. This
+/// lets the dashboard configure a role before the first agent is provisioned.
+pub async fn ensure_role_exists(pool: &PgPool, org_id: &str, role_id: &str) -> Result<(), DbError> {
+    let mut tx = pool.begin().await?;
+    ensure_org(&mut tx, org_id).await?;
+    ensure_role(&mut tx, org_id, role_id).await?;
+    tx.commit().await?;
+    Ok(())
+}
+
 #[derive(Debug, Clone)]
 pub struct ApiKeyMetadata {
     pub api_key_id: String,

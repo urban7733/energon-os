@@ -1,12 +1,13 @@
 # Railway Deployment
 
-Energon OS needs four Railway services in one project:
+Energon OS needs five Railway services in one project:
 
 ```txt
 web       Next.js + Better Auth + dashboard
 api       Rust/Axum API
 worker    Rust embedding worker
 postgres  pgvector PostgreSQL
+nats      NATS with JetStream enabled
 ```
 
 Cloudflare can still provide DNS, TLS and WAF in front of the Railway domains.
@@ -18,6 +19,14 @@ server routes and sessions.
 Create Railway's `pgvector` Postgres template. Reference its private
 `DATABASE_URL` from the `api`, `worker`, and `web` services. The API runs the
 repository migrations automatically at startup.
+
+Create a private NATS service with JetStream enabled (`nats-server -js`). Do
+not expose it publicly. Give the worker its private connection URL:
+
+```txt
+ENERGON_NATS_URL=nats://<private-nats-host>:4222
+ENERGON_EVENT_OUTBOX_BATCH_SIZE=100
+```
 
 ## 2. API
 
@@ -47,8 +56,10 @@ Create another service from the same root `Dockerfile` and set:
 ENERGON_PROCESS=energon-worker
 ```
 
-Set `DATABASE_URL`, `OPENAI_API_KEY`, `ENERGON_EMBEDDING_MODEL`, and
-`ENERGON_EMBEDDING_BATCH_SIZE`. The worker needs no public domain.
+Set `DATABASE_URL`, `OPENAI_API_KEY` (optional when only publishing events),
+`ENERGON_EMBEDDING_MODEL`, `ENERGON_EMBEDDING_BATCH_SIZE`,
+`ENERGON_NATS_URL`, and `ENERGON_EVENT_OUTBOX_BATCH_SIZE`. The worker needs no
+public domain.
 
 ## 4. Web
 

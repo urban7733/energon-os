@@ -1,9 +1,12 @@
-use energon_core::{AgentIdentity, AuditRecord, ContextItem, PromotionAuditRecord};
+use energon_core::{
+    AgentIdentity, AuditRecord, ContextItem, ControlPlaneEvent, PromotionAuditRecord,
+};
 use sqlx::{PgPool, Postgres, Row, Transaction};
 
 use crate::{
     DbError,
     errors::{i64_to_u128, usize_to_i32},
+    event_outbox,
     memory::{scope_from_str, scope_to_str},
 };
 
@@ -73,6 +76,8 @@ pub async fn insert_context_audit(
         .execute(&mut *tx)
         .await?;
     }
+
+    event_outbox::enqueue_in_tx(&mut tx, &ControlPlaneEvent::context_built(audit)).await?;
 
     tx.commit().await?;
 

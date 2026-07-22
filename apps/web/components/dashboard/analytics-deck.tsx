@@ -12,7 +12,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { Activity, BarChart3, BrainCircuit, Database, ShieldCheck } from "lucide-react";
+import { Activity, BarChart3, BrainCircuit, Database, RadioTower, ShieldCheck } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
 
 type UsageRoute = {
@@ -34,6 +34,14 @@ type ContextAuditData = {
   token_budget: number;
 } | null;
 
+type OutboxStatus = {
+  storage: "memory" | "postgres";
+  pending: number;
+  leased: number;
+  published: number;
+  retrying: number;
+} | null;
+
 type LifecycleItem = readonly [string, boolean, string];
 
 type AnalyticsDeckProps = {
@@ -42,6 +50,7 @@ type AnalyticsDeckProps = {
   totalMemories: number;
   agentCount: number;
   contextAudit: ContextAuditData;
+  outbox: OutboxStatus;
   lifecycle: readonly LifecycleItem[];
 };
 
@@ -53,6 +62,7 @@ export function AnalyticsDeck({
   totalMemories,
   agentCount,
   contextAudit,
+  outbox,
   lifecycle,
 }: AnalyticsDeckProps) {
   const totalCalls = usage.reduce((total, route) => total + route.calls, 0);
@@ -67,6 +77,10 @@ export function AnalyticsDeck({
     : 0;
   const approvedRate = auditTotal
     ? Math.round((contextAudit!.allowed_memory_ids.length / auditTotal) * 100)
+    : null;
+  const eventTotal = outbox ? outbox.pending + outbox.leased + outbox.published : 0;
+  const eventDeliveryRate = eventTotal > 0 && outbox
+    ? Math.round((outbox.published / eventTotal) * 100)
     : null;
 
   const usageData = usage.map((route) => ({
@@ -112,6 +126,11 @@ export function AnalyticsDeck({
           <span>USDC settled</span>
           <strong>{formatUsdc(paidUsdcMicro)}</strong>
           <p>from recorded paid actions</p>
+        </article>
+        <article>
+          <span>Event delivery</span>
+          <strong>{eventDeliveryRate === null ? "--" : `${eventDeliveryRate}%`}</strong>
+          <p>{outbox ? `${outbox.pending} pending · ${outbox.retrying} retrying` : "awaiting durable storage"}</p>
         </article>
       </div>
 
@@ -168,10 +187,14 @@ export function AnalyticsDeck({
             )}
           </article>
           <article className="analytics-aside">
-            <div className="analytics-aside-icon"><BrainCircuit size={18} aria-hidden="true" /></div>
-            <span>Cost visibility</span>
-            <strong>{formatUsdc(paidUsdcMicro)}</strong>
-            <p>Paid API actions are settled before a context pack is returned.</p>
+            <div className="analytics-aside-icon"><RadioTower size={18} aria-hidden="true" /></div>
+            <span>Durable events</span>
+            <strong>{outbox ? outbox.published.toLocaleString() : "--"}</strong>
+            <p>
+              {outbox
+                ? `${outbox.leased} being delivered · ${outbox.retrying} retrying`
+                : "Event delivery is visible after persistent storage is connected."}
+            </p>
           </article>
         </TabsContent>
 

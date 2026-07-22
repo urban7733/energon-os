@@ -21,11 +21,24 @@ const context = await energon.context.build({
   task: "Plan the next retry window.",
   tokenBudget: 1_500,
 });
+
+await energon.claims.assert({
+  subject: "vendor:upstream",
+  predicate: "rate_limit_state",
+  value: { status: "reduced" },
+  confidenceBps: 8_700,
+  evidenceMemoryIds: ["mem_..."],
+});
 ```
 
 `Energon` always derives the calling agent, swarm, project, and role from the
 API key. The SDK does not accept identity fields for agent operations, so an
 agent cannot impersonate another swarm member through SDK input.
+
+Claims are structured facts rather than free-form memory. The agent submits
+confidence and evidence, while Energon derives role authority from the
+operator-managed policy. Conflicting claims return a branch identifier for the
+operator workflow instead of silently overwriting the existing fact.
 
 The client intentionally does not automatically retry `POST` operations: a
 timeout after a write can be ambiguous without an idempotency key. It retries

@@ -296,6 +296,7 @@ GET  /v1/swarm/runtime
 POST /v1/memory/write
 POST /v1/context/build
 POST /v1/memory/promote
+POST /v1/claims/assert
 GET  /v1/vault/obsidian.zip
 GET  /v1/audit/context/{request_id}
 GET  /v1/audit/promotion/{promoted_memory_id}
@@ -313,6 +314,11 @@ GET    /v1/orgs/{org_id}/memories?scope=&limit=&offset=
 GET    /v1/orgs/{org_id}/memory-stats
 DELETE /v1/orgs/{org_id}/memories/{memory_id}
 GET    /v1/orgs/{org_id}/usage
+GET    /v1/orgs/{org_id}/events/outbox
+GET    /v1/orgs/{org_id}/role-policies
+PUT    /v1/orgs/{org_id}/role-policies/{role_id}
+GET    /v1/orgs/{org_id}/conflicts
+POST   /v1/orgs/{org_id}/conflicts/{conflict_id}/resolve
 GET    /v1/orgs/{org_id}/billing
 POST   /v1/orgs/{org_id}/billing/checkout
 POST   /v1/orgs/{org_id}/billing/complete

@@ -34,6 +34,7 @@ export default async function DashboardPage() {
           <a href="#overview">Analytics</a>
           <a href="#agents">Set up</a>
           <a href="#org-agents">Agents and keys</a>
+          <a href="#conflicts">Authority and conflicts</a>
           <a href="#memory">Memory</a>
           <a href="#context">Context and audit</a>
           <a href="#billing">Billing</a>
