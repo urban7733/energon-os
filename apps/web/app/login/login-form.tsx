@@ -7,12 +7,10 @@ import { authClient } from "../../lib/auth-client";
 
 type AuthMode = "sign-in" | "sign-up";
 
-export type SocialProviderId = "github" | "google" | "apple";
+export type SocialProviderId = "github";
 
 const socialProviderLabels: Record<SocialProviderId, string> = {
   github: "Continue with GitHub",
-  google: "Continue with Google",
-  apple: "Continue with Apple",
 };
 
 export function LoginForm({ socialProviders }: { socialProviders: SocialProviderId[] }) {

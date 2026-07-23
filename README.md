@@ -5,7 +5,7 @@
 
 **The memory OS for AI agents.** Open source core. Hosted API for production.
 
-Energon OS is the permissioned memory and context layer for AI agent swarms. Connect one agent or one million — developers control scopes, token budgets, and which agent gets more memory than another.
+Energon OS is the permissioned memory and context layer for AI agent swarms. Connect one agent or a distributed swarm — developers control scopes, token budgets, and which agent gets more memory than another.
 
 It does not run agents, click browsers, execute workflows, make payments, or host agent runtimes. Agents live in other systems. Energon decides what memory each agent is allowed to see for a specific task, retrieves only permitted context, packs it into a token budget, and records an audit trail.
 
@@ -115,17 +115,19 @@ should be built as a separate service or repository. Energon should integrate
 with it through clean APIs when payment-aware agents need memory, identity,
 permissions, or audit context.
 
-The first crypto payment boundary in this repo is an x402 API gate. When enabled,
-paid agent routes return `402 Payment Required` with payment instructions before
-memory or context is delivered. Real wallet custody, private keys, treasury
-automation, accounting, and broader payment orchestration stay outside this
-memory core.
+This repository has two crypto payment boundaries. The x402 API gate lets agents
+pay per paid request; when enabled it returns `402 Payment Required` before
+memory or context is delivered. The operator dashboard also supports a direct
+Base-USDC purchase that unlocks an organization for 30 days after the API
+verifies the transfer. Real wallet custody, private keys, treasury automation,
+accounting, and recurring-debit orchestration stay outside this memory core.
 
-## API-First Product Model
+## SDK-First Product Model
 
 The primary users of Energon OS are agents, not humans clicking through a UI.
 The dashboard is an operator surface for setup, inspection, and audits. The core
-product surface is the API and future SDKs that autonomous agents call directly.
+product surface is the SDK that autonomous agent runtimes call directly. The
+HTTP API is the versioned control-plane transport behind that SDK.
 
 The long-term scale goal is that billions of external agents can use Energon as
 their permissioned memory layer. Every design decision should preserve that
@@ -133,7 +135,8 @@ shape:
 
 ```txt
 Autonomous agents
-  -> Energon API/SDK
+  -> Energon SDK
+  -> Energon control plane
   -> permissioned memory and context
   -> audited context pack
   -> autonomous agents
@@ -208,6 +211,12 @@ user_private  one user-approved context path
 session       one temporary task/session
 ```
 
+The schema reserves all seven scopes, but the current agent API only accepts
+direct `agent_private` writes. An agent must explicitly promote its own memory
+to `open`, `org`, `project`, or `role`, with an audit reason. `user_private`
+and `session` access require a separately signed capability grant and are not
+accepted from a bearer API-key request yet.
+
 Private memory never flows back into shared memory automatically. Promotion must be explicit:
 
 ```txt
@@ -239,7 +248,7 @@ sqlx for explicit SQL access
 Cedar policies for authorization rules
 Cloudflare R2 / MinIO for large document storage
 OpenAI embeddings behind a provider interface
-TypeScript and Python SDKs later
+Official TypeScript SDK for agent runtimes
 Next.js/Bun landing page and operator dashboard
 ```
 
@@ -247,24 +256,47 @@ Current repository state:
 
 ```txt
 crates/energon-core   pure domain logic for memory, permissions, retrieval, packing
-crates/energon-api    Axum API with dev identity headers and pluggable storage
+crates/energon-api    Rust control plane with dev identity headers and pluggable storage
 crates/energon-db     Postgres/sqlx repositories for identity, memory, and audit
 crates/energon-worker async worker for OpenAI embeddings into pgvector chunks
 migrations/           Postgres schema for identity, memory, chunks, and audit
 policies/             Cedar policy starting point
-apps/web              Next.js site + Better Auth (email/password + GitHub/Google/Apple, orgs, JWT/JWKS)
+apps/web              Next.js site + Better Auth (email/password + optional GitHub, orgs, JWT/JWKS)
+packages/sdk-typescript official server-side TypeScript SDK for agent runtimes
 ```
 
-## Production API
+## Swarm Control Plane
+
+The Rust service is the Energon control plane. Product integrations should use
+the official SDK, which holds the stable agent-facing contract and prevents
+applications from sending identity fields that an agent must not control.
+
+```ts
+import { Energon } from "@energon/sdk";
+
+const energon = new Energon({
+  baseUrl: process.env.ENERGON_API_URL!,
+  apiKey: process.env.ENERGON_AGENT_API_KEY!,
+});
+
+await energon.memory.remember({ content: "Private verified finding." });
+const context = await energon.context.build({ task: "plan next action" });
+```
+
+The HTTP endpoints below are the internal control-plane contract used by the
+SDK and by self-hosted deployments. They remain versioned and supported, but
+application code should prefer the SDK surface.
 
 Agent endpoints (bearer `eos_live_...` API keys):
 
 ```txt
 GET  /health
 GET  /v1/billing/x402
+GET  /v1/swarm/runtime
 POST /v1/memory/write
 POST /v1/context/build
 POST /v1/memory/promote
+POST /v1/claims/assert
 GET  /v1/vault/obsidian.zip
 GET  /v1/audit/context/{request_id}
 GET  /v1/audit/promotion/{promoted_memory_id}
@@ -279,19 +311,31 @@ GET    /v1/orgs/{org_id}/agents
 POST   /v1/orgs/{org_id}/agents/{agent_id}/keys
 DELETE /v1/orgs/{org_id}/keys/{api_key_id}
 GET    /v1/orgs/{org_id}/memories?scope=&limit=&offset=
+GET    /v1/orgs/{org_id}/memory-stats
 DELETE /v1/orgs/{org_id}/memories/{memory_id}
 GET    /v1/orgs/{org_id}/usage
+GET    /v1/orgs/{org_id}/events/outbox
+GET    /v1/orgs/{org_id}/vault/obsidian.zip
+GET    /v1/orgs/{org_id}/role-policies
+PUT    /v1/orgs/{org_id}/role-policies/{role_id}
+GET    /v1/orgs/{org_id}/conflicts
+POST   /v1/orgs/{org_id}/conflicts/{conflict_id}/resolve
+GET    /v1/orgs/{org_id}/billing
+POST   /v1/orgs/{org_id}/billing/checkout
+POST   /v1/orgs/{org_id}/billing/complete
 ```
 
-Humans sign in through the web app — Better Auth email/password, or GitHub,
-Google, and Apple social login (each provider enables itself when its
-`*_CLIENT_ID`/`*_CLIENT_SECRET` env vars are set; see `.env.example`). Users
+Humans sign in through the web app with Better Auth email/password, or optional
+GitHub login when its credentials are configured (see `.env.example`). Users
 create an organization and manage agents and API keys from the dashboard. The
 dashboard mints short-lived EdDSA JWTs which the Rust API verifies against the
 Better Auth JWKS endpoint (`ENERGON_JWKS_URL`).
 
 All paid usage is crypto-only: agents pay per request through x402, and human
-plans settle in USDC. There is no fiat payment path anywhere in the platform.
+operators can buy a 30-day organization plan in USDC on Base. The server
+verifies the USDC ERC-20 transfer and wallet signature before it unlocks the
+plan's included operations. There is no fiat payment path anywhere in the
+platform.
 
 `POST /v1/admin/agents` with `x-energon-admin-token` still exists but is a
 BOOTSTRAP-ONLY escape hatch (e.g. first agent before the web app is up):
@@ -309,20 +353,24 @@ curl -X POST http://127.0.0.1:3001/v1/admin/agents \
   }'
 ```
 
-Full API examples are in [docs/api.md](docs/api.md).
+The SDK guide is in [docs/sdk-typescript.md](docs/sdk-typescript.md). The
+low-level self-hosting contract is in [docs/api.md](docs/api.md).
 
 ## Obsidian Vault Export
 
 Humans can inspect agent memory as a real Obsidian-compatible vault. The API
 exports permission-filtered Markdown notes for agents, organizations, projects,
-roles, sessions, memories, context builds, and promotions. Notes use YAML
-frontmatter and Obsidian `[[wikilinks]]`, so Obsidian's graph view shows who
-wrote what, where it belongs, which context builds used it, and how private
-memory was promoted.
+roles, sessions, memories, context builds, and promotions. The operator export
+adds structured claims, conflict branches, and the hash-linked audit ledger.
+Notes use YAML frontmatter and Obsidian `[[wikilinks]]`, so Obsidian's graph
+view shows who wrote what, where it belongs, which context builds used it, and
+how private memory was promoted.
 
 The vault is a read-only human view. Energon OS remains the source of truth for
 permissions, Postgres storage, pgvector retrieval, and audit logs. The export
-must never bypass identity or permission filtering.
+must never bypass identity or permission filtering. In the operator-wide vault,
+private memory content is redacted while the node remains visible for graph
+inspection.
 
 ## Local Development
 
@@ -412,5 +460,7 @@ real public launch, the remaining non-code production work is:
 1. Deploy API, worker, and web app with real secrets.
 2. Configure backups, monitoring, and log aggregation.
 3. Run load tests against realistic memory volume.
-4. Generate public SDKs from the stabilized API.
-5. Flip x402 to Base mainnet USDC (see docs/crypto-payments.md).
+4. Publish the verified TypeScript SDK and add the Python SDK from the same
+   versioned control-plane contract.
+5. Configure a production Base RPC provider, receiving wallet and mainnet USDC
+   variables before enabling real payments (see docs/crypto-payments.md).

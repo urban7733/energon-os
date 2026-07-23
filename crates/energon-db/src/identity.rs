@@ -112,6 +112,16 @@ pub async fn ensure_org_exists(pool: &PgPool, org_id: &str) -> Result<(), DbErro
     Ok(())
 }
 
+/// Ensure a role exists before an operator creates its authority policy. This
+/// lets the dashboard configure a role before the first agent is provisioned.
+pub async fn ensure_role_exists(pool: &PgPool, org_id: &str, role_id: &str) -> Result<(), DbError> {
+    let mut tx = pool.begin().await?;
+    ensure_org(&mut tx, org_id).await?;
+    ensure_role(&mut tx, org_id, role_id).await?;
+    tx.commit().await?;
+    Ok(())
+}
+
 #[derive(Debug, Clone)]
 pub struct ApiKeyMetadata {
     pub api_key_id: String,
@@ -350,14 +360,14 @@ async fn ensure_agent(
     project_id: Option<&str>,
     role_id: Option<&str>,
 ) -> Result<(), DbError> {
-    sqlx::query(
+    let result = sqlx::query(
         r#"
         INSERT INTO agents (agent_id, org_id, project_id, role_id, name)
         VALUES ($1, $2, $3, $4, $1)
         ON CONFLICT (agent_id) DO UPDATE SET
-            org_id = EXCLUDED.org_id,
             project_id = EXCLUDED.project_id,
             role_id = EXCLUDED.role_id
+        WHERE agents.org_id = EXCLUDED.org_id
         "#,
     )
     .bind(agent_id)
@@ -366,6 +376,10 @@ async fn ensure_agent(
     .bind(role_id)
     .execute(&mut **tx)
     .await?;
+
+    if result.rows_affected() == 0 {
+        return Err(DbError::AgentIdAlreadyInUse(agent_id.to_owned()));
+    }
 
     Ok(())
 }
@@ -378,15 +392,15 @@ async fn upsert_agent(
     role_id: Option<&str>,
     name: &str,
 ) -> Result<(), DbError> {
-    sqlx::query(
+    let result = sqlx::query(
         r#"
         INSERT INTO agents (agent_id, org_id, project_id, role_id, name)
         VALUES ($1, $2, $3, $4, $5)
         ON CONFLICT (agent_id) DO UPDATE SET
-            org_id = EXCLUDED.org_id,
             project_id = EXCLUDED.project_id,
             role_id = EXCLUDED.role_id,
             name = EXCLUDED.name
+        WHERE agents.org_id = EXCLUDED.org_id
         "#,
     )
     .bind(agent_id)
@@ -396,6 +410,10 @@ async fn upsert_agent(
     .bind(name)
     .execute(&mut **tx)
     .await?;
+
+    if result.rows_affected() == 0 {
+        return Err(DbError::AgentIdAlreadyInUse(agent_id.to_owned()));
+    }
 
     Ok(())
 }

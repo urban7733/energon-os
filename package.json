@@ -2,7 +2,8 @@
   "private": true,
   "name": "energon-os",
   "workspaces": [
-    "apps/web"
+    "apps/web",
+    "packages/*"
   ],
   "scripts": {
     "api:dev": "ENERGON_BIND_ADDR=127.0.0.1:3001 cargo run -p energon-api",
@@ -10,6 +11,10 @@
     "web:build": "bun --cwd apps/web build",
     "web:start": "bun --cwd apps/web start",
     "web:lint": "bun --cwd apps/web lint",
-    "check": "cargo fmt --all --check && cargo test --workspace && bun run web:lint && bun run web:build"
+    "sdk:build": "bun --cwd=packages/sdk-typescript run build",
+    "sdk:check": "bun --cwd=packages/sdk-typescript run check",
+    "sdk:test": "bun --cwd=packages/sdk-typescript test",
+    "agent:live": "bun tools/live-agent.mjs",
+    "check": "cargo fmt --all --check && cargo test --workspace && bun run sdk:check && bun run sdk:test && bun run sdk:build && bun run web:lint && bun run web:build"
   }
 }

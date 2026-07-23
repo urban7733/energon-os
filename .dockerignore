@@ -1,9 +1,8 @@
-target
 .git
-.env
-.env.local
-.DS_Store
-data
+.next
 node_modules
-apps/web/.next
-apps/web/out
+target
+.wrangler
+.env
+.env.*
+*.log

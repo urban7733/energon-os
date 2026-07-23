@@ -59,13 +59,18 @@ pub fn build_context(
     memories: &[MemoryRecord],
     created_at_unix_ms: u128,
 ) -> ContextBuildOutcome {
+    // Agent API keys are not proof of a human user or a session. Those claims
+    // need a separately signed capability grant before they can unlock private
+    // user/session overlays.
+    let user_id = None;
+    let session_id = None;
     let access_context = AccessContext {
         project_id: request
             .project_id
             .clone()
             .or_else(|| agent.project_id.clone()),
-        user_id: request.user_id.clone(),
-        session_id: request.session_id.clone(),
+        user_id,
+        session_id,
     };
 
     let mut denied_memory_count = 0;

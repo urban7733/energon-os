@@ -35,6 +35,7 @@ pub struct RoutePricing {
     pub memory_write_micro: u64,
     pub memory_promote_micro: u64,
     pub context_build_micro: u64,
+    pub claim_assert_micro: u64,
     pub audit_read_micro: u64,
     pub vault_export_micro: u64,
 }
@@ -45,6 +46,7 @@ impl Default for RoutePricing {
             memory_write_micro: 1_000,
             memory_promote_micro: 1_000,
             context_build_micro: 3_000,
+            claim_assert_micro: 1_000,
             audit_read_micro: 500,
             vault_export_micro: 5_000,
         }
@@ -68,6 +70,10 @@ impl RoutePricing {
                 "ENERGON_PRICE_CONTEXT_BUILD_MICRO",
                 defaults.context_build_micro,
             ),
+            claim_assert_micro: price_env(
+                "ENERGON_PRICE_CLAIM_ASSERT_MICRO",
+                defaults.claim_assert_micro,
+            ),
             audit_read_micro: price_env(
                 "ENERGON_PRICE_AUDIT_READ_MICRO",
                 defaults.audit_read_micro,
@@ -84,6 +90,7 @@ impl RoutePricing {
             PaidRoute::MemoryWrite => self.memory_write_micro,
             PaidRoute::MemoryPromote => self.memory_promote_micro,
             PaidRoute::ContextBuild => self.context_build_micro,
+            PaidRoute::ClaimAssert => self.claim_assert_micro,
             PaidRoute::ContextAuditRead | PaidRoute::PromotionAuditRead => self.audit_read_micro,
             PaidRoute::ObsidianVaultExport => self.vault_export_micro,
         }
@@ -137,6 +144,7 @@ pub enum PaidRoute {
     MemoryWrite,
     MemoryPromote,
     ContextBuild,
+    ClaimAssert,
     ContextAuditRead,
     PromotionAuditRead,
     ObsidianVaultExport,
@@ -306,6 +314,7 @@ impl X402Config {
                 self.payment_required(PaidRoute::MemoryWrite),
                 self.payment_required(PaidRoute::MemoryPromote),
                 self.payment_required(PaidRoute::ContextBuild),
+                self.payment_required(PaidRoute::ClaimAssert),
                 self.payment_required(PaidRoute::ContextAuditRead),
                 self.payment_required(PaidRoute::PromotionAuditRead),
                 self.payment_required(PaidRoute::ObsidianVaultExport),
@@ -436,6 +445,7 @@ impl PaidRoute {
             PaidRoute::MemoryWrite => "POST /v1/memory/write",
             PaidRoute::MemoryPromote => "POST /v1/memory/promote",
             PaidRoute::ContextBuild => "POST /v1/context/build",
+            PaidRoute::ClaimAssert => "POST /v1/claims/assert",
             PaidRoute::ContextAuditRead => "GET /v1/audit/context/{request_id}",
             PaidRoute::PromotionAuditRead => "GET /v1/audit/promotion/{promoted_memory_id}",
             PaidRoute::ObsidianVaultExport => "GET /v1/vault/obsidian.zip",
@@ -462,6 +472,7 @@ impl PaidRoute {
             PaidRoute::MemoryWrite => "Write a permissioned memory record.",
             PaidRoute::MemoryPromote => "Promote private memory into a shared scope with audit.",
             PaidRoute::ContextBuild => "Build an allowed context pack for an external agent.",
+            PaidRoute::ClaimAssert => "Assert a structured swarm claim with evidence.",
             PaidRoute::ContextAuditRead => "Read the audit record for a context build.",
             PaidRoute::PromotionAuditRead => "Read the audit record for a memory promotion.",
             PaidRoute::ObsidianVaultExport => {
@@ -476,6 +487,7 @@ impl PaidRoute {
             PaidRoute::MemoryWrite => "memory_write",
             PaidRoute::MemoryPromote => "memory_promote",
             PaidRoute::ContextBuild => "context_build",
+            PaidRoute::ClaimAssert => "claim_assert",
             PaidRoute::ContextAuditRead => "context_audit_read",
             PaidRoute::PromotionAuditRead => "promotion_audit_read",
             PaidRoute::ObsidianVaultExport => "vault_export",
@@ -652,6 +664,7 @@ mod tests {
         assert_eq!(pricing.amount_usdc_micro(PaidRoute::MemoryWrite), 1_000);
         assert_eq!(pricing.amount_usdc_micro(PaidRoute::MemoryPromote), 1_000);
         assert_eq!(pricing.amount_usdc_micro(PaidRoute::ContextBuild), 3_000);
+        assert_eq!(pricing.amount_usdc_micro(PaidRoute::ClaimAssert), 1_000);
         assert_eq!(pricing.amount_usdc_micro(PaidRoute::ContextAuditRead), 500);
         assert_eq!(
             pricing.amount_usdc_micro(PaidRoute::PromotionAuditRead),

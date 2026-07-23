@@ -12,8 +12,8 @@ use energon_core::{AuditRecord, MemoryRecord, PromotionAuditRecord};
 use sqlx::PgPool;
 
 use crate::{
-    embedding::EmbeddingClient, jwt::JwtVerifier, middleware::rate_limit::RateLimiter,
-    x402::X402Config,
+    chain::BaseCheckoutConfig, embedding::EmbeddingClient, jwt::JwtVerifier,
+    middleware::rate_limit::RateLimiter, x402::X402Config,
 };
 
 #[derive(Clone)]
@@ -21,6 +21,7 @@ pub struct AppState {
     pub storage: StorageBackend,
     pub auth: AuthConfig,
     pub x402: X402Config,
+    pub billing: Option<BaseCheckoutConfig>,
     pub jwt: Option<JwtVerifier>,
     pub embedding: Option<EmbeddingClient>,
     pub rate_limiter: RateLimiter,
@@ -30,6 +31,9 @@ pub struct AppState {
     next_request: Arc<AtomicU64>,
     next_receipt: Arc<AtomicU64>,
     next_usage_event: Arc<AtomicU64>,
+    next_checkout: Arc<AtomicU64>,
+    next_claim: Arc<AtomicU64>,
+    next_conflict: Arc<AtomicU64>,
 }
 
 #[derive(Clone)]
@@ -63,7 +67,7 @@ pub struct InMemoryStorage {
 }
 
 impl AppState {
-    fn new_with_x402(x402: X402Config) -> Self {
+    fn new_with_x402(x402: X402Config, billing: Option<BaseCheckoutConfig>) -> Self {
         Self {
             storage: StorageBackend::Memory(InMemoryStorage::new()),
             auth: AuthConfig {
@@ -72,6 +76,7 @@ impl AppState {
                 api_key_pepper: env::var("ENERGON_API_KEY_PEPPER").ok(),
             },
             x402,
+            billing,
             jwt: JwtVerifier::from_env(),
             embedding: EmbeddingClient::from_env(),
             rate_limiter: RateLimiter::from_env(),
@@ -81,19 +86,31 @@ impl AppState {
             next_request: Arc::new(AtomicU64::new(1)),
             next_receipt: Arc::new(AtomicU64::new(1)),
             next_usage_event: Arc::new(AtomicU64::new(1)),
+            next_checkout: Arc::new(AtomicU64::new(1)),
+            next_claim: Arc::new(AtomicU64::new(1)),
+            next_conflict: Arc::new(AtomicU64::new(1)),
         }
     }
 
     pub async fn from_env() -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
+        if is_production() {
+            validate_production_environment()?;
+        }
+
         let x402 = X402Config::from_env()
+            .map_err(|message| std::io::Error::new(std::io::ErrorKind::InvalidInput, message))?;
+        let billing = BaseCheckoutConfig::from_env(&x402)
             .map_err(|message| std::io::Error::new(std::io::ErrorKind::InvalidInput, message))?;
 
         let Some(database_url) = env::var("DATABASE_URL")
             .ok()
             .filter(|value| !value.trim().is_empty())
         else {
+            if is_production() {
+                return Err(config_error("DATABASE_URL must be set in production"));
+            }
             tracing::info!("DATABASE_URL is not set; using in-memory storage");
-            return Ok(Self::new_with_x402(x402));
+            return Ok(Self::new_with_x402(x402, billing));
         };
 
         let pool = energon_db::pool::connect(&database_url).await?;
@@ -115,6 +132,7 @@ impl AppState {
                 api_key_pepper: Some(api_key_pepper),
             },
             x402,
+            billing,
             jwt: JwtVerifier::from_env(),
             embedding: EmbeddingClient::from_env(),
             rate_limiter: RateLimiter::from_env(),
@@ -124,6 +142,9 @@ impl AppState {
             next_request: Arc::new(AtomicU64::new(1)),
             next_receipt: Arc::new(AtomicU64::new(1)),
             next_usage_event: Arc::new(AtomicU64::new(1)),
+            next_checkout: Arc::new(AtomicU64::new(1)),
+            next_claim: Arc::new(AtomicU64::new(1)),
+            next_conflict: Arc::new(AtomicU64::new(1)),
         })
     }
 
@@ -151,6 +172,21 @@ impl AppState {
         let id = self.next_usage_event.fetch_add(1, Ordering::Relaxed);
         format!("usage_{}_{}", now_unix_ms(), id)
     }
+
+    pub fn next_checkout_intent_id(&self) -> String {
+        let id = self.next_checkout.fetch_add(1, Ordering::Relaxed);
+        format!("checkout_{}_{}", now_unix_ms(), id)
+    }
+
+    pub fn next_claim_id(&self) -> String {
+        let id = self.next_claim.fetch_add(1, Ordering::Relaxed);
+        format!("claim_{}_{}", now_unix_ms(), id)
+    }
+
+    pub fn next_conflict_id(&self) -> String {
+        let id = self.next_conflict.fetch_add(1, Ordering::Relaxed);
+        format!("conflict_{}_{}", now_unix_ms(), id)
+    }
 }
 
 fn retrieval_candidate_limit() -> i64 {
@@ -161,6 +197,45 @@ fn retrieval_candidate_limit() -> i64 {
         .unwrap_or(500)
 }
 
+pub fn is_production() -> bool {
+    is_production_value(env::var("ENERGON_ENV").ok().as_deref())
+}
+
+fn is_production_value(value: Option<&str>) -> bool {
+    value.is_some_and(|value| value.trim().eq_ignore_ascii_case("production"))
+}
+
+fn validate_production_environment() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    required_env("DATABASE_URL")?;
+    required_env("ENERGON_API_KEY_PEPPER")?;
+    required_env("ENERGON_JWKS_URL")?;
+    required_env("ENERGON_WEB_ORIGIN")?;
+
+    if env_flag("ENERGON_DEV_AUTH") {
+        return Err(config_error(
+            "ENERGON_DEV_AUTH must not be enabled in production",
+        ));
+    }
+
+    if env_flag("ENERGON_X402_ACCEPT_UNVERIFIED") {
+        return Err(config_error(
+            "ENERGON_X402_ACCEPT_UNVERIFIED must not be enabled in production",
+        ));
+    }
+
+    Ok(())
+}
+
+fn env_flag(name: &str) -> bool {
+    env::var(name)
+        .ok()
+        .is_some_and(|value| value == "1" || value.eq_ignore_ascii_case("true"))
+}
+
+fn config_error(message: impl Into<String>) -> Box<dyn std::error::Error + Send + Sync> {
+    std::io::Error::new(std::io::ErrorKind::InvalidInput, message.into()).into()
+}
+
 fn required_env(name: &'static str) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
     env::var(name)
         .ok()
@@ -168,7 +243,7 @@ fn required_env(name: &'static str) -> Result<String, Box<dyn std::error::Error 
         .ok_or_else(|| {
             std::io::Error::new(
                 std::io::ErrorKind::InvalidInput,
-                format!("{name} must be set when DATABASE_URL is configured"),
+                format!("{name} must be set"),
             )
             .into()
         })
@@ -190,4 +265,17 @@ pub fn now_unix_ms() -> u128 {
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default()
         .as_millis()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::is_production_value;
+
+    #[test]
+    fn production_mode_requires_an_explicit_value() {
+        assert!(is_production_value(Some("production")));
+        assert!(is_production_value(Some("PRODUCTION")));
+        assert!(!is_production_value(Some("development")));
+        assert!(!is_production_value(None));
+    }
 }

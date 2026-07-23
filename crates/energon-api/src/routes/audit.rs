@@ -8,7 +8,7 @@ use axum::{
 use crate::{
     errors::ApiError,
     middleware::auth::identity_from_request,
-    payments::record_usage,
+    payments::{authorize_paid_usage, record_usage},
     state::{AppState, StorageBackend},
     x402::{PaidRoute, attach_payment_response},
 };
@@ -18,11 +18,9 @@ pub async fn get_context_audit(
     headers: HeaderMap,
     Path(request_id): Path<String>,
 ) -> Result<Response, ApiError> {
-    let payment = state
-        .x402
-        .require_payment(&headers, PaidRoute::ContextAuditRead)
-        .await?;
     let agent = identity_from_request(&state, &headers).await?;
+    let payment =
+        authorize_paid_usage(&state, &headers, &agent, PaidRoute::ContextAuditRead).await?;
     record_usage(&state, &agent, PaidRoute::ContextAuditRead, &payment).await;
     let audit = match &state.storage {
         StorageBackend::Memory(storage) => storage.audits.read().unwrap().get(&request_id).cloned(),
@@ -49,11 +47,9 @@ pub async fn get_promotion_audit(
     headers: HeaderMap,
     Path(promoted_memory_id): Path<String>,
 ) -> Result<Response, ApiError> {
-    let payment = state
-        .x402
-        .require_payment(&headers, PaidRoute::PromotionAuditRead)
-        .await?;
     let agent = identity_from_request(&state, &headers).await?;
+    let payment =
+        authorize_paid_usage(&state, &headers, &agent, PaidRoute::PromotionAuditRead).await?;
     record_usage(&state, &agent, PaidRoute::PromotionAuditRead, &payment).await;
     let audit = match &state.storage {
         StorageBackend::Memory(storage) => storage

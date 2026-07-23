@@ -1,8 +1,10 @@
 /target
 /node_modules
 /apps/web/node_modules
+/packages/*/node_modules
 /apps/web/.next
 /apps/web/out
+/packages/*/dist
 /.env
 /.env.local
 /.DS_Store
