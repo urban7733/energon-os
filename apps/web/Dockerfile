@@ -3,6 +3,7 @@ FROM oven/bun:1.3.6 AS dependencies
 WORKDIR /app
 COPY package.json bun.lock ./
 COPY apps/web/package.json apps/web/package.json
+COPY packages/sdk-typescript/package.json packages/sdk-typescript/package.json
 RUN bun install --frozen-lockfile
 
 FROM dependencies AS builder
