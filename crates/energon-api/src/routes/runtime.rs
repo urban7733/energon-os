@@ -20,7 +20,7 @@ pub struct SwarmRuntimeResponse {
     pub swarm_id: String,
     pub agent: RuntimeAgent,
     pub guarantees: RuntimeGuarantees,
-    pub capabilities: [&'static str; 5],
+    pub capabilities: [&'static str; 6],
 }
 
 #[derive(Debug, Serialize)]
@@ -60,6 +60,7 @@ impl From<AgentIdentity> for SwarmRuntimeResponse {
                 "context.permissioned.build",
                 "audit.context.read",
                 "audit.promotion.read",
+                "operations.dashboard.read",
             ],
         }
     }

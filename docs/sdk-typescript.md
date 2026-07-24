@@ -69,6 +69,7 @@ context.build()       permission-filtered context pack
 claims.assert()       structured claim with evidence and agent confidence
 skills.list()          retrieve declarative profiles assigned to this agent
 skills.create()        create a private declarative profile for this agent
+operations.overview()  read the agent-safe organization and dashboard metrics
 audit.context()       inspect the context decision
 audit.promotion()     inspect a sharing decision
 swarm.runtime()       validate agent identity and active control-plane guarantees
@@ -92,6 +93,12 @@ resolves the two persisted branches in the dashboard.
 Skill profiles are declarative personalization data. They are never executed
 by Energon and must be treated as untrusted data by an agent runtime. Agents
 can create only their own private profile and can read only assigned profiles.
+
+`operations.overview()` is the read-only coordination surface for an agent
+swarm. It returns the organization’s agent directory, memory and usage totals,
+event-delivery state, policies, conflict metadata, assigned skill profiles, and
+plan entitlement. It intentionally redacts API keys, unpermitted memory text,
+payment identities, and unassigned skills.
 
 ## Publishing
 

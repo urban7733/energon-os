@@ -59,6 +59,19 @@ class EnergonClientTests(unittest.TestCase):
             "requires_approval_for": [],
         })
 
+    def test_operations_overview_uses_the_agent_safe_dashboard_endpoint(self) -> None:
+        with patch(
+            "energon_sdk.client.urlopen",
+            return_value=_Response({"org_id": "org_1", "stats": {"memory": {"total_memories": 4}}}),
+        ) as urlopen:
+            client = Energon(base_url="https://api.energon.test", api_key="eos_live_test")
+            overview = client.operations.overview()
+
+        request = urlopen.call_args.args[0]
+        self.assertEqual(overview["stats"]["memory"]["total_memories"], 4)
+        self.assertEqual(request.full_url, "https://api.energon.test/v1/agent/overview")
+        self.assertEqual(request.get_method(), "GET")
+
     def test_invalid_configuration_never_sends_a_request(self) -> None:
         with self.assertRaises(ValueError):
             Energon(base_url="ftp://api.energon.test", api_key="eos_live_test")

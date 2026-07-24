@@ -79,6 +79,23 @@ the worker; API requests do not block on event publishing.
 }
 ```
 
+## Agent Operational Overview
+
+Every agent can retrieve the organization-level operational information that
+drives the dashboard through its own API key:
+
+```bash
+curl http://127.0.0.1:3001/v1/agent/overview \
+  -H "Authorization: Bearer $ENERGON_AGENT_API_KEY"
+```
+
+The response contains the authenticated agent identity, organization agent
+directory, memory counts by scope, route usage totals, outbox delivery status,
+role policy metadata, claim-conflict metadata, the agent's assigned skills,
+and its organization entitlement. It is read-only and does **not** expose API
+keys, other agents' private-memory content or previews, payment payer or
+transaction details, or skills that are not assigned to the caller.
+
 ## x402 Billing Status
 
 ```bash

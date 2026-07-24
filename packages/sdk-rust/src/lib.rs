@@ -117,6 +117,166 @@ pub struct SkillProfile {
     pub executable: bool,
 }
 
+/// Read-only operational state mirrored from the agent-safe dashboard view.
+/// It deliberately omits API keys, unpermitted memory text, payment identities,
+/// and skill profiles not assigned to the authenticated agent.
+#[derive(Debug, Clone, Deserialize)]
+pub struct OperationalOverview {
+    pub contract_version: String,
+    pub generated_at_unix_ms: i64,
+    pub org_id: String,
+    pub agent: OperationalAgent,
+    pub system: OperationalSystem,
+    pub directory: Vec<OperationalAgentDirectoryEntry>,
+    pub stats: OperationalStats,
+    #[serde(default)]
+    pub role_policies: Vec<OperationalRolePolicy>,
+    #[serde(default)]
+    pub conflicts: Vec<OperationalConflict>,
+    #[serde(default)]
+    pub assigned_skills: Vec<OperationalSkillProfile>,
+    pub billing: OperationalBilling,
+    #[serde(default)]
+    pub redactions: Vec<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct OperationalAgent {
+    pub agent_id: String,
+    pub role_id: Option<String>,
+    pub project_id: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct OperationalSystem {
+    pub health: OperationalHealth,
+    pub x402: serde_json::Value,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct OperationalHealth {
+    pub status: String,
+    pub service: String,
+    pub version: String,
+    pub storage: String,
+    pub database: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct OperationalAgentDirectoryEntry {
+    pub agent_id: String,
+    pub name: String,
+    pub role_id: Option<String>,
+    pub project_id: Option<String>,
+    pub created_at_unix_ms: Option<i64>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct OperationalStats {
+    pub memory: OperationalMemoryStats,
+    pub usage: OperationalUsage,
+    pub event_delivery: OperationalEventDelivery,
+    pub conflict_summary: OperationalConflictSummary,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct OperationalMemoryStats {
+    pub total_memories: i64,
+    #[serde(default)]
+    pub scopes: Vec<OperationalScopeCount>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct OperationalScopeCount {
+    pub scope: String,
+    pub count: i64,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct OperationalUsage {
+    pub storage: String,
+    #[serde(default)]
+    pub totals: Vec<OperationalRouteUsage>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct OperationalRouteUsage {
+    pub route: String,
+    pub calls: i64,
+    pub paid_calls: i64,
+    pub amount_usdc_micro: i64,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct OperationalEventDelivery {
+    pub storage: String,
+    pub pending: i64,
+    pub leased: i64,
+    pub published: i64,
+    pub retrying: i64,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct OperationalConflictSummary {
+    pub contested: i64,
+    pub resolved: i64,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct OperationalRolePolicy {
+    pub role_id: String,
+    pub authority_bps: i32,
+    pub can_resolve_conflicts: bool,
+    pub policy_version: i32,
+    pub updated_at_unix_ms: i64,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct OperationalConflict {
+    pub conflict_id: String,
+    pub subject: String,
+    pub predicate: String,
+    pub incumbent_claim_id: String,
+    pub challenger_claim_id: String,
+    pub status: String,
+    pub resolved_claim_id: Option<String>,
+    pub resolution_reason: Option<String>,
+    pub created_at_unix_ms: i64,
+    pub resolved_at_unix_ms: Option<i64>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct OperationalSkillProfile {
+    pub skill_id: String,
+    pub scope: String,
+    pub name: String,
+    pub instructions: String,
+    #[serde(default)]
+    pub allowed_tools: Vec<String>,
+    #[serde(default)]
+    pub requires_approval_for: Vec<String>,
+    pub version: i32,
+    pub created_by_kind: String,
+    pub created_by_id: String,
+    pub created_at_unix_ms: i64,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct OperationalBilling {
+    pub configured: bool,
+    pub entitlement: Option<OperationalEntitlement>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct OperationalEntitlement {
+    pub plan_id: String,
+    pub included_operations: i64,
+    pub used_operations: i64,
+    pub remaining_operations: i64,
+    pub active_from_unix_ms: i64,
+    pub expires_at_unix_ms: i64,
+}
+
 #[derive(Debug, Deserialize)]
 struct SkillsResponse {
     skills: Vec<SkillProfile>,
@@ -192,6 +352,11 @@ impl Energon {
             token_budget: input.token_budget,
         };
         self.send("POST", "/v1/context/build", Some(&body))
+    }
+
+    /// Returns agent-safe organization telemetry and dashboard metrics.
+    pub fn operational_overview(&self) -> Result<OperationalOverview> {
+        self.send::<(), _>("GET", "/v1/agent/overview", None)
     }
 
     /// Lists only profiles explicitly assigned to this authenticated agent.

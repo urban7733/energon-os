@@ -13,6 +13,7 @@ pub mod context;
 pub mod health;
 pub mod memory;
 pub mod orgs;
+pub mod overview;
 pub mod runtime;
 pub mod skills;
 pub mod vault;
@@ -22,6 +23,7 @@ pub fn router() -> Router<AppState> {
         .route("/admin/agents", post(admin::create_agent))
         .route("/billing/x402", get(billing::get_x402_status))
         .route("/swarm/runtime", get(runtime::swarm_runtime))
+        .route("/agent/overview", get(overview::agent_operational_overview))
         .route(
             "/skills",
             get(skills::list_own_skill_profiles).post(skills::create_own_skill_profile),

@@ -120,6 +120,85 @@ export interface SkillProfile {
   executable: false;
 }
 
+/** Read-only operational data that mirrors the agent-safe dashboard view. */
+export interface AgentOperationalOverview {
+  contract_version: "v1";
+  generated_at_unix_ms: number;
+  org_id: string;
+  agent: {
+    agent_id: string;
+    role_id: string | null;
+    project_id: string | null;
+  };
+  system: {
+    health: {
+      status: "ok" | "degraded";
+      service: string;
+      version: string;
+      storage: "memory" | "postgres";
+      database: "none" | "connected" | "unavailable";
+    };
+    x402: Record<string, unknown>;
+  };
+  directory: Array<{
+    agent_id: string;
+    name: string;
+    role_id: string | null;
+    project_id: string | null;
+    created_at_unix_ms: number | null;
+  }>;
+  stats: {
+    memory: {
+      total_memories: number;
+      scopes: Array<{ scope: MemoryScope; count: number }>;
+    };
+    usage: {
+      storage: "memory" | "postgres";
+      totals: Array<{ route: string; calls: number; paid_calls: number; amount_usdc_micro: number }>;
+    };
+    event_delivery: {
+      storage: "memory" | "postgres";
+      pending: number;
+      leased: number;
+      published: number;
+      retrying: number;
+    };
+    conflict_summary: { contested: number; resolved: number };
+  };
+  role_policies: Array<{
+    role_id: string;
+    authority_bps: number;
+    can_resolve_conflicts: boolean;
+    policy_version: number;
+    updated_at_unix_ms: number;
+  }>;
+  conflicts: Array<{
+    conflict_id: string;
+    subject: string;
+    predicate: string;
+    incumbent_claim_id: string;
+    challenger_claim_id: string;
+    status: "contested" | "resolved";
+    resolved_claim_id: string | null;
+    resolution_reason: string | null;
+    created_at_unix_ms: number;
+    resolved_at_unix_ms: number | null;
+  }>;
+  assigned_skills: Array<Omit<SkillProfile, "assigned_agent_ids" | "executable">>;
+  billing: {
+    configured: boolean;
+    entitlement: {
+      plan_id: string;
+      included_operations: number;
+      used_operations: number;
+      remaining_operations: number;
+      active_from_unix_ms: number;
+      expires_at_unix_ms: number;
+    } | null;
+  };
+  redactions: string[];
+}
+
 export interface RememberInput {
   content: string;
   tags?: string[];
@@ -250,6 +329,11 @@ export class Energon {
     create: (input: CreateSkillInput, options?: RequestOptions) => Promise<SkillProfile>;
   };
 
+  readonly operations: {
+    /** Agent-safe organization state and the dashboard's live operational metrics. */
+    overview: (options?: RequestOptions) => Promise<AgentOperationalOverview>;
+  };
+
   private readonly baseUrl: string;
   private readonly apiKey: string;
   private readonly paymentSignature?: PaymentSignatureProvider;
@@ -302,6 +386,12 @@ export class Energon {
         return response.skills;
       },
       create: (input, requestOptions) => this.createSkill(input, requestOptions),
+    };
+    this.operations = {
+      overview: (requestOptions) => this.request("/v1/agent/overview", {
+        method: "GET",
+        options: requestOptions,
+      }),
     };
   }
 

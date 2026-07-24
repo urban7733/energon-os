@@ -116,6 +116,16 @@ class _SkillOperations:
         )
 
 
+class _OperationalData:
+    """Read-only, agent-safe organization telemetry from the dashboard model."""
+
+    def __init__(self, client: Energon) -> None:
+        self._client = client
+
+    def overview(self) -> Mapping[str, Any]:
+        return self._client._request("GET", "/v1/agent/overview")
+
+
 class Energon:
     """A server-side client authenticated as exactly one Energon agent."""
 
@@ -131,6 +141,7 @@ class Energon:
         self.memory = _MemoryOperations(self)
         self.context = _ContextOperations(self)
         self.skills = _SkillOperations(self)
+        self.operations = _OperationalData(self)
 
     def _request(
         self,

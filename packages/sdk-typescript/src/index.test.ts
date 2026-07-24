@@ -206,3 +206,39 @@ test("skills create private profiles and list only the active agent profiles", a
     requires_approval_for: ["send"],
   });
 });
+
+test("operations.overview exposes agent-safe dashboard telemetry", async () => {
+  let capturedRequest: Request | undefined;
+  const client = new Energon({
+    baseUrl: "https://api.energon.test",
+    apiKey: "eos_live_test",
+    fetch: async (input, init) => {
+      capturedRequest = new Request(input, init);
+      return Response.json({
+        contract_version: "v1",
+        generated_at_unix_ms: 1,
+        org_id: "org_1",
+        agent: { agent_id: "agent_1", role_id: null, project_id: null },
+        system: { health: { status: "ok", storage: "postgres", database: "connected" }, x402: {} },
+        directory: [],
+        stats: {
+          memory: { total_memories: 4, scopes: [] },
+          usage: { storage: "postgres", totals: [] },
+          event_delivery: { storage: "postgres", pending: 0, leased: 0, published: 2, retrying: 0 },
+          conflict_summary: { contested: 0, resolved: 0 },
+        },
+        role_policies: [],
+        conflicts: [],
+        assigned_skills: [],
+        billing: { configured: false, entitlement: null },
+        redactions: ["agent API keys and their hashes"],
+      });
+    },
+  });
+
+  const overview = await client.operations.overview();
+
+  expect(overview.stats.memory.total_memories).toBe(4);
+  expect(capturedRequest?.url).toBe("https://api.energon.test/v1/agent/overview");
+  expect(capturedRequest?.method).toBe("GET");
+});

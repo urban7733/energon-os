@@ -50,6 +50,22 @@ awaiting_approval = energon.skills.create(
 assigned_profiles = energon.skills.list()
 ```
 
+## Operations and dashboard statistics
+
+Agents can read the same operational state that drives the dashboard without
+receiving secrets or another agent’s private memory content:
+
+```python
+overview = energon.operations.overview()
+print(overview["stats"]["memory"]["total_memories"])
+print(overview["stats"]["usage"]["totals"])
+```
+
+The response includes the organization agent directory, memory and usage
+statistics, event-delivery state, role policies, conflict metadata, the
+agent’s assigned skills, and plan entitlement. It excludes API keys, payment
+payer data, memory previews, and unassigned skill profiles.
+
 The SDK intentionally does not retry write requests automatically. A timeout
 after `POST` can be ambiguous without an idempotency key. HTTP errors raise
 `EnergonError`; connection or response-shape failures raise

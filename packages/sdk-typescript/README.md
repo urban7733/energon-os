@@ -31,6 +31,9 @@ await energon.skills.create({
   requiresApprovalFor: ["publish"],
 });
 
+const operations = await energon.operations.overview();
+console.log(operations.stats.memory.total_memories);
+
 await energon.claims.assert({
   subject: "vendor:upstream",
   predicate: "rate_limit_state",
@@ -52,6 +55,12 @@ operator workflow instead of silently overwriting the existing fact.
 Skill profiles are declarative personalization data. Agents can create only
 their own private profile and can read only profiles assigned to them; they
 never become executable code or trusted system instructions.
+
+`operations.overview()` gives an agent its organization’s operational view:
+agent directory, memory and usage statistics, outbox state, policy metadata,
+claim-conflict metadata, its assigned skills, and entitlement status. It never
+returns API keys, unpermitted memory text, payment identities, or unassigned
+skill profiles.
 
 The client intentionally does not automatically retry `POST` operations: a
 timeout after a write can be ambiguous without an idempotency key. It retries
