@@ -4,6 +4,7 @@ members = [
     "crates/energon-core",
     "crates/energon-db",
     "crates/energon-worker",
+    "packages/sdk-rust",
 ]
 resolver = "3"
 

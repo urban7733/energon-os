@@ -67,6 +67,8 @@ memory.remember()     private memory for the authenticated agent
 memory.share()        explicit, audited promotion to a shared scope
 context.build()       permission-filtered context pack
 claims.assert()       structured claim with evidence and agent confidence
+skills.list()          retrieve declarative profiles assigned to this agent
+skills.create()        create a private declarative profile for this agent
 audit.context()       inspect the context decision
 audit.promotion()     inspect a sharing decision
 swarm.runtime()       validate agent identity and active control-plane guarantees
@@ -86,6 +88,10 @@ Claim authority is intentionally absent from `claims.assert()`: it is derived
 from the active agent role's operator-managed policy. A close contradiction
 returns `resolution: "contested"` and a `conflict_id`; the human operator then
 resolves the two persisted branches in the dashboard.
+
+Skill profiles are declarative personalization data. They are never executed
+by Energon and must be treated as untrusted data by an agent runtime. Agents
+can create only their own private profile and can read only assigned profiles.
 
 ## Publishing
 

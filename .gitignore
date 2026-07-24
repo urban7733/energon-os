@@ -11,6 +11,8 @@
 /data
 *.log
 *.tsbuildinfo
+__pycache__/
+*.py[cod]
 /.tmp
 
 # Private local security artifacts — never commit or publish.

@@ -248,7 +248,7 @@ sqlx for explicit SQL access
 Cedar policies for authorization rules
 Cloudflare R2 / MinIO for large document storage
 OpenAI embeddings behind a provider interface
-Official TypeScript SDK for agent runtimes
+Official TypeScript, Python, and Rust SDKs for agent runtimes
 Next.js/Bun landing page and operator dashboard
 ```
 
@@ -263,6 +263,8 @@ migrations/           Postgres schema for identity, memory, chunks, and audit
 policies/             Cedar policy starting point
 apps/web              Next.js site + Better Auth (email/password + optional GitHub, orgs, JWT/JWKS)
 packages/sdk-typescript official server-side TypeScript SDK for agent runtimes
+packages/sdk-python     official server-side Python SDK source package
+packages/sdk-rust       official server-side Rust SDK source package
 ```
 
 ## Swarm Control Plane
@@ -353,8 +355,9 @@ curl -X POST http://127.0.0.1:3001/v1/admin/agents \
   }'
 ```
 
-The SDK guide is in [docs/sdk-typescript.md](docs/sdk-typescript.md). The
-low-level self-hosting contract is in [docs/api.md](docs/api.md).
+SDK guides are available for [TypeScript](docs/sdk-typescript.md),
+[Python](docs/sdk-python.md), and [Rust](docs/sdk-rust.md). The low-level
+self-hosting contract is in [docs/api.md](docs/api.md).
 
 ## Obsidian Vault Export
 
@@ -460,7 +463,7 @@ real public launch, the remaining non-code production work is:
 1. Deploy API, worker, and web app with real secrets.
 2. Configure backups, monitoring, and log aggregation.
 3. Run load tests against realistic memory volume.
-4. Publish the verified TypeScript SDK and add the Python SDK from the same
-   versioned control-plane contract.
+4. Publish the verified TypeScript, Python, and Rust SDKs with reviewed
+   package provenance and registry access policies.
 5. Configure a production Base RPC provider, receiving wallet and mainnet USDC
    variables before enabling real payments (see docs/crypto-payments.md).

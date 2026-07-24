@@ -22,6 +22,15 @@ const context = await energon.context.build({
   tokenBudget: 1_500,
 });
 
+const skills = await energon.skills.list();
+
+await energon.skills.create({
+  name: "Concise writer",
+  instructions: "Use short, sourced answers.",
+  allowedTools: ["read_memory", "write_draft"],
+  requiresApprovalFor: ["publish"],
+});
+
 await energon.claims.assert({
   subject: "vendor:upstream",
   predicate: "rate_limit_state",
@@ -39,6 +48,10 @@ Claims are structured facts rather than free-form memory. The agent submits
 confidence and evidence, while Energon derives role authority from the
 operator-managed policy. Conflicting claims return a branch identifier for the
 operator workflow instead of silently overwriting the existing fact.
+
+Skill profiles are declarative personalization data. Agents can create only
+their own private profile and can read only profiles assigned to them; they
+never become executable code or trusted system instructions.
 
 The client intentionally does not automatically retry `POST` operations: a
 timeout after a write can be ambiguous without an idempotency key. It retries

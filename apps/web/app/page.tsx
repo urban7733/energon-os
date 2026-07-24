@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ClosingScene } from "./closing-scene";
+import { SdkQuickstart } from "./sdk-quickstart";
 import { paymentRails, pricingPlans, productBoundaries, site } from "../lib/site";
 
 const platformPillars = [
@@ -45,23 +46,6 @@ const relationships = [
   ["Agent", "one AI worker with its own private memory"],
   ["Audit", "a record of every context decision"],
 ] as const;
-
-const agentQuickstart = `import { Energon } from "@energon/sdk";
-
-const energon = new Energon({
-  baseUrl: process.env.ENERGON_API_URL!,
-  apiKey: process.env.ENERGON_AGENT_API_KEY!,
-});
-
-const memory = await energon.memory.remember({
-  content: "Verified: enterprise plan supports SSO.",
-  tags: ["pricing", "verified"],
-});
-
-const context = await energon.context.build({
-  task: "Answer an enterprise pricing question.",
-  tokenBudget: 1_500,
-});`;
 
 const permissionTrace = `// Identity comes from the agent credential.
 const runtime = await energon.swarm.runtime();
@@ -235,11 +219,11 @@ export default function HomePage() {
             <div className="hero-actions">
               <a
                 className="primary-action"
-                href="https://github.com/urban7733/energon-os/blob/main/docs/sdk-typescript.md"
+                href="https://github.com/urban7733/energon-os/tree/main/docs"
                 target="_blank"
                 rel="noreferrer"
               >
-                Read SDK guide
+                Browse SDK guides
               </a>
               <a
                 className="secondary-action"
@@ -251,19 +235,7 @@ export default function HomePage() {
               </a>
             </div>
           </div>
-          <div className="sdk-terminal" aria-label="TypeScript SDK quickstart">
-            <div className="sdk-terminal-bar">
-              <span>quickstart.ts</span>
-              <span>TypeScript · server runtime</span>
-            </div>
-            <pre>
-              <code>{agentQuickstart}</code>
-            </pre>
-            <div className="sdk-terminal-note">
-              <span>IMPORTANT</span>
-              Keep <code>ENERGON_AGENT_API_KEY</code> in an agent runtime, worker, or server. Never ship it to a browser.
-            </div>
-          </div>
+          <SdkQuickstart />
         </div>
         <div className="container permission-proof">
           <div>

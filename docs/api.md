@@ -1,7 +1,9 @@
 # Energon OS Control-Plane Contract
 
-Application code should use `@energon/sdk`. This document defines the
-versioned HTTP contract used by the SDK and self-hosted deployments.
+Application code should use the official TypeScript, Python, or Rust SDK. This
+document defines the versioned HTTP contract used by those clients and
+self-hosted deployments. See [TypeScript](sdk-typescript.md),
+[Python](sdk-python.md), and [Rust](sdk-rust.md).
 
 Base URL:
 

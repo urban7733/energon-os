@@ -584,11 +584,7 @@ button:hover {
 .sdk-terminal {
   overflow: hidden;
   border: 1px solid var(--line-strong);
-  background:
-    linear-gradient(rgba(255, 255, 255, 0.022) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.022) 1px, transparent 1px),
-    #0d0d0d;
-  background-size: 18px 18px;
+  background: transparent;
 }
 
 .sdk-terminal-bar {
@@ -606,6 +602,41 @@ button:hover {
 
 .sdk-terminal-bar span:last-child {
   color: var(--dim);
+}
+
+.sdk-language-tabs {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.sdk-language-tab {
+  border: 0;
+  border-bottom: 1px solid transparent;
+  background: transparent;
+  color: var(--dim);
+  cursor: pointer;
+  font: inherit;
+  font-size: 10px;
+  letter-spacing: 0.05em;
+  padding: 2px 0;
+  text-transform: uppercase;
+}
+
+.sdk-language-tab + .sdk-language-tab::before {
+  content: "/";
+  color: var(--line-strong);
+  margin: 0 6px 0 4px;
+}
+
+.sdk-language-tab[aria-selected="true"] {
+  border-bottom-color: var(--ink);
+  color: var(--ink);
+}
+
+.sdk-language-tab:focus-visible {
+  outline: 1px solid var(--ink);
+  outline-offset: 3px;
 }
 
 .sdk-terminal pre,
@@ -646,6 +677,14 @@ button:hover {
 
 .sdk-terminal-note code {
   color: var(--ink);
+}
+
+.sdk-terminal-note a {
+  color: var(--ink);
+  display: inline-block;
+  margin-left: 12px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 
 .permission-proof {

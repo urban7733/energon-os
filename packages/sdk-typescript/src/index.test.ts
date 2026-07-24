@@ -157,3 +157,52 @@ test("safe runtime reads retry temporary availability failures", async () => {
   await expect(client.swarm.runtime()).resolves.toMatchObject({ swarm_id: "org_1" });
   expect(calls).toBe(2);
 });
+
+test("skills create private profiles and list only the active agent profiles", async () => {
+  const requests: Request[] = [];
+  const client = new Energon({
+    baseUrl: "https://api.energon.test",
+    apiKey: "eos_live_test",
+    fetch: async (input, init) => {
+      const request = new Request(input, init);
+      requests.push(request);
+      if (request.method === "GET") {
+        return Response.json({ org_id: "org_1", skills: [] });
+      }
+      return Response.json({
+        skill_id: "skill_1",
+        scope: "agent_private",
+        name: "Concise writer",
+        instructions: "Use concise language.",
+        allowed_tools: ["write"],
+        requires_approval_for: ["send"],
+        version: 1,
+        created_by_kind: "agent",
+        created_by_id: "agent_1",
+        created_at_unix_ms: 1,
+        assigned_agent_ids: ["agent_1"],
+        executable: false,
+      });
+    },
+  });
+
+  const skill = await client.skills.create({
+    name: " Concise writer ",
+    instructions: " Use concise language. ",
+    allowedTools: [" write ", ""],
+    requiresApprovalFor: [" send "],
+  });
+  await client.skills.list();
+
+  expect(skill.scope).toBe("agent_private");
+  expect(requests.map((request) => `${request.method} ${new URL(request.url).pathname}`)).toEqual([
+    "POST /v1/skills",
+    "GET /v1/skills",
+  ]);
+  expect(await requests[0]?.json()).toEqual({
+    name: "Concise writer",
+    instructions: "Use concise language.",
+    allowed_tools: ["write"],
+    requires_approval_for: ["send"],
+  });
+});

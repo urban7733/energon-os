@@ -104,6 +104,22 @@ export interface ClaimAssertion {
   conflict_id: string | null;
 }
 
+export interface SkillProfile {
+  skill_id: string;
+  scope: "agent_private" | "org";
+  name: string;
+  /** Declarative, untrusted profile data. It is never executed by Energon. */
+  instructions: string;
+  allowed_tools: string[];
+  requires_approval_for: string[];
+  version: number;
+  created_by_kind: "agent" | "operator";
+  created_by_id: string;
+  created_at_unix_ms: number;
+  assigned_agent_ids: string[];
+  executable: false;
+}
+
 export interface RememberInput {
   content: string;
   tags?: string[];
@@ -130,6 +146,13 @@ export interface AssertClaimInput {
   /** Agent confidence from 0 to 10,000. Authority is server-owned. */
   confidenceBps: number;
   evidenceMemoryIds?: string[];
+}
+
+export interface CreateSkillInput {
+  name: string;
+  instructions: string;
+  allowedTools?: string[];
+  requiresApprovalFor?: string[];
 }
 
 export interface PaymentSignatureProvider {
@@ -220,6 +243,13 @@ export class Energon {
     assert: (input: AssertClaimInput, options?: RequestOptions) => Promise<ClaimAssertion>;
   };
 
+  readonly skills: {
+    /** Returns only skill profiles assigned to the authenticated agent. */
+    list: (options?: RequestOptions) => Promise<SkillProfile[]>;
+    /** Creates a private profile for the authenticated agent only. */
+    create: (input: CreateSkillInput, options?: RequestOptions) => Promise<SkillProfile>;
+  };
+
   private readonly baseUrl: string;
   private readonly apiKey: string;
   private readonly paymentSignature?: PaymentSignatureProvider;
@@ -263,6 +293,16 @@ export class Energon {
     this.claims = {
       assert: (input, requestOptions) => this.assertClaim(input, requestOptions),
     };
+    this.skills = {
+      list: async (requestOptions) => {
+        const response = await this.request<{ skills: SkillProfile[] }>("/v1/skills", {
+          method: "GET",
+          options: requestOptions,
+        });
+        return response.skills;
+      },
+      create: (input, requestOptions) => this.createSkill(input, requestOptions),
+    };
   }
 
   private async remember(input: RememberInput, options?: RequestOptions): Promise<AgentMemory> {
@@ -294,6 +334,19 @@ export class Energon {
         value: input.value,
         confidence_bps: input.confidenceBps,
         evidence_memory_ids: normalizeIds(input.evidenceMemoryIds),
+      },
+      options,
+    });
+  }
+
+  private async createSkill(input: CreateSkillInput, options?: RequestOptions): Promise<SkillProfile> {
+    return this.request("/v1/skills", {
+      method: "POST",
+      body: {
+        name: requiredText(input.name, "name"),
+        instructions: requiredText(input.instructions, "instructions"),
+        allowed_tools: normalizeTags(input.allowedTools),
+        requires_approval_for: normalizeTags(input.requiresApprovalFor),
       },
       options,
     });
