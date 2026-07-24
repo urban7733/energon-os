@@ -875,7 +875,7 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
       />
 
       <div className="console-grid">
-      <section id="agents" className="ops-panel" aria-labelledby="agents-title">
+      <section id="agents" className="ops-panel wide setup-panel" aria-labelledby="agents-title">
         <div className="panel-title">
           <KeyRound size={18} aria-hidden="true" />
           <h2 id="agents-title">1. Set up your workspace and agent</h2>
@@ -1292,12 +1292,12 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
         )}
       </section>
 
-      <section id="memory" className="ops-panel" aria-labelledby="memory-title">
+      <section id="memory" className="ops-panel wide memory-panel" aria-labelledby="memory-title">
         <div className="panel-title">
           <ShieldCheck size={18} aria-hidden="true" />
           <h2 id="memory-title">3. Save a private memory</h2>
         </div>
-        <form onSubmit={writeMemory}>
+        <form className="memory-write-form" onSubmit={writeMemory}>
           <label>
             Agent API key
             <input
