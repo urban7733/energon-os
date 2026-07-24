@@ -34,6 +34,7 @@ pub struct AppState {
     next_checkout: Arc<AtomicU64>,
     next_claim: Arc<AtomicU64>,
     next_conflict: Arc<AtomicU64>,
+    next_skill: Arc<AtomicU64>,
 }
 
 #[derive(Clone)]
@@ -89,6 +90,7 @@ impl AppState {
             next_checkout: Arc::new(AtomicU64::new(1)),
             next_claim: Arc::new(AtomicU64::new(1)),
             next_conflict: Arc::new(AtomicU64::new(1)),
+            next_skill: Arc::new(AtomicU64::new(1)),
         }
     }
 
@@ -145,6 +147,7 @@ impl AppState {
             next_checkout: Arc::new(AtomicU64::new(1)),
             next_claim: Arc::new(AtomicU64::new(1)),
             next_conflict: Arc::new(AtomicU64::new(1)),
+            next_skill: Arc::new(AtomicU64::new(1)),
         })
     }
 
@@ -186,6 +189,11 @@ impl AppState {
     pub fn next_conflict_id(&self) -> String {
         let id = self.next_conflict.fetch_add(1, Ordering::Relaxed);
         format!("conflict_{}_{}", now_unix_ms(), id)
+    }
+
+    pub fn next_skill_id(&self) -> String {
+        let id = self.next_skill.fetch_add(1, Ordering::Relaxed);
+        format!("skill_{}_{}", now_unix_ms(), id)
     }
 }
 

@@ -35,6 +35,12 @@ impl From<energon_db::DbError> for ApiError {
                 ApiError::BadRequest(message)
             }
             energon_db::DbError::InvalidClaimEvidence(message) => ApiError::BadRequest(message),
+            energon_db::DbError::SkillAssignmentAgentNotFound => ApiError::BadRequest(
+                "one or more assigned agents do not belong to this organization".to_owned(),
+            ),
+            energon_db::DbError::SkillProfileNotFound(skill_id) => {
+                ApiError::NotFound(format!("skill profile not found: {skill_id}"))
+            }
             error => ApiError::Internal(format!("database error: {error}")),
         }
     }

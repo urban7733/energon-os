@@ -16,6 +16,10 @@ pub enum DbError {
     InvalidConflictResolution(String),
     #[error("invalid claim evidence: {0}")]
     InvalidClaimEvidence(String),
+    #[error("one or more skill assignment agents do not belong to the organization")]
+    SkillAssignmentAgentNotFound,
+    #[error("skill profile not found: {0}")]
+    SkillProfileNotFound(String),
 }
 
 pub fn i64_to_u128(value: i64, field: &'static str) -> Result<u128, DbError> {

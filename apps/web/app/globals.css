@@ -1101,7 +1101,7 @@ button:hover {
 }
 
 .dashboard-overview {
-  grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr) repeat(3, minmax(130px, 0.5fr));
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .visual-grid {
@@ -1118,6 +1118,101 @@ button:hover {
   border-radius: 8px;
   background: var(--dash-surface);
   padding: 18px;
+}
+
+.overview-strip {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  min-height: 0;
+  padding: 12px 14px;
+}
+
+.overview-copy {
+  min-width: 180px;
+}
+
+.overview-title {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--dash-cyan);
+}
+
+.overview-title h2 {
+  margin: 0;
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.overview-copy p {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.overview-route,
+.overview-statuses,
+.overview-status {
+  display: flex;
+  align-items: center;
+}
+
+.overview-route {
+  gap: 5px;
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+.overview-route span:not(:last-child)::after {
+  margin-left: 5px;
+  color: var(--dash-cyan);
+  content: "→";
+}
+
+.overview-statuses {
+  gap: 7px;
+  margin-left: auto;
+}
+
+.overview-status {
+  gap: 5px;
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+.overview-status svg {
+  color: var(--dash-cyan);
+}
+
+.overview-status strong {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.overview-payment-action {
+  min-height: auto;
+  padding: 4px 7px;
+  border: 1px solid var(--dash-border);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 10px;
+}
+
+.overview-payment-action:hover:not(:disabled) {
+  border-color: var(--dash-cyan);
+  color: var(--dash-cyan);
 }
 
 .wide,
@@ -2348,6 +2443,69 @@ pre {
   overflow-wrap: anywhere;
 }
 
+.skill-profile-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.skill-profile {
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--bg);
+  padding: 12px;
+}
+
+.skill-profile-heading,
+.skill-profile-heading > div,
+.skill-profile-meta {
+  display: flex;
+  align-items: center;
+}
+
+.skill-profile-heading {
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.skill-profile-heading > div,
+.skill-profile-meta {
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.skill-profile-heading strong {
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.skill-profile-heading span,
+.skill-profile-meta,
+.skill-profile-assignment {
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 10px;
+}
+
+.skill-profile-heading > div > span {
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 2px 5px;
+}
+
+.skill-profile p {
+  display: -webkit-box;
+  overflow: hidden;
+  margin: 9px 0;
+  color: var(--text);
+  font-size: 12px;
+  line-height: 1.5;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
 .data-table-row button {
   min-height: 26px;
   font-size: 10px;
@@ -2450,6 +2608,15 @@ pre {
     grid-template-columns: 1fr;
   }
 
+  .overview-strip {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .overview-statuses {
+    margin-left: 0;
+  }
+
   .atlas-layout {
     grid-template-columns: 1fr;
   }
@@ -2545,6 +2712,21 @@ pre {
 
   .dashboard-main {
     padding: 18px 14px;
+  }
+
+  .overview-strip {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .overview-statuses {
+    flex-wrap: wrap;
+  }
+
+  .skill-profile-heading {
+    align-items: flex-start;
+    flex-direction: column;
   }
 
   .dashboard-header,

@@ -4,7 +4,6 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import {
-  ArrowRight,
   ArrowUpRight,
   Bot,
   Coins,
@@ -144,6 +143,23 @@ type PromotionAudit = {
   reason: string;
 };
 
+type SkillScope = "agent_private" | "org";
+
+type SkillProfile = {
+  skill_id: string;
+  scope: SkillScope;
+  name: string;
+  instructions: string;
+  allowed_tools: string[];
+  requires_approval_for: string[];
+  version: number;
+  created_by_kind: "operator" | "agent";
+  created_by_id: string;
+  created_at_unix_ms: number;
+  assigned_agent_ids: string[];
+  executable: false;
+};
+
 export function DashboardConsole({ userEmail }: { userEmail: string }) {
   const router = useRouter();
   const { data: organizations } = authClient.useListOrganizations();
@@ -166,6 +182,7 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
   const [task, setTask] = useState("");
   const [requestId, setRequestId] = useState("");
   const [orgAgents, setOrgAgents] = useState<OrgAgent[]>([]);
+  const [orgSkills, setOrgSkills] = useState<SkillProfile[]>([]);
   const [orgMemories, setOrgMemories] = useState<OrgMemory[]>([]);
   const [memoryStats, setMemoryStats] = useState<MemoryStats | null>(null);
   const [usageSummary, setUsageSummary] = useState<UsageSummary | null>(null);
@@ -180,6 +197,12 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
   const [policyAuthorityBps, setPolicyAuthorityBps] = useState("5000");
   const [policyCanResolve, setPolicyCanResolve] = useState(false);
   const [conflictReason, setConflictReason] = useState("");
+  const [skillName, setSkillName] = useState("");
+  const [skillInstructions, setSkillInstructions] = useState("");
+  const [skillScope, setSkillScope] = useState<SkillScope>("agent_private");
+  const [skillAgentIds, setSkillAgentIds] = useState<string[]>([]);
+  const [skillAllowedTools, setSkillAllowedTools] = useState("");
+  const [skillApprovalActions, setSkillApprovalActions] = useState("");
   const [mintedKey, setMintedKey] = useState<string | null>(null);
   const [result, setResult] = useState<ApiResult>({
     label: "No activity yet",
@@ -194,7 +217,6 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
   const cleanBaseUrl = useMemo(() => apiBaseUrl.replace(/\/$/, ""), [apiBaseUrl]);
   const orgId = activeOrganization?.id ?? "";
   const hasAgentApiKey = Boolean(agentApiKey.trim());
-  const authMode = hasAgentApiKey ? "Bearer API key" : "Create or rotate an agent key";
   const lifecycle = [
     ["API health", health?.status === "ok", health?.database ?? apiStatus],
     ["Organization", Boolean(orgId), activeOrganization?.name ?? "no active org"],
@@ -298,6 +320,7 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
   async function refreshOperationalData() {
     await Promise.all([
       refreshAgents(),
+      refreshOrgSkills(),
       refreshOrgMemories(),
       refreshUsage(),
       refreshMemoryStats(),
@@ -341,6 +364,7 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
 
     if (!orgId) {
       setOrgAgents([]);
+      setOrgSkills([]);
       setOrgMemories([]);
       setMemoryStats(null);
       setUsageSummary(null);
@@ -380,6 +404,11 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
     setMintedKey(null);
     setMemoryId("");
     setPromotedMemoryId("");
+    setSkillAgentIds([]);
+    setSkillName("");
+    setSkillInstructions("");
+    setSkillAllowedTools("");
+    setSkillApprovalActions("");
     setContextAudit(null);
     setPromotionAudit(null);
   }, [orgId]);
@@ -466,6 +495,44 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
       setOrgAgents(body.agents);
     }
     return body;
+  }
+
+  async function refreshOrgSkills() {
+    const org = requireOrg();
+    const body = await managementFetch(`/v1/orgs/${encodeURIComponent(org)}/skills`);
+    if (!isSkillList(body)) throw new Error("Skill profile response was invalid.");
+    setOrgSkills(body.skills);
+    return body;
+  }
+
+  async function createSkillProfile(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    await run("Created skill profile", async () => {
+      const org = requireOrg();
+      const name = skillName.trim();
+      const instructions = skillInstructions.trim();
+      if (!name) throw new Error("Skill profile name is required.");
+      if (!instructions) throw new Error("Skill instructions are required.");
+      if (skillAgentIds.length === 0) throw new Error("Choose an agent for this skill profile.");
+
+      const body = await managementFetch(`/v1/orgs/${encodeURIComponent(org)}/skills`, {
+        method: "POST",
+        body: JSON.stringify({
+          scope: skillScope,
+          name,
+          instructions,
+          allowed_tools: commaSeparatedValues(skillAllowedTools),
+          requires_approval_for: commaSeparatedValues(skillApprovalActions),
+          assigned_agent_ids: skillAgentIds,
+        }),
+      });
+      setSkillName("");
+      setSkillInstructions("");
+      setSkillAllowedTools("");
+      setSkillApprovalActions("");
+      await refreshOrgSkills();
+      return body;
+    });
   }
 
   async function listAgents(event: FormEvent<HTMLFormElement>) {
@@ -745,69 +812,46 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
       </div>
 
       <section className="dashboard-overview" aria-label="Energon operating model">
-        <article className="surface-card command-card">
-          <div className="panel-title">
-            <Bot size={18} aria-hidden="true" />
-            <h2>For your agents</h2>
+        <article className="surface-card overview-strip">
+          <div className="overview-copy">
+            <div className="overview-title">
+              <Bot size={16} aria-hidden="true" />
+              <h2>Private by default</h2>
+            </div>
+            <p>Agents get scoped context. You approve what becomes shared.</p>
           </div>
-          <p>
-            Each agent uses its own API key and starts with private memory. Energon decides what
-            that agent is allowed to read before it receives context.
-          </p>
-          <div className="route-map" aria-label="Agent request route">
+
+          <div className="overview-route" aria-label="Agent request route">
             <span>agent</span>
-            <ArrowRight size={15} aria-hidden="true" />
-            <span>API</span>
-            <ArrowRight size={15} aria-hidden="true" />
             <span>permissions</span>
-            <ArrowRight size={15} aria-hidden="true" />
-            <span>Postgres + pgvector</span>
+            <span>memory</span>
           </div>
-        </article>
 
-        <article className="surface-card command-card">
-          <div className="panel-title">
-            <Users size={18} aria-hidden="true" />
-            <h2>For you</h2>
+          <div className="overview-statuses" aria-label="System status">
+            <span className="overview-status">
+              <Database size={14} aria-hidden="true" />
+              <span>Memory</span>
+              <strong>{health?.storage ?? "checking"}</strong>
+            </span>
+            <span className="overview-status">
+              <Gauge size={14} aria-hidden="true" />
+              <span>API</span>
+              <strong>{health?.status ?? apiStatus}</strong>
+            </span>
+            <span className="overview-status">
+              <Coins size={14} aria-hidden="true" />
+              <span>Payments</span>
+              <strong>{x402Status}</strong>
+            </span>
+            <button
+              className="overview-payment-action"
+              type="button"
+              disabled={busy}
+              onClick={checkX402}
+            >
+              Check
+            </button>
           </div>
-          <p>
-            Create agents, approve what they can share, and review every context decision in one place.
-          </p>
-          <div className="human-readout">
-            <span>your control</span>
-            <strong>private first, shared by approval</strong>
-          </div>
-        </article>
-
-        <article className="surface-card metric-card">
-          <div className="metric-card-head">
-            <Database size={18} aria-hidden="true" />
-            <span>Memory storage</span>
-          </div>
-          <strong>{health?.storage ?? "checking"}</strong>
-          <p>{health ? `database: ${health.database}` : "Waiting for API health"}</p>
-        </article>
-
-        <article className="surface-card metric-card">
-          <div className="metric-card-head">
-            <Gauge size={18} aria-hidden="true" />
-            <span>Connection</span>
-          </div>
-          <strong>{health?.status ?? apiStatus}</strong>
-          <p>{authMode}</p>
-        </article>
-
-        <article className="surface-card metric-card">
-          <div className="metric-card-head">
-            <Coins size={18} aria-hidden="true" />
-            <span>Agent payments</span>
-          </div>
-          <strong>{x402Status}</strong>
-          <p>USDC on Base for paid memory actions</p>
-          <button className="inline-action" type="button" disabled={busy} onClick={checkX402}>
-            <Coins size={16} aria-hidden="true" />
-            Check payments
-          </button>
         </article>
       </section>
 
@@ -956,6 +1000,138 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
             )}
           </div>
         ) : null}
+      </section>
+
+      <section id="skills" className="ops-panel wide" aria-labelledby="skills-title">
+        <div className="panel-title">
+          <Bot size={18} aria-hidden="true" />
+          <h2 id="skills-title">Skill profiles</h2>
+        </div>
+        <p className="panel-copy">
+          Declarative instructions for how an agent works. They are separate from memory and never
+          execute code; a private profile belongs to one agent, while an organization profile can
+          be reused deliberately.
+        </p>
+        <form onSubmit={createSkillProfile}>
+          <div className="form-row">
+            <label>
+              Profile name
+              <input
+                value={skillName}
+                onChange={(event) => setSkillName(event.target.value)}
+                placeholder="security reviewer"
+              />
+            </label>
+            <label>
+              {skillScope === "org" ? "Assign to agents" : "Give to"}
+              <select
+                multiple={skillScope === "org"}
+                size={skillScope === "org" ? Math.min(Math.max(orgAgents.length, 2), 5) : undefined}
+                value={skillScope === "org" ? skillAgentIds : (skillAgentIds[0] ?? "")}
+                onChange={(event) => {
+                  const selected = Array.from(event.currentTarget.selectedOptions, (option) => option.value);
+                  setSkillAgentIds(skillScope === "org" ? selected : selected.slice(-1));
+                }}
+              >
+                {skillScope === "agent_private" ? <option value="">select an agent</option> : null}
+                {orgAgents.map((agent) => (
+                  <option key={agent.agent_id} value={agent.agent_id}>
+                    {agent.name} · {agent.agent_id}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Visibility
+              <select
+                value={skillScope}
+                onChange={(event) => {
+                  const nextScope = event.target.value as SkillScope;
+                  setSkillScope(nextScope);
+                  if (nextScope === "agent_private") setSkillAgentIds((ids) => ids.slice(0, 1));
+                }}
+              >
+                <option value="agent_private">private to this agent</option>
+                <option value="org">reusable organization profile</option>
+              </select>
+            </label>
+          </div>
+          <label>
+            Instructions
+            <textarea
+              value={skillInstructions}
+              onChange={(event) => setSkillInstructions(event.target.value)}
+              rows={4}
+              placeholder="Review code for security risks. Never deploy or modify production."
+            />
+          </label>
+          <div className="form-row">
+            <label>
+              Allowed tools (optional, comma-separated)
+              <input
+                value={skillAllowedTools}
+                onChange={(event) => setSkillAllowedTools(event.target.value)}
+                placeholder="read_repo, create_report"
+              />
+            </label>
+            <label>
+              Require approval for (optional, comma-separated)
+              <input
+                value={skillApprovalActions}
+                onChange={(event) => setSkillApprovalActions(event.target.value)}
+                placeholder="write_code, deploy"
+              />
+            </label>
+          </div>
+          <button
+            type="submit"
+            disabled={
+              busy ||
+              !orgId ||
+              skillAgentIds.length === 0 ||
+              !skillName.trim() ||
+              !skillInstructions.trim()
+            }
+          >
+            <Bot size={16} aria-hidden="true" />
+            Create and assign skill
+          </button>
+        </form>
+        {orgSkills.length > 0 ? (
+          <div className="skill-profile-list" aria-label="Skill profiles in the active organization">
+            {orgSkills.map((skill) => (
+              <article className="skill-profile" key={skill.skill_id}>
+                <div className="skill-profile-heading">
+                  <div>
+                    <strong>{skill.name}</strong>
+                    <span>{skill.scope === "agent_private" ? "private" : "organization"}</span>
+                    <span>v{skill.version}</span>
+                  </div>
+                  <span className="skill-profile-assignment">
+                    {skill.assigned_agent_ids.join(", ")}
+                  </span>
+                </div>
+                <p>{skill.instructions}</p>
+                <div className="skill-profile-meta">
+                  <span>
+                    tools: {skill.allowed_tools.length > 0 ? skill.allowed_tools.join(", ") : "none declared"}
+                  </span>
+                  <span>
+                    approval: {skill.requires_approval_for.length > 0
+                      ? skill.requires_approval_for.join(", ")
+                      : "none declared"}
+                  </span>
+                  <span>created by {skill.created_by_kind}</span>
+                </div>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <div className="empty-operator-state">
+            <Bot size={18} aria-hidden="true" />
+            <p>No skill profiles yet. Create one after you have added an agent.</p>
+          </div>
+        )}
       </section>
 
       <section id="org-memories" className="ops-panel wide" aria-labelledby="org-memories-title">
@@ -1302,6 +1478,22 @@ function isAgentList(value: unknown): value is { agents: OrgAgent[] } {
     "agents" in value &&
     Array.isArray((value as { agents: unknown }).agents)
   );
+}
+
+function isSkillList(value: unknown): value is { skills: SkillProfile[] } {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "skills" in value &&
+    Array.isArray((value as { skills: unknown }).skills)
+  );
+}
+
+function commaSeparatedValues(value: string): string[] {
+  return value
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
 }
 
 function isMemoryList(value: unknown): value is { memories: OrgMemory[] } {

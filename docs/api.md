@@ -190,6 +190,44 @@ curl -X DELETE http://127.0.0.1:3001/v1/orgs/$ORG_ID/keys/key_... \
   -H "Authorization: Bearer $OPERATOR_JWT"
 ```
 
+### Skill Profiles
+
+Skills are declarative, versioned profiles for agent personalization. They are
+not memory, they do not run code, and their `instructions` field is untrusted
+data that an agent runtime must not treat as a privileged system prompt.
+
+An operator can create a private profile for one agent or an organization
+profile assigned to one or more selected agents:
+
+```bash
+curl -X POST http://127.0.0.1:3001/v1/orgs/$ORG_ID/skills \
+  -H 'content-type: application/json' \
+  -H "Authorization: Bearer $OPERATOR_JWT" \
+  -d '{
+    "scope":"agent_private",
+    "name":"security reviewer",
+    "instructions":"Review code for security risks. Never deploy production.",
+    "allowed_tools":["read_repo","create_report"],
+    "requires_approval_for":["write_code","deploy"],
+    "assigned_agent_ids":["agent_777"]
+  }'
+```
+
+```bash
+curl http://127.0.0.1:3001/v1/orgs/$ORG_ID/skills \
+  -H "Authorization: Bearer $OPERATOR_JWT"
+```
+
+An agent can read only profiles explicitly assigned to it:
+
+```bash
+curl http://127.0.0.1:3001/v1/skills \
+  -H "Authorization: Bearer $ENERGON_AGENT_API_KEY"
+```
+
+An agent may create a private profile for itself with `POST /v1/skills`; it
+cannot assign a profile to another agent or create an organization profile.
+
 ### List Org Memories
 
 Metadata plus a truncated content preview. Optional `scope`, `limit` (max 200),

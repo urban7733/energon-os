@@ -7,5 +7,6 @@ pub mod identity;
 pub mod memory;
 pub mod payments;
 pub mod pool;
+pub mod skills;
 
 pub use errors::DbError;

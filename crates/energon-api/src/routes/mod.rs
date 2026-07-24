@@ -14,6 +14,7 @@ pub mod health;
 pub mod memory;
 pub mod orgs;
 pub mod runtime;
+pub mod skills;
 pub mod vault;
 
 pub fn router() -> Router<AppState> {
@@ -21,6 +22,10 @@ pub fn router() -> Router<AppState> {
         .route("/admin/agents", post(admin::create_agent))
         .route("/billing/x402", get(billing::get_x402_status))
         .route("/swarm/runtime", get(runtime::swarm_runtime))
+        .route(
+            "/skills",
+            get(skills::list_own_skill_profiles).post(skills::create_own_skill_profile),
+        )
         .route("/memory/write", post(memory::write_memory))
         .route("/memory/promote", post(memory::promote_memory))
         .route("/context/build", post(context::build_context))
@@ -44,6 +49,10 @@ pub fn router() -> Router<AppState> {
             delete(orgs::revoke_api_key),
         )
         .route("/orgs/{org_id}/memories", get(orgs::list_org_memories))
+        .route(
+            "/orgs/{org_id}/skills",
+            get(skills::list_org_skill_profiles).post(skills::create_org_skill_profile),
+        )
         .route("/orgs/{org_id}/memory-stats", get(orgs::org_memory_stats))
         .route(
             "/orgs/{org_id}/memories/{memory_id}",
