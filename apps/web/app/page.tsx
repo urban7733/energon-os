@@ -46,13 +46,34 @@ const relationships = [
   ["Audit", "a record of every context decision"],
 ] as const;
 
-const sdkOperations = [
-  ["SDK", "swarm.runtime()"],
-  ["SDK", "memory.remember()"],
-  ["SDK", "memory.share()"],
-  ["SDK", "context.build()"],
-  ["auth", "agent API key, kept server-side"],
-] as const;
+const agentQuickstart = `import { Energon } from "@energon/sdk";
+
+const energon = new Energon({
+  baseUrl: process.env.ENERGON_API_URL!,
+  apiKey: process.env.ENERGON_AGENT_API_KEY!,
+});
+
+const memory = await energon.memory.remember({
+  content: "Verified: enterprise plan supports SSO.",
+  tags: ["pricing", "verified"],
+});
+
+const context = await energon.context.build({
+  task: "Answer an enterprise pricing question.",
+  tokenBudget: 1_500,
+});`;
+
+const permissionTrace = `// Identity comes from the agent credential.
+const runtime = await energon.swarm.runtime();
+
+// Shared memory is explicit and audited.
+await energon.memory.share({
+  memoryId: memory.memory_id,
+  target: "project",
+  reason: "Sales agents need this verified fact.",
+});
+
+const audit = await energon.audit.context(context.request_id);`;
 
 export default function HomePage() {
   return (
@@ -119,12 +140,12 @@ export default function HomePage() {
                   </article>
                 ))}
               </div>
-              <div className="code-block">
-                <em>context.build()</em>
+              <div className="code-block flow-code" aria-label="Context request flow">
+                <span className="code-comment">// authenticated agent</span>
                 {"\n"}
-                authenticated agent → permission filter → relevant memory
+                <em>context.build()</em> → permission filter → relevant memory
                 {"\n"}
-                → context pack + audit record
+                <span className="code-result">context pack + audit record</span>
               </div>
             </div>
           </div>
@@ -199,30 +220,60 @@ export default function HomePage() {
 
       <section id="sdk" className="section">
         <div className="container api-section">
-          <div>
+          <div className="sdk-copy">
             <p className="eyebrow">Developer platform</p>
-            <h2>One SDK call gives an agent only the memory it may use for a task.</h2>
+            <h2>Give an agent memory without giving it your whole database.</h2>
             <p className="hero-lede">
-              Connect the SDK to an agent runtime. The control plane derives its identity, keeps
-              memory private first, and returns only the context that agent is allowed to use.
+              The SDK is the agent-facing contract. Identity is derived from the credential, memory
+              starts private, and every returned context pack has an audit trail.
             </p>
+            <div className="sdk-guarantees" aria-label="SDK guarantees">
+              <span>SERVER-SIDE ONLY</span>
+              <span>PRIVATE BY DEFAULT</span>
+              <span>AUDITED SHARING</span>
+            </div>
             <div className="hero-actions">
-              <Link className="primary-action" href="/dashboard">
-                Open dashboard
-              </Link>
-              <Link className="secondary-action" href="/llms-full.txt">
-                llms-full.txt
-              </Link>
+              <a
+                className="primary-action"
+                href="https://github.com/urban7733/energon-os/blob/main/docs/sdk-typescript.md"
+                target="_blank"
+                rel="noreferrer"
+              >
+                Read SDK guide
+              </a>
+              <a
+                className="secondary-action"
+                href="https://github.com/urban7733/energon-os/blob/main/docs/api.md"
+                target="_blank"
+                rel="noreferrer"
+              >
+                API reference
+              </a>
             </div>
           </div>
-          <div className="api-panel" aria-label="SDK operations">
-            {sdkOperations.map(([method, route]) => (
-              <div className="api-row" key={route}>
-                <span>{method}</span>
-                <strong>{route}</strong>
-              </div>
-            ))}
+          <div className="sdk-terminal" aria-label="TypeScript SDK quickstart">
+            <div className="sdk-terminal-bar">
+              <span>quickstart.ts</span>
+              <span>TypeScript · server runtime</span>
+            </div>
+            <pre>
+              <code>{agentQuickstart}</code>
+            </pre>
+            <div className="sdk-terminal-note">
+              <span>IMPORTANT</span>
+              Keep <code>ENERGON_AGENT_API_KEY</code> in an agent runtime, worker, or server. Never ship it to a browser.
+            </div>
           </div>
+        </div>
+        <div className="container permission-proof">
+          <div>
+            <p className="eyebrow">Permission proof</p>
+            <h3>Share deliberately. Verify afterwards.</h3>
+            <p>Agents cannot declare their own organization, project, or role. The control plane derives those boundaries from the credential.</p>
+          </div>
+          <pre aria-label="Audited sharing SDK example">
+            <code>{permissionTrace}</code>
+          </pre>
         </div>
       </section>
 

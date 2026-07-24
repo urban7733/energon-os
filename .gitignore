@@ -12,3 +12,7 @@
 *.log
 *.tsbuildinfo
 /.tmp
+
+# Private local security artifacts — never commit or publish.
+/security_best_practices_report.md
+/Energon OS-threat-model.md
