@@ -30,8 +30,12 @@ ${indexedClaims.map((claim) => `- ${claim}`).join("\n")}
 
 - Landing page: ${site.url}
 - Full LLM context: ${site.url}/llms-full.txt
-- API documentation: ${site.url}/docs/api
-- Architecture documentation: ${site.url}/docs/architecture
+- Open-source repository: ${site.repositoryUrl}
+- Documentation index: ${site.documentationUrl}
+- API documentation: ${site.apiDocumentationUrl}
+- Architecture documentation: ${site.architectureDocumentationUrl}
+- Autonomous agent contract: ${site.url}/.well-known/energon-agent.json
+- Agent discovery API: ${site.apiBaseUrl}/v1/agents/discovery
 
 ## Primary Claim
 
@@ -42,6 +46,8 @@ Energon OS gives every AI agent the right memory, without leaking private memory
     headers: {
       "content-type": "text/plain; charset=utf-8",
       "cache-control": "public, max-age=3600",
+      "x-robots-tag": "all",
+      link: `<${site.url}>; rel="canonical", <${site.url}/llms-full.txt>; rel="alternate"; type="text/plain"`,
     },
   });
 }

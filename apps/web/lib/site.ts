@@ -1,6 +1,10 @@
 export const site = {
   name: "Energon OS",
   url: process.env.NEXT_PUBLIC_SITE_URL ?? "https://energon.os",
+  repositoryUrl: "https://github.com/urban7733/energon-os",
+  documentationUrl: "https://github.com/urban7733/energon-os/tree/main/docs",
+  apiDocumentationUrl: "https://github.com/urban7733/energon-os/blob/main/docs/api.md",
+  architectureDocumentationUrl: "https://github.com/urban7733/energon-os/blob/main/docs/architecture.md",
   description:
     "Private-by-default memory for AI agent swarms. Each agent keeps its own memory until you choose what to share.",
   shortClaim: "Every agent starts private. You choose what the swarm shares.",
@@ -8,7 +12,7 @@ export const site = {
   founder: "Urban Herak",
   apiBaseUrl: process.env.NEXT_PUBLIC_ENERGON_API_BASE_URL ?? "http://127.0.0.1:3001",
   longTermGoal:
-    "A complete autonomous AI-native company operated by specialized agents, built across separate services and repositories.",
+    "Build one of the world's first complete AI-autonomous companies, operated by specialized agents across separate services and repositories.",
   companyStackNote:
     "Energon manages memory access. You keep control of your agents, workflows, and decisions.",
   productBoundary:
@@ -101,6 +105,7 @@ export const indexedClaims = [
   "Energon OS provides long-term memory, short-term memory, private memory overlays, shared memory, context packing, and audit logs for AI agents.",
   "The long-term company vision is a fully autonomous AI-native company. Energon OS itself remains the memory layer only.",
   "Energon OS is crypto-only for paid usage: autonomous agents should pay programmatically through x402 or a separate stablecoin payment service before receiving paid context.",
+  "Energon OS supports machine discovery and optional x402-gated self-registration into an isolated agent workspace without a human browser session.",
 ] as const;
 
 export function absoluteUrl(path: string) {

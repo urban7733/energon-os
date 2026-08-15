@@ -26,6 +26,7 @@ pub struct AppState {
     pub embedding: Option<EmbeddingClient>,
     pub rate_limiter: RateLimiter,
     pub retrieval_candidate_limit: i64,
+    pub agent_self_registration: bool,
     next_memory: Arc<AtomicU64>,
     next_promotion: Arc<AtomicU64>,
     next_request: Arc<AtomicU64>,
@@ -82,6 +83,7 @@ impl AppState {
             embedding: EmbeddingClient::from_env(),
             rate_limiter: RateLimiter::from_env(),
             retrieval_candidate_limit: retrieval_candidate_limit(),
+            agent_self_registration: env_flag("ENERGON_AGENT_SELF_REGISTRATION_ENABLED"),
             next_memory: Arc::new(AtomicU64::new(1)),
             next_promotion: Arc::new(AtomicU64::new(1)),
             next_request: Arc::new(AtomicU64::new(1)),
@@ -139,6 +141,7 @@ impl AppState {
             embedding: EmbeddingClient::from_env(),
             rate_limiter: RateLimiter::from_env(),
             retrieval_candidate_limit: retrieval_candidate_limit(),
+            agent_self_registration: env_flag("ENERGON_AGENT_SELF_REGISTRATION_ENABLED"),
             next_memory: Arc::new(AtomicU64::new(1)),
             next_promotion: Arc::new(AtomicU64::new(1)),
             next_request: Arc::new(AtomicU64::new(1)),
@@ -231,6 +234,24 @@ fn validate_production_environment() -> Result<(), Box<dyn std::error::Error + S
         ));
     }
 
+    validate_agent_self_registration(
+        env_flag("ENERGON_AGENT_SELF_REGISTRATION_ENABLED"),
+        env_flag("ENERGON_X402_ENABLED"),
+    )?;
+
+    Ok(())
+}
+
+fn validate_agent_self_registration(
+    enabled: bool,
+    x402_enabled: bool,
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    if enabled && !x402_enabled {
+        return Err(config_error(
+            "ENERGON_AGENT_SELF_REGISTRATION_ENABLED requires ENERGON_X402_ENABLED in production",
+        ));
+    }
+
     Ok(())
 }
 
@@ -277,7 +298,7 @@ pub fn now_unix_ms() -> u128 {
 
 #[cfg(test)]
 mod tests {
-    use super::is_production_value;
+    use super::{is_production_value, validate_agent_self_registration};
 
     #[test]
     fn production_mode_requires_an_explicit_value() {
@@ -285,5 +306,12 @@ mod tests {
         assert!(is_production_value(Some("PRODUCTION")));
         assert!(!is_production_value(Some("development")));
         assert!(!is_production_value(None));
+    }
+
+    #[test]
+    fn production_self_registration_requires_x402() {
+        assert!(validate_agent_self_registration(false, false).is_ok());
+        assert!(validate_agent_self_registration(true, true).is_ok());
+        assert!(validate_agent_self_registration(true, false).is_err());
     }
 }

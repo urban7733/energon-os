@@ -7,7 +7,7 @@ import { ScrollTrigger } from "gsap/ScrollTrigger";
 export function ClosingScene() {
   const sectionRef = useRef<HTMLElement>(null);
   const eyebrowRef = useRef<HTMLParagraphElement>(null);
-  const titleRef = useRef<HTMLHeadingElement>(null);
+  const titleRef = useRef<HTMLPreElement>(null);
   const statementRef = useRef<HTMLParagraphElement>(null);
 
   useLayoutEffect(() => {
@@ -57,9 +57,12 @@ export function ClosingScene() {
         <p className="closing-scene-kicker" ref={eyebrowRef}>
           Memory, with boundaries.
         </p>
-        <h2 id="closing-scene-title" ref={titleRef}>
-          Energon OS
-        </h2>
+        <h2 id="closing-scene-title" className="sr-only">Energon OS</h2>
+        <pre className="closing-ascii-wordmark" ref={titleRef} aria-hidden="true">{`████████    ██      ██  ████████    ████████      ██████      ██████    ██      ██            ██████      ████████
+██          ████    ██  ██          ██      ██  ██          ██      ██  ████    ██          ██      ██  ██
+████████    ██  ██  ██  ████████    ████████    ██  ██████  ██      ██  ██  ██  ██          ██      ██    ██████
+██          ██    ████  ██          ██  ██      ██      ██  ██      ██  ██    ████          ██      ██          ██
+████████    ██      ██  ████████    ██    ██      ██████      ██████    ██      ██            ██████    ████████`}</pre>
         <p className="closing-scene-statement" ref={statementRef}>
           The infrastructure for agentic swarms.
         </p>

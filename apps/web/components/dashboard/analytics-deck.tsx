@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import {
   Bar,
   BarChart,
@@ -55,6 +56,8 @@ type AnalyticsDeckProps = {
 };
 
 const chartColors = ["#7dd3fc", "#c4b5fd", "#e5e7eb", "#94a3b8", "#67e8f9", "#ddd6fe"];
+const usageColors = ["#60a5fa", "#34d399", "#f59e0b", "#a78bfa", "#fb7185", "#22d3ee"];
+type UsageMetric = "calls" | "paid" | "usdc";
 
 export function AnalyticsDeck({
   usage,
@@ -65,6 +68,8 @@ export function AnalyticsDeck({
   outbox,
   lifecycle,
 }: AnalyticsDeckProps) {
+  const [usageMetric, setUsageMetric] = useState<UsageMetric>("calls");
+  const [selectedRoute, setSelectedRoute] = useState<string | null>(null);
   const totalCalls = usage.reduce((total, route) => total + route.calls, 0);
   const paidCalls = usage.reduce((total, route) => total + route.paid_calls, 0);
   const paidUsdcMicro = usage.reduce((total, route) => total + route.amount_usdc_micro, 0);
@@ -87,7 +92,10 @@ export function AnalyticsDeck({
     route: route.route.replace("/v1/", ""),
     calls: route.calls,
     paid: route.paid_calls,
+    usdc: route.amount_usdc_micro / 1_000_000,
   }));
+  const sortedUsageData = [...usageData].sort((a, b) => b[usageMetric] - a[usageMetric]);
+  const activeRoute = sortedUsageData.find((route) => route.route === selectedRoute) ?? sortedUsageData[0];
   const scopeData = scopes.map((scope) => ({
     name: scope.scope.replaceAll("_", " "),
     value: scope.count,
@@ -155,20 +163,32 @@ export function AnalyticsDeck({
           <article className="analytics-chart analytics-chart-wide">
             <div className="analytics-chart-header">
               <div>
-                <span>Request volume</span>
-                <p>Calls recorded by API route.</p>
+                <span>Usage by route</span>
+                <p>Select a metric, then inspect any route.</p>
               </div>
-              <strong>{totalCalls.toLocaleString()} calls</strong>
+              <div className="analytics-metric-switch" aria-label="Usage metric">
+                {(["calls", "paid", "usdc"] as const).map((metric) => (
+                  <button
+                    type="button"
+                    key={metric}
+                    aria-pressed={usageMetric === metric}
+                    onClick={() => setUsageMetric(metric)}
+                  >
+                    {metric === "calls" ? "Calls" : metric === "paid" ? "Metered" : "USDC"}
+                  </button>
+                ))}
+              </div>
             </div>
-            {usageData.length > 0 ? (
+            {sortedUsageData.length > 0 ? (
               <div className="recharts-frame" aria-label="API request volume by route">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={usageData} margin={{ top: 8, right: 4, left: -20, bottom: 0 }}>
-                    <CartesianGrid stroke="#2c2c31" vertical={false} />
-                    <XAxis dataKey="route" stroke="#82828c" tickLine={false} axisLine={false} fontSize={11} />
-                    <YAxis stroke="#82828c" tickLine={false} axisLine={false} fontSize={11} allowDecimals={false} />
+                  <BarChart layout="vertical" data={sortedUsageData} margin={{ top: 4, right: 18, left: 8, bottom: 0 }}>
+                    <CartesianGrid stroke="#27272a" horizontal={false} />
+                    <XAxis type="number" stroke="#71717a" tickLine={false} axisLine={false} fontSize={10} allowDecimals={usageMetric === "usdc"} />
+                    <YAxis type="category" dataKey="route" width={112} stroke="#a1a1aa" tickLine={false} axisLine={false} fontSize={10} />
                     <Tooltip
                       cursor={{ fill: "rgba(255,255,255,0.04)" }}
+                      formatter={(value) => formatUsageMetric(Number(value), usageMetric)}
                       contentStyle={{
                         border: "1px solid #37373f",
                         borderRadius: 8,
@@ -177,8 +197,17 @@ export function AnalyticsDeck({
                         fontSize: 12,
                       }}
                     />
-                    <Bar dataKey="calls" name="API calls" fill="#7dd3fc" radius={[4, 4, 0, 0]} />
-                    <Bar dataKey="paid" name="Metered calls" fill="#c4b5fd" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey={usageMetric} name={usageMetric === "calls" ? "Calls" : usageMetric === "paid" ? "Metered calls" : "USDC"} radius={[0, 5, 5, 0]} barSize={16}>
+                      {sortedUsageData.map((route, index) => (
+                        <Cell
+                          key={route.route}
+                          fill={usageColors[index % usageColors.length]}
+                          fillOpacity={!selectedRoute || selectedRoute === route.route ? 1 : 0.35}
+                          onClick={() => setSelectedRoute(route.route)}
+                          className="usage-bar-cell"
+                        />
+                      ))}
+                    </Bar>
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -186,15 +215,19 @@ export function AnalyticsDeck({
               <EmptyAnalytics message="No API operations have been recorded for this workspace." />
             )}
           </article>
-          <article className="analytics-aside">
+          <article className="analytics-aside route-detail">
             <div className="analytics-aside-icon"><RadioTower size={18} aria-hidden="true" /></div>
-            <span>Durable events</span>
-            <strong>{outbox ? outbox.published.toLocaleString() : "--"}</strong>
-            <p>
-              {outbox
-                ? `${outbox.leased} being delivered · ${outbox.retrying} retrying`
-                : "Event delivery is visible after persistent storage is connected."}
-            </p>
+            <span>Selected route</span>
+            <strong>{activeRoute?.route ?? "No traffic"}</strong>
+            {activeRoute ? (
+              <div className="route-detail-grid">
+                <p><b>{activeRoute.calls.toLocaleString()}</b> calls</p>
+                <p><b>{activeRoute.paid.toLocaleString()}</b> metered</p>
+                <p><b>{formatUsdc(activeRoute.usdc * 1_000_000)}</b> settled</p>
+              </div>
+            ) : (
+              <p>Route details appear after the first API operation.</p>
+            )}
           </article>
         </TabsContent>
 
@@ -315,4 +348,9 @@ function EmptyAnalytics({ message }: { message: string }) {
 function formatUsdc(microUsdc: number) {
   const value = microUsdc / 1_000_000;
   return `${value.toLocaleString(undefined, { maximumFractionDigits: 4 })} USDC`;
+}
+
+function formatUsageMetric(value: number, metric: UsageMetric) {
+  if (metric === "usdc") return `${value.toLocaleString(undefined, { maximumFractionDigits: 4 })} USDC`;
+  return value.toLocaleString();
 }

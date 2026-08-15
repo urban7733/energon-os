@@ -3,7 +3,6 @@ import Link from "next/link";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { auth } from "../../lib/auth";
-import { site } from "../../lib/site";
 import { DashboardConsole } from "./dashboard-console";
 
 export const metadata: Metadata = {
@@ -31,24 +30,21 @@ export default async function DashboardPage() {
           <span>Energon</span>
         </Link>
         <nav>
-          <a href="#atlas">Memory Atlas</a>
-          <a href="#overview">Analytics</a>
-          <a href="#agents">Set up</a>
-          <a href="#org-agents">Agents and keys</a>
-          <a href="#skills">Skill profiles</a>
-          <a href="#conflicts">Authority and conflicts</a>
+          <a href="#overview">Overview</a>
+          <a href="#org-agents">Agents</a>
           <a href="#memory">Memory</a>
-          <a href="#context">Context and audit</a>
+          <a href="#org-memories">Records</a>
           <a href="#billing">Billing</a>
+          <a href="#advanced">Advanced</a>
         </nav>
       </aside>
       <section className="dashboard-main">
         <header className="dashboard-header">
           <div>
-            <p className="eyebrow">Agent memory workspace</p>
-            <h1>Keep agent memory private. Share it when it helps.</h1>
+            <p className="eyebrow">Workspace overview</p>
+            <h1>Control your autonomous company.</h1>
           </div>
-          <p>{site.shortClaim}</p>
+          <p>Usage, agents and memory in one focused operating view.</p>
         </header>
         <DashboardConsole userEmail={session.user.email} />
       </section>

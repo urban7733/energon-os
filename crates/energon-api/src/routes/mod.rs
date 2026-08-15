@@ -14,6 +14,7 @@ pub mod health;
 pub mod memory;
 pub mod orgs;
 pub mod overview;
+pub mod registration;
 pub mod runtime;
 pub mod skills;
 pub mod vault;
@@ -21,6 +22,8 @@ pub mod vault;
 pub fn router() -> Router<AppState> {
     Router::new()
         .route("/admin/agents", post(admin::create_agent))
+        .route("/agents/discovery", get(registration::agent_discovery))
+        .route("/agents/register", post(registration::register_agent))
         .route("/billing/x402", get(billing::get_x402_status))
         .route("/swarm/runtime", get(runtime::swarm_runtime))
         .route("/agent/overview", get(overview::agent_operational_overview))

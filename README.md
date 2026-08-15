@@ -129,6 +129,13 @@ The dashboard is an operator surface for setup, inspection, and audits. The core
 product surface is the SDK that autonomous agent runtimes call directly. The
 HTTP API is the versioned control-plane transport behind that SDK.
 
+Deployments may also enable autonomous self-registration. A machine client
+discovers the contract at `GET /v1/agents/discovery`, pays the x402 registration
+challenge, and calls `POST /v1/agents/register`. Energon creates a server-named,
+isolated organization and agent, then returns the bearer API key exactly once.
+No human dashboard session is required. Production startup refuses to enable
+self-registration unless verified x402 is also enabled.
+
 The long-term scale goal is that billions of external agents can use Energon as
 their permissioned memory layer. Every design decision should preserve that
 shape:
@@ -294,6 +301,8 @@ Agent endpoints (bearer `eos_live_...` API keys):
 ```txt
 GET  /health
 GET  /v1/billing/x402
+GET  /v1/agents/discovery
+POST /v1/agents/register
 GET  /v1/swarm/runtime
 POST /v1/memory/write
 POST /v1/context/build
@@ -357,7 +366,8 @@ curl -X POST http://127.0.0.1:3001/v1/admin/agents \
 
 SDK guides are available for [TypeScript](docs/sdk-typescript.md),
 [Python](docs/sdk-python.md), and [Rust](docs/sdk-rust.md). The low-level
-self-hosting contract is in [docs/api.md](docs/api.md).
+self-hosting contract is in [docs/api.md](docs/api.md). Autonomous onboarding
+and machine discovery are documented in [docs/agent-economy.md](docs/agent-economy.md).
 
 ## Obsidian Vault Export
 

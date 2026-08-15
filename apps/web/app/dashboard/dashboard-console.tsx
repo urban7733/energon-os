@@ -20,6 +20,7 @@ import {
   Send,
   ShieldCheck,
   Scale,
+  SlidersHorizontal,
   Trash2,
   Users,
 } from "lucide-react";
@@ -213,6 +214,8 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
     "unchecked",
   );
   const [busy, setBusy] = useState(false);
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [setupOpen, setSetupOpen] = useState(false);
 
   const cleanBaseUrl = useMemo(() => apiBaseUrl.replace(/\/$/, ""), [apiBaseUrl]);
   const orgId = activeOrganization?.id ?? "";
@@ -329,6 +332,15 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
       refreshClaimConflicts(),
     ]);
   }
+
+  useEffect(() => {
+    if (activeOrganization || !organizations) return;
+    if (organizations.length === 1) {
+      void setActiveOrganization(organizations[0].id);
+    } else if (organizations.length === 0) {
+      setSetupOpen(true);
+    }
+  }, [activeOrganization, organizations]);
 
   useEffect(() => {
     let current = true;
@@ -800,10 +812,12 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
             <RefreshCcw size={14} aria-hidden="true" />
             Refresh workspace
           </button>
-          <button type="button" onClick={() => void downloadOperatorVault()} disabled={busy || !orgId}>
-            <Download size={14} aria-hidden="true" />
-            Export graph
-          </button>
+          {showAdvanced ? (
+            <button type="button" onClick={() => void downloadOperatorVault()} disabled={busy || !orgId}>
+              <Download size={14} aria-hidden="true" />
+              Export graph
+            </button>
+          ) : null}
           <button type="button" onClick={() => void signOut()}>
             <LogOut size={14} aria-hidden="true" />
             Sign out
@@ -855,15 +869,6 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
         </article>
       </section>
 
-      <MemoryAtlas
-        organizationName={activeOrganization?.name ?? "Active workspace"}
-        agents={orgAgents}
-        memories={orgMemories}
-        totalMemories={memoryStats?.total_memories ?? 0}
-        rolePolicies={rolePolicies}
-        conflicts={claimConflicts}
-      />
-
       <AnalyticsDeck
         usage={usageRows}
         scopes={scopeRows}
@@ -874,12 +879,44 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
         lifecycle={lifecycle}
       />
 
-      <div className="console-grid">
-      <section id="agents" className="ops-panel wide setup-panel" aria-labelledby="agents-title">
-        <div className="panel-title">
-          <KeyRound size={18} aria-hidden="true" />
-          <h2 id="agents-title">1. Set up your workspace and agent</h2>
+      <section id="advanced" className="advanced-toggle" aria-label="Advanced workspace controls">
+        <div>
+          <SlidersHorizontal size={17} aria-hidden="true" />
+          <span>
+            <strong>Advanced workspace tools</strong>
+            <small>Skills, authority, context audits and the memory atlas.</small>
+          </span>
         </div>
+        <button type="button" aria-expanded={showAdvanced} onClick={() => setShowAdvanced((value) => !value)}>
+          {showAdvanced ? "Hide advanced" : "Show advanced"}
+        </button>
+      </section>
+
+      {showAdvanced ? (
+        <MemoryAtlas
+          organizationName={activeOrganization?.name ?? "Active workspace"}
+          agents={orgAgents}
+          memories={orgMemories}
+          totalMemories={memoryStats?.total_memories ?? 0}
+          rolePolicies={rolePolicies}
+          conflicts={claimConflicts}
+        />
+      ) : null}
+
+      <div className={`console-grid${showAdvanced ? " show-advanced" : ""}`}>
+      <details
+        id="agents"
+        className="ops-panel wide setup-panel setup-disclosure"
+        open={setupOpen}
+        onToggle={(event) => setSetupOpen(event.currentTarget.open)}
+      >
+        <summary>
+          <KeyRound size={18} aria-hidden="true" />
+          <span>
+            <strong>Workspace setup</strong>
+            <small>Connection, organization and agent credentials</small>
+          </span>
+        </summary>
         <form onSubmit={checkHealth}>
           <label>
             API address
@@ -943,14 +980,14 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
             {mintedKey}
           </p>
         ) : null}
-      </section>
+      </details>
 
       <BillingCheckout apiBaseUrl={cleanBaseUrl} orgId={orgId} />
 
-      <section id="org-agents" className="ops-panel" aria-labelledby="org-agents-title">
+      <section id="org-agents" className="ops-panel wide" aria-labelledby="org-agents-title">
         <div className="panel-title">
           <ListChecks size={18} aria-hidden="true" />
-          <h2 id="org-agents-title">2. Manage agents and keys</h2>
+          <h2 id="org-agents-title">Agents &amp; API keys</h2>
         </div>
         <form onSubmit={listAgents}>
           <button type="submit" disabled={busy || !orgId}>
@@ -1002,7 +1039,7 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
         ) : null}
       </section>
 
-      <section id="skills" className="ops-panel wide" aria-labelledby="skills-title">
+      <section id="skills" className="ops-panel wide advanced-panel" aria-labelledby="skills-title">
         <div className="panel-title">
           <Bot size={18} aria-hidden="true" />
           <h2 id="skills-title">Skill profiles</h2>
@@ -1188,7 +1225,7 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
         ) : null}
       </section>
 
-      <section id="conflicts" className="ops-panel wide" aria-labelledby="conflicts-title">
+      <section id="conflicts" className="ops-panel wide advanced-panel" aria-labelledby="conflicts-title">
         <div className="panel-title">
           <Scale size={18} aria-hidden="true" />
           <h2 id="conflicts-title">Authority and conflict resolution</h2>
@@ -1295,7 +1332,7 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
       <section id="memory" className="ops-panel wide memory-panel" aria-labelledby="memory-title">
         <div className="panel-title">
           <ShieldCheck size={18} aria-hidden="true" />
-          <h2 id="memory-title">3. Save a private memory</h2>
+          <h2 id="memory-title">Write private memory</h2>
         </div>
         <form className="memory-write-form" onSubmit={writeMemory}>
           <label>
@@ -1368,10 +1405,10 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
         </form>
       </section>
 
-      <section id="context" className="ops-panel wide" aria-labelledby="context-title">
+      <section id="context" className="ops-panel wide advanced-panel" aria-labelledby="context-title">
         <div className="panel-title">
           <Send size={18} aria-hidden="true" />
-          <h2 id="context-title">4. Build safe context for an agent</h2>
+          <h2 id="context-title">Context inspector</h2>
         </div>
         <form onSubmit={buildContext}>
           <label>
@@ -1408,7 +1445,7 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
         </form>
       </section>
 
-      <section id="audit" className="result-panel" aria-live="polite" aria-label="API result">
+      <section id="audit" className="result-panel advanced-panel" aria-live="polite" aria-label="API result">
         <div className="panel-title">
           <ShieldCheck size={18} aria-hidden="true" />
           <h2>Recent activity: {result.label}</h2>

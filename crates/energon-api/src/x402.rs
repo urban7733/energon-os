@@ -32,6 +32,7 @@ pub struct X402Config {
 /// Per-route pricing in USDC micro units, overridable via environment.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RoutePricing {
+    pub agent_register_micro: u64,
     pub memory_write_micro: u64,
     pub memory_promote_micro: u64,
     pub context_build_micro: u64,
@@ -43,6 +44,7 @@ pub struct RoutePricing {
 impl Default for RoutePricing {
     fn default() -> Self {
         Self {
+            agent_register_micro: 10_000,
             memory_write_micro: 1_000,
             memory_promote_micro: 1_000,
             context_build_micro: 3_000,
@@ -58,6 +60,10 @@ impl RoutePricing {
         let defaults = Self::default();
 
         Self {
+            agent_register_micro: price_env(
+                "ENERGON_PRICE_AGENT_REGISTER_MICRO",
+                defaults.agent_register_micro,
+            ),
             memory_write_micro: price_env(
                 "ENERGON_PRICE_MEMORY_WRITE_MICRO",
                 defaults.memory_write_micro,
@@ -87,6 +93,7 @@ impl RoutePricing {
 
     pub fn amount_usdc_micro(&self, route: PaidRoute) -> u64 {
         match route {
+            PaidRoute::AgentRegister => self.agent_register_micro,
             PaidRoute::MemoryWrite => self.memory_write_micro,
             PaidRoute::MemoryPromote => self.memory_promote_micro,
             PaidRoute::ContextBuild => self.context_build_micro,
@@ -141,6 +148,7 @@ impl PaymentOutcome {
 
 #[derive(Debug, Clone, Copy)]
 pub enum PaidRoute {
+    AgentRegister,
     MemoryWrite,
     MemoryPromote,
     ContextBuild,
@@ -311,6 +319,7 @@ impl X402Config {
             "facilitatorBearerConfigured": self.facilitator_bearer.is_some(),
             "acceptUnverified": self.accept_unverified,
             "routes": [
+                self.payment_required(PaidRoute::AgentRegister),
                 self.payment_required(PaidRoute::MemoryWrite),
                 self.payment_required(PaidRoute::MemoryPromote),
                 self.payment_required(PaidRoute::ContextBuild),
@@ -442,6 +451,7 @@ impl X402Config {
 impl PaidRoute {
     fn path(self) -> &'static str {
         match self {
+            PaidRoute::AgentRegister => "POST /v1/agents/register",
             PaidRoute::MemoryWrite => "POST /v1/memory/write",
             PaidRoute::MemoryPromote => "POST /v1/memory/promote",
             PaidRoute::ContextBuild => "POST /v1/context/build",
@@ -469,6 +479,7 @@ impl PaidRoute {
 
     fn description(self) -> &'static str {
         match self {
+            PaidRoute::AgentRegister => "Register an autonomous agent and isolated workspace.",
             PaidRoute::MemoryWrite => "Write a permissioned memory record.",
             PaidRoute::MemoryPromote => "Promote private memory into a shared scope with audit.",
             PaidRoute::ContextBuild => "Build an allowed context pack for an external agent.",
@@ -484,6 +495,7 @@ impl PaidRoute {
     /// Stable identifier used for receipts and usage metering.
     pub fn key(self) -> &'static str {
         match self {
+            PaidRoute::AgentRegister => "agent_register",
             PaidRoute::MemoryWrite => "memory_write",
             PaidRoute::MemoryPromote => "memory_promote",
             PaidRoute::ContextBuild => "context_build",
@@ -661,6 +673,7 @@ mod tests {
     fn default_pricing_matches_documented_amounts() {
         let pricing = RoutePricing::default();
 
+        assert_eq!(pricing.amount_usdc_micro(PaidRoute::AgentRegister), 10_000);
         assert_eq!(pricing.amount_usdc_micro(PaidRoute::MemoryWrite), 1_000);
         assert_eq!(pricing.amount_usdc_micro(PaidRoute::MemoryPromote), 1_000);
         assert_eq!(pricing.amount_usdc_micro(PaidRoute::ContextBuild), 3_000);

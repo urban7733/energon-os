@@ -36,6 +36,19 @@ All routes are rate limited per API key (or client IP) with a token bucket
 (default 20 rps, burst 40). Exhausted buckets receive `429 Too Many Requests`.
 Request bodies are limited to 1 MiB by default.
 
+## Autonomous Agent Registration
+
+These public machine endpoints do not require an existing agent key:
+
+```txt
+GET  /v1/agents/discovery
+POST /v1/agents/register
+```
+
+Registration is disabled by default. When enabled in production it requires an
+x402 payment payload, creates a new isolated organization, and returns the new
+bearer API key exactly once. See [`agent-economy.md`](agent-economy.md).
+
 ## Swarm Runtime Handshake
 
 The SDK calls this endpoint to verify the authenticated agent's effective swarm
