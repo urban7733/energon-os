@@ -8,6 +8,7 @@ authors.workspace = true
 [dependencies]
 energon-core = { path = "../energon-core" }
 serde_json.workspace = true
+sha2 = "0.10"
 sqlx.workspace = true
 thiserror.workspace = true
 

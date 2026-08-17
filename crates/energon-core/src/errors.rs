@@ -22,4 +22,10 @@ pub enum EnergonError {
     InvalidPromotionSource,
     #[error("promotion target must be a shared scope")]
     InvalidPromotionTarget,
+    #[error("agents must write agent_private memory before promoting it to a shared scope")]
+    DirectSharedMemoryWriteNotAllowed,
+    #[error(
+        "user and session memory require a trusted grant and cannot be claimed by an agent request"
+    )]
+    UntrustedAccessContext,
 }

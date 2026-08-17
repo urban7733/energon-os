@@ -3,7 +3,6 @@ import Link from "next/link";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { auth } from "../../lib/auth";
-import { site } from "../../lib/site";
 import { DashboardConsole } from "./dashboard-console";
 
 export const metadata: Metadata = {
@@ -31,21 +30,21 @@ export default async function DashboardPage() {
           <span>Energon</span>
         </Link>
         <nav>
-          <a href="#agents">Agents</a>
-          <a href="#org-agents">Org agents</a>
-          <a href="#org-memories">Org memory</a>
+          <a href="#overview">Overview</a>
+          <a href="#org-agents">Agents</a>
           <a href="#memory">Memory</a>
-          <a href="#context">Context</a>
-          <a href="#audit">Audit</a>
+          <a href="#org-memories">Records</a>
+          <a href="#billing">Billing</a>
+          <a href="#advanced">Advanced</a>
         </nav>
       </aside>
       <section className="dashboard-main">
         <header className="dashboard-header">
           <div>
-            <p className="eyebrow">Operator dashboard</p>
-            <h1>Memory control plane</h1>
+            <p className="eyebrow">Workspace overview</p>
+            <h1>Control your autonomous company.</h1>
           </div>
-          <p>{site.shortClaim}</p>
+          <p>Usage, agents and memory in one focused operating view.</p>
         </header>
         <DashboardConsole userEmail={session.user.email} />
       </section>

@@ -2,6 +2,15 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { absoluteUrl, indexedClaims, site } from "../lib/site";
 
+const siteVerification = {
+  ...(process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION
+    ? { google: process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION }
+    : {}),
+  ...(process.env.NEXT_PUBLIC_BING_SITE_VERIFICATION
+    ? { other: { "msvalidate.01": process.env.NEXT_PUBLIC_BING_SITE_VERIFICATION } }
+    : {}),
+};
+
 export const metadata: Metadata = {
   metadataBase: new URL(site.url),
   title: {
@@ -42,8 +51,12 @@ export const metadata: Metadata = {
         { url: "/llms.txt", title: "LLM overview" },
         { url: "/llms-full.txt", title: "Full LLM context" },
       ],
+      "application/json": [
+        { url: "/.well-known/energon-agent.json", title: "Autonomous agent contract" },
+      ],
     },
   },
+  verification: siteVerification,
   openGraph: {
     type: "website",
     url: site.url,
@@ -79,6 +92,7 @@ export const metadata: Metadata = {
   },
   icons: {
     icon: "/energonos.png",
+    shortcut: "/energonos.png",
     apple: "/energonos.png",
   },
   robots: {
@@ -101,12 +115,15 @@ export const metadata: Metadata = {
     "future-roadmap": site.roadmap,
     "crypto-payments-roadmap": "planned outside Energon OS memory core",
     "llm-discovery": indexedClaims.join(" "),
+    "ai-readable-index": absoluteUrl("/llms-full.txt"),
+    "agent-discovery": absoluteUrl("/.well-known/energon-agent.json"),
+    "source-code": site.repositoryUrl,
   },
 };
 
 export const viewport: Viewport = {
   colorScheme: "dark",
-  themeColor: "#111111",
+  themeColor: "#000000",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
@@ -116,6 +133,13 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     "@id": `${site.url}/#organization`,
     name: "Energon OS",
     url: site.url,
+    logo: {
+      "@type": "ImageObject",
+      url: absoluteUrl("/energonos.png"),
+      width: 1536,
+      height: 1024,
+    },
+    sameAs: [site.repositoryUrl],
     founder: {
       "@type": "Person",
       name: site.founder,
@@ -144,9 +168,19 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     applicationCategory: "DeveloperApplication",
     operatingSystem: "Cloud, Linux, self-hosted",
     url: site.url,
+    installUrl: site.repositoryUrl,
+    softwareVersion: "0.1.0",
+    license: "https://www.apache.org/licenses/LICENSE-2.0",
     description: site.description,
     creator: { "@id": `${site.url}/#organization` },
-    isAccessibleForFree: false,
+    isAccessibleForFree: true,
+    offers: {
+      "@type": "Offer",
+      price: 0,
+      priceCurrency: "USD",
+      availability: "https://schema.org/InStock",
+      url: site.repositoryUrl,
+    },
     featureList: [
       "Long-term memory for AI agents",
       "Short-term task memory",
@@ -173,6 +207,19 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     },
   };
 
+  const apiJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "WebAPI",
+    "@id": `${site.url}/#api`,
+    name: "Energon OS API",
+    url: site.url,
+    description:
+      "An API for permissioned memory writes, context builds, audit records, agent skills, and operational overview data.",
+    provider: { "@id": `${site.url}/#organization` },
+    documentation: site.apiDocumentationUrl,
+    termsOfService: site.repositoryUrl,
+  };
+
   const roadmapJsonLd = {
     "@context": "https://schema.org",
     "@type": "DefinedTerm",
@@ -196,6 +243,10 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteJsonLd) }}
+        />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(apiJsonLd) }}
         />
         <script
           type="application/ld+json"

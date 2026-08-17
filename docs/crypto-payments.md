@@ -5,9 +5,10 @@ x402: agents request a paid endpoint, the API returns `402 Payment Required`, th
 agent signs/pays with a wallet, and the API verifies/settles before returning
 memory or context.
 
-This repository only owns the memory/API enforcement boundary. Wallet custody,
-treasury automation, accounting, subscription checkout, and broader payment
-orchestration belong in separate services or repositories.
+This repository owns the memory/API enforcement boundary and a direct Base-USDC
+checkout for human operator plans. Wallet custody, treasury automation,
+accounting, automatic recurring debits, and broader payment orchestration stay
+outside this repository.
 
 ## x402 Configuration
 
@@ -55,6 +56,27 @@ GET  /v1/audit/context/{request_id}      ENERGON_PRICE_AUDIT_READ_MICRO=500
 GET  /v1/audit/promotion/{memory_id}     ENERGON_PRICE_AUDIT_READ_MICRO=500
 GET  /v1/vault/obsidian.zip              ENERGON_PRICE_VAULT_EXPORT_MICRO=5000
 ```
+
+## Human Plan Checkout
+
+Authenticated operators can buy a Developer (99 USDC, 100k included API
+operations) or Team plan (499 USDC, 1M included operations) in the dashboard.
+The browser wallet transfers USDC on Base, signs the checkout intent, and the
+API independently verifies the confirmed ERC-20 `Transfer` event before it
+unlocks the organization for 30 days.
+
+Required configuration:
+
+```txt
+ENERGON_X402_PAY_TO=0xYourPublicReceivingAddress
+ENERGON_BASE_RPC_URL=https://<base-rpc-provider>
+ENERGON_BILLING_NETWORK=eip155:8453
+ENERGON_BILLING_ASSET=0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913
+```
+
+Plan purchases are deliberately manual renewals. A wallet must explicitly
+approve every new 30-day period; Energon never stores a wallet key or silently
+debits a wallet.
 
 ## Receipts and Usage Metering
 

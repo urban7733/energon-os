@@ -1,4 +1,5 @@
 mod app;
+mod chain;
 mod embedding;
 mod errors;
 mod jwt;
@@ -23,9 +24,7 @@ async fn main() {
         )
         .init();
 
-    let bind_addr = env::var("ENERGON_BIND_ADDR").unwrap_or_else(|_| "127.0.0.1:3001".to_owned());
-    let addr: SocketAddr = bind_addr
-        .parse()
+    let addr = resolve_bind_addr(env::var("ENERGON_BIND_ADDR").ok(), env::var("PORT").ok())
         .expect("ENERGON_BIND_ADDR must be a socket address");
 
     let state = AppState::from_env()
@@ -44,4 +43,39 @@ async fn main() {
     )
     .await
     .expect("API server failed");
+}
+
+fn resolve_bind_addr(
+    bind_addr: Option<String>,
+    port: Option<String>,
+) -> Result<SocketAddr, std::net::AddrParseError> {
+    bind_addr
+        .or_else(|| port.map(|port| format!("0.0.0.0:{port}")))
+        .unwrap_or_else(|| "127.0.0.1:3001".to_owned())
+        .parse()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::resolve_bind_addr;
+
+    #[test]
+    fn uses_host_port_for_platform_deployments() {
+        assert_eq!(
+            resolve_bind_addr(None, Some("8080".to_owned()))
+                .unwrap()
+                .to_string(),
+            "0.0.0.0:8080"
+        );
+    }
+
+    #[test]
+    fn explicit_address_takes_precedence() {
+        assert_eq!(
+            resolve_bind_addr(Some("127.0.0.1:4000".to_owned()), Some("8080".to_owned()))
+                .unwrap()
+                .to_string(),
+            "127.0.0.1:4000"
+        );
+    }
 }

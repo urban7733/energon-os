@@ -250,6 +250,45 @@ pub struct ListOrgMemoriesResponse {
     pub memories: Vec<OrgMemoryResponse>,
 }
 
+#[derive(Debug, Serialize)]
+pub struct MemoryScopeCountResponse {
+    pub scope: energon_core::MemoryScope,
+    pub count: i64,
+}
+
+#[derive(Debug, Serialize)]
+pub struct OrgMemoryStatsResponse {
+    pub org_id: String,
+    pub total_memories: i64,
+    pub scopes: Vec<MemoryScopeCountResponse>,
+}
+
+/// `GET /v1/orgs/{org_id}/memory-stats` — exact memory counts by scope for
+/// an operator dashboard, without paging through the underlying records.
+pub async fn org_memory_stats(
+    State(state): State<AppState>,
+    Path(org_id): Path<String>,
+    headers: HeaderMap,
+) -> Result<Json<OrgMemoryStatsResponse>, ApiError> {
+    authorize_operator(&state, &headers, &org_id).await?;
+    let pool = postgres_pool(&state)?;
+    let scopes = energon_db::memory::count_org_memories_by_scope(pool, &org_id)
+        .await?
+        .into_iter()
+        .map(|count| MemoryScopeCountResponse {
+            scope: count.scope,
+            count: count.count,
+        })
+        .collect::<Vec<_>>();
+    let total_memories = scopes.iter().map(|count| count.count).sum();
+
+    Ok(Json(OrgMemoryStatsResponse {
+        org_id,
+        total_memories,
+        scopes,
+    }))
+}
+
 /// `GET /v1/orgs/{org_id}/memories?scope=&limit=&offset=` — metadata plus a
 /// truncated content preview.
 pub async fn list_org_memories(
@@ -361,6 +400,192 @@ pub struct UsageSummaryResponse {
     pub recent_receipts: Vec<ReceiptResponse>,
 }
 
+#[derive(Debug, Serialize)]
+pub struct OutboxStatusResponse {
+    pub storage: &'static str,
+    pub pending: i64,
+    pub leased: i64,
+    pub published: i64,
+    pub retrying: i64,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct SetRolePolicyRequest {
+    pub authority_bps: i32,
+    #[serde(default)]
+    pub can_resolve_conflicts: bool,
+}
+
+#[derive(Debug, Serialize)]
+pub struct RolePolicyResponse {
+    pub role_id: String,
+    pub authority_bps: i32,
+    pub can_resolve_conflicts: bool,
+    pub policy_version: i32,
+    pub updated_at_unix_ms: i64,
+}
+
+#[derive(Debug, Serialize)]
+pub struct ListRolePoliciesResponse {
+    pub org_id: String,
+    pub policies: Vec<RolePolicyResponse>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ListConflictsQuery {
+    #[serde(default)]
+    pub include_resolved: bool,
+}
+
+#[derive(Debug, Serialize)]
+pub struct ClaimConflictResponse {
+    pub conflict_id: String,
+    pub subject: String,
+    pub predicate: String,
+    pub incumbent_claim_id: String,
+    pub challenger_claim_id: String,
+    pub status: String,
+    pub resolved_claim_id: Option<String>,
+    pub resolution_reason: Option<String>,
+    pub resolved_by_user_id: Option<String>,
+    pub created_at_unix_ms: i64,
+    pub resolved_at_unix_ms: Option<i64>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct ListConflictsResponse {
+    pub org_id: String,
+    pub conflicts: Vec<ClaimConflictResponse>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ResolveConflictRequest {
+    pub accepted_claim_id: String,
+    pub reason: String,
+}
+
+/// `GET /v1/orgs/{org_id}/role-policies` — explicit, operator-owned role
+/// authority values. Agents cannot read or modify this through their key.
+pub async fn list_role_policies(
+    State(state): State<AppState>,
+    Path(org_id): Path<String>,
+    headers: HeaderMap,
+) -> Result<Json<ListRolePoliciesResponse>, ApiError> {
+    authorize_operator(&state, &headers, &org_id).await?;
+    let pool = postgres_pool(&state)?;
+    let policies = energon_db::claims::list_role_policies(pool, &org_id)
+        .await?
+        .into_iter()
+        .map(role_policy_response)
+        .collect();
+
+    Ok(Json(ListRolePoliciesResponse { org_id, policies }))
+}
+
+/// `PUT /v1/orgs/{org_id}/role-policies/{role_id}` — policy management for
+/// a role, including whether the role may later be delegated resolution work.
+pub async fn set_role_policy(
+    State(state): State<AppState>,
+    Path((org_id, role_id)): Path<(String, String)>,
+    headers: HeaderMap,
+    Json(request): Json<SetRolePolicyRequest>,
+) -> Result<Json<RolePolicyResponse>, ApiError> {
+    authorize_operator(&state, &headers, &org_id).await?;
+    let pool = postgres_pool(&state)?;
+    let role_id = required_text(role_id, "role_id")?;
+    if !(0..=10_000).contains(&request.authority_bps) {
+        return Err(ApiError::BadRequest(
+            "authority_bps must be between 0 and 10000".to_owned(),
+        ));
+    }
+
+    energon_db::identity::ensure_role_exists(pool, &org_id, &role_id).await?;
+    let policy = energon_db::claims::set_role_policy(
+        pool,
+        &org_id,
+        &role_id,
+        request.authority_bps,
+        request.can_resolve_conflicts,
+    )
+    .await?;
+    Ok(Json(role_policy_response(policy)))
+}
+
+/// `GET /v1/orgs/{org_id}/conflicts` — conflict branches that were created
+/// by actual competing assertions, not dashboard-only status data.
+pub async fn list_conflicts(
+    State(state): State<AppState>,
+    Path(org_id): Path<String>,
+    headers: HeaderMap,
+    Query(query): Query<ListConflictsQuery>,
+) -> Result<Json<ListConflictsResponse>, ApiError> {
+    authorize_operator(&state, &headers, &org_id).await?;
+    let pool = postgres_pool(&state)?;
+    let conflicts = energon_db::claims::list_conflicts(pool, &org_id, query.include_resolved)
+        .await?
+        .into_iter()
+        .map(conflict_response)
+        .collect();
+
+    Ok(Json(ListConflictsResponse { org_id, conflicts }))
+}
+
+/// `POST /v1/orgs/{org_id}/conflicts/{conflict_id}/resolve` — an operator
+/// picks one existing branch. The decision and its reason enter the audit hash
+/// chain within the same database transaction.
+pub async fn resolve_conflict(
+    State(state): State<AppState>,
+    Path((org_id, conflict_id)): Path<(String, String)>,
+    headers: HeaderMap,
+    Json(request): Json<ResolveConflictRequest>,
+) -> Result<Json<ClaimConflictResponse>, ApiError> {
+    let operator = authorize_operator(&state, &headers, &org_id).await?;
+    let pool = postgres_pool(&state)?;
+    let accepted_claim_id = required_text(request.accepted_claim_id, "accepted_claim_id")?;
+    let reason = required_text(request.reason, "reason")?;
+    let conflict = energon_db::claims::resolve_conflict(
+        pool,
+        &org_id,
+        &conflict_id,
+        &accepted_claim_id,
+        &operator.user_id,
+        &reason,
+        now_unix_ms(),
+    )
+    .await?;
+    Ok(Json(conflict_response(conflict)))
+}
+
+/// `GET /v1/orgs/{org_id}/events/outbox` — delivery state for the durable
+/// control-plane event stream. This contains no event payloads or memory text.
+pub async fn org_outbox_status(
+    State(state): State<AppState>,
+    Path(org_id): Path<String>,
+    headers: HeaderMap,
+) -> Result<Json<OutboxStatusResponse>, ApiError> {
+    authorize_operator(&state, &headers, &org_id).await?;
+
+    match &state.storage {
+        StorageBackend::Memory(_) => Ok(Json(OutboxStatusResponse {
+            storage: "memory",
+            pending: 0,
+            leased: 0,
+            published: 0,
+            retrying: 0,
+        })),
+        StorageBackend::Postgres(pool) => {
+            let summary = energon_db::event_outbox::summary(pool, &org_id).await?;
+            Ok(Json(OutboxStatusResponse {
+                storage: "postgres",
+                pending: summary.pending,
+                leased: summary.leased,
+                published: summary.published,
+                retrying: summary.retrying,
+            }))
+        }
+    }
+}
+
 /// `GET /v1/orgs/{org_id}/usage` — per-route totals plus recent receipts.
 pub async fn org_usage(
     State(state): State<AppState>,
@@ -450,4 +675,30 @@ fn clean_optional(value: Option<String>) -> Option<String> {
     value
         .map(|value| value.trim().to_owned())
         .filter(|value| !value.is_empty())
+}
+
+fn role_policy_response(policy: energon_db::claims::RolePolicy) -> RolePolicyResponse {
+    RolePolicyResponse {
+        role_id: policy.role_id,
+        authority_bps: policy.authority_bps,
+        can_resolve_conflicts: policy.can_resolve_conflicts,
+        policy_version: policy.policy_version,
+        updated_at_unix_ms: policy.updated_at_unix_ms,
+    }
+}
+
+fn conflict_response(conflict: energon_db::claims::ClaimConflict) -> ClaimConflictResponse {
+    ClaimConflictResponse {
+        conflict_id: conflict.conflict_id,
+        subject: conflict.subject,
+        predicate: conflict.predicate,
+        incumbent_claim_id: conflict.incumbent_claim_id,
+        challenger_claim_id: conflict.challenger_claim_id,
+        status: conflict.status,
+        resolved_claim_id: conflict.resolved_claim_id,
+        resolution_reason: conflict.resolution_reason,
+        resolved_by_user_id: conflict.resolved_by_user_id,
+        created_at_unix_ms: conflict.created_at_unix_ms,
+        resolved_at_unix_ms: conflict.resolved_at_unix_ms,
+    }
 }

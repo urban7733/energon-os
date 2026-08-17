@@ -1,9 +1,12 @@
-use energon_core::{AgentIdentity, AuditRecord, ContextItem, PromotionAuditRecord};
+use energon_core::{
+    AgentIdentity, AuditRecord, ContextItem, ControlPlaneEvent, PromotionAuditRecord,
+};
 use sqlx::{PgPool, Postgres, Row, Transaction};
 
 use crate::{
     DbError,
     errors::{i64_to_u128, usize_to_i32},
+    event_outbox,
     memory::{scope_from_str, scope_to_str},
 };
 
@@ -73,6 +76,8 @@ pub async fn insert_context_audit(
         .execute(&mut *tx)
         .await?;
     }
+
+    event_outbox::enqueue_in_tx(&mut tx, &ControlPlaneEvent::context_built(audit)).await?;
 
     tx.commit().await?;
 
@@ -169,6 +174,88 @@ pub async fn list_context_audits_for_agent(
     }
 
     Ok(audits)
+}
+
+/// Bounded organization-wide context audits for the read-only operator vault.
+pub async fn list_context_audits_for_org(
+    pool: &PgPool,
+    org_id: &str,
+    limit: i64,
+    task_limit_chars: i32,
+) -> Result<Vec<AuditRecord>, DbError> {
+    let rows = sqlx::query(
+        r#"
+        WITH selected AS (
+            SELECT
+                request_id,
+                agent_id,
+                org_id,
+                left(task, $3) AS task,
+                token_budget,
+                estimated_tokens,
+                denied_memory_count,
+                created_at
+            FROM context_requests
+            WHERE org_id = $1
+            ORDER BY created_at DESC
+            LIMIT $2
+        )
+        SELECT
+            selected.request_id,
+            selected.agent_id,
+            selected.org_id,
+            selected.task,
+            selected.token_budget,
+            selected.estimated_tokens,
+            selected.denied_memory_count,
+            floor(extract(epoch from selected.created_at) * 1000)::bigint AS created_at_unix_ms,
+            COALESCE(
+                array_agg(context_request_items.memory_id)
+                    FILTER (WHERE context_request_items.memory_id IS NOT NULL),
+                ARRAY[]::text[]
+            ) AS allowed_memory_ids
+        FROM selected
+        LEFT JOIN context_request_items
+            ON context_request_items.request_id = selected.request_id
+        GROUP BY
+            selected.request_id,
+            selected.agent_id,
+            selected.org_id,
+            selected.task,
+            selected.token_budget,
+            selected.estimated_tokens,
+            selected.denied_memory_count,
+            selected.created_at
+        ORDER BY selected.created_at DESC
+        "#,
+    )
+    .bind(org_id)
+    .bind(limit.clamp(1, 5_000))
+    .bind(task_limit_chars.clamp(1, 65_536))
+    .fetch_all(pool)
+    .await?;
+
+    rows.into_iter()
+        .map(|row| {
+            let token_budget: i32 = row.try_get("token_budget")?;
+            let estimated_tokens: i32 = row.try_get("estimated_tokens")?;
+            let denied_memory_count: i32 = row.try_get("denied_memory_count")?;
+            let created_at_unix_ms: i64 = row.try_get("created_at_unix_ms")?;
+            Ok(AuditRecord {
+                request_id: row.try_get("request_id")?,
+                agent_id: row.try_get("agent_id")?,
+                org_id: row.try_get("org_id")?,
+                task: row.try_get("task")?,
+                allowed_memory_ids: row.try_get("allowed_memory_ids")?,
+                denied_memory_count: i64_to_u128(denied_memory_count.into(), "denied_memory_count")?
+                    as usize,
+                token_budget: i64_to_u128(token_budget.into(), "token_budget")? as usize,
+                estimated_tokens: i64_to_u128(estimated_tokens.into(), "estimated_tokens")?
+                    as usize,
+                created_at_unix_ms: i64_to_u128(created_at_unix_ms, "created_at_unix_ms")?,
+            })
+        })
+        .collect()
 }
 
 pub async fn insert_promotion_audit_in_tx(
@@ -280,6 +367,39 @@ pub async fn list_promotion_audits_for_agent(
     .bind(&agent.agent_id)
     .bind(&agent.org_id)
     .bind(limit)
+    .fetch_all(pool)
+    .await?;
+
+    rows.into_iter().map(row_to_promotion_audit).collect()
+}
+
+/// Bounded organization-wide promotion audits for the read-only operator vault.
+pub async fn list_promotion_audits_for_org(
+    pool: &PgPool,
+    org_id: &str,
+    limit: i64,
+    reason_limit_chars: i32,
+) -> Result<Vec<PromotionAuditRecord>, DbError> {
+    let rows = sqlx::query(
+        r#"
+        SELECT
+            promotion_id,
+            source_memory_id,
+            promoted_memory_id,
+            agent_id,
+            org_id,
+            target_scope,
+            left(reason, $3) AS reason,
+            floor(extract(epoch from created_at) * 1000)::bigint AS created_at_unix_ms
+        FROM memory_promotions
+        WHERE org_id = $1
+        ORDER BY created_at DESC
+        LIMIT $2
+        "#,
+    )
+    .bind(org_id)
+    .bind(limit.clamp(1, 5_000))
+    .bind(reason_limit_chars.clamp(1, 65_536))
     .fetch_all(pool)
     .await?;
 

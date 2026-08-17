@@ -24,7 +24,25 @@ pub enum ApiError {
 
 impl From<energon_db::DbError> for ApiError {
     fn from(error: energon_db::DbError) -> Self {
-        ApiError::Internal(format!("database error: {error}"))
+        match error {
+            energon_db::DbError::AgentIdAlreadyInUse(agent_id) => {
+                ApiError::BadRequest(format!("agent id is already registered: {agent_id}"))
+            }
+            energon_db::DbError::ClaimConflictNotFound(conflict_id) => {
+                ApiError::NotFound(format!("claim conflict not found: {conflict_id}"))
+            }
+            energon_db::DbError::InvalidConflictResolution(message) => {
+                ApiError::BadRequest(message)
+            }
+            energon_db::DbError::InvalidClaimEvidence(message) => ApiError::BadRequest(message),
+            energon_db::DbError::SkillAssignmentAgentNotFound => ApiError::BadRequest(
+                "one or more assigned agents do not belong to this organization".to_owned(),
+            ),
+            energon_db::DbError::SkillProfileNotFound(skill_id) => {
+                ApiError::NotFound(format!("skill profile not found: {skill_id}"))
+            }
+            error => ApiError::Internal(format!("database error: {error}")),
+        }
     }
 }
 
@@ -38,7 +56,9 @@ impl From<EnergonError> for ApiError {
             | EnergonError::MissingUserId
             | EnergonError::MissingSessionId
             | EnergonError::InvalidPromotionSource
-            | EnergonError::InvalidPromotionTarget => ApiError::BadRequest(error.to_string()),
+            | EnergonError::InvalidPromotionTarget
+            | EnergonError::DirectSharedMemoryWriteNotAllowed
+            | EnergonError::UntrustedAccessContext => ApiError::BadRequest(error.to_string()),
             EnergonError::MemoryNotFound(_) => ApiError::NotFound(error.to_string()),
             EnergonError::PermissionDenied { .. } => ApiError::Forbidden(error.to_string()),
         }

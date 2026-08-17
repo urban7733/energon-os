@@ -15,7 +15,7 @@ use tower_http::cors::CorsLayer;
 use crate::{
     middleware::rate_limit,
     routes,
-    state::AppState,
+    state::{AppState, is_production},
     x402::{PAYMENT_REQUIRED_HEADER, PAYMENT_RESPONSE_HEADER, PAYMENT_SIGNATURE_HEADER},
 };
 
@@ -46,12 +46,16 @@ fn max_body_bytes() -> usize {
 /// comma-separated origin list; localhost dev origins are always allowed.
 /// Agent (server-to-server) traffic does not need CORS.
 fn cors_layer() -> CorsLayer {
-    let mut origins = vec![
-        HeaderValue::from_static("http://localhost:3000"),
-        HeaderValue::from_static("http://127.0.0.1:3000"),
-        HeaderValue::from_static("http://localhost:3002"),
-        HeaderValue::from_static("http://127.0.0.1:3002"),
-    ];
+    let mut origins = Vec::new();
+
+    if !is_production() {
+        origins.extend([
+            HeaderValue::from_static("http://localhost:3000"),
+            HeaderValue::from_static("http://127.0.0.1:3000"),
+            HeaderValue::from_static("http://localhost:3002"),
+            HeaderValue::from_static("http://127.0.0.1:3002"),
+        ]);
+    }
 
     if let Ok(configured) = env::var("ENERGON_WEB_ORIGIN") {
         for origin in configured.split(',') {
@@ -82,6 +86,7 @@ fn cors_layer() -> CorsLayer {
             HeaderName::from_static("x-energon-org-id"),
             HeaderName::from_static("x-energon-role-id"),
             HeaderName::from_static("x-energon-project-id"),
+            HeaderName::from_static("x-energon-sdk"),
             HeaderName::from_static(PAYMENT_SIGNATURE_HEADER),
         ])
         .expose_headers([

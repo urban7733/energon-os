@@ -47,6 +47,10 @@ impl WriteMemoryRequest {
             return Err(EnergonError::EmptyMemory);
         }
 
+        if self.scope != MemoryScope::AgentPrivate {
+            return Err(EnergonError::DirectSharedMemoryWriteNotAllowed);
+        }
+
         Ok(())
     }
 }
@@ -104,11 +108,14 @@ impl MemoryRecord {
             scope: request.scope,
             content: request.content.trim().to_owned(),
             tags: clean_tags(request.tags),
-            project_id: clean_optional(request.project_id).or_else(|| agent.project_id.clone()),
-            role_id: clean_optional(request.role_id).or_else(|| agent.role_id.clone()),
+            // The authenticated agent identity owns the routing metadata. An
+            // agent must not be able to label a private note as another
+            // project or role and later promote it into that scope.
+            project_id: agent.project_id.clone(),
+            role_id: agent.role_id.clone(),
             owner_agent_id: Some(agent.agent_id.clone()),
-            user_id: clean_optional(request.user_id),
-            session_id: clean_optional(request.session_id),
+            user_id: None,
+            session_id: None,
             source: clean_optional(request.source),
             promoted_from: None,
             created_at_unix_ms,
@@ -225,26 +232,52 @@ mod tests {
     }
 
     #[test]
-    fn write_trims_tags_and_defaults_agent_scope_metadata() {
-        let record =
-            MemoryRecord::from_write("mem_1", &agent(), write_request(MemoryScope::Project), 1)
-                .expect("project memory should use the agent project");
+    fn private_write_trims_tags_and_uses_agent_scope_metadata() {
+        let record = MemoryRecord::from_write(
+            "mem_1",
+            &agent(),
+            write_request(MemoryScope::AgentPrivate),
+            1,
+        )
+        .expect("private memory should use the agent project");
 
         assert_eq!(record.project_id.as_deref(), Some("apex_verify"));
         assert_eq!(record.tags, vec!["investor"]);
     }
 
     #[test]
-    fn user_private_memory_requires_user_id() {
+    fn direct_user_private_memory_write_is_rejected() {
         let error = MemoryRecord::from_write(
             "mem_1",
             &agent(),
             write_request(MemoryScope::UserPrivate),
             1,
         )
-        .expect_err("user_private memory must name a user");
+        .expect_err("agents cannot claim a user-private scope directly");
 
-        assert_eq!(error, EnergonError::MissingUserId);
+        assert_eq!(error, EnergonError::DirectSharedMemoryWriteNotAllowed);
+    }
+
+    #[test]
+    fn direct_shared_memory_write_is_rejected() {
+        let error =
+            MemoryRecord::from_write("mem_1", &agent(), write_request(MemoryScope::Project), 1)
+                .expect_err("agents must promote private memory instead of writing shared memory");
+
+        assert_eq!(error, EnergonError::DirectSharedMemoryWriteNotAllowed);
+    }
+
+    #[test]
+    fn private_memory_uses_authenticated_project_and_role() {
+        let mut request = write_request(MemoryScope::AgentPrivate);
+        request.project_id = Some("other_project".to_owned());
+        request.role_id = Some("other_role".to_owned());
+
+        let record = MemoryRecord::from_write("mem_1", &agent(), request, 1)
+            .expect("agent-private memory should use its authenticated identity");
+
+        assert_eq!(record.project_id.as_deref(), Some("apex_verify"));
+        assert_eq!(record.role_id.as_deref(), Some("strategist"));
     }
 
     #[test]
@@ -260,9 +293,21 @@ mod tests {
 
     #[test]
     fn promoted_copy_only_allows_agent_private_sources() {
-        let source =
-            MemoryRecord::from_write("mem_1", &agent(), write_request(MemoryScope::Org), 1)
-                .expect("org memory should be valid");
+        let source = MemoryRecord {
+            memory_id: "mem_1".to_owned(),
+            org_id: "org_1".to_owned(),
+            scope: MemoryScope::Org,
+            content: "Shared positioning memory".to_owned(),
+            tags: vec![],
+            project_id: None,
+            role_id: None,
+            owner_agent_id: None,
+            user_id: None,
+            session_id: None,
+            source: None,
+            promoted_from: None,
+            created_at_unix_ms: 1,
+        };
 
         let error = source
             .promoted_copy("mem_2", MemoryScope::Project, 2)

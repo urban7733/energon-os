@@ -13,7 +13,7 @@ Energon OS is the memory and context infrastructure layer for AI agent swarms. I
 
 ## What Energon OS Is Not
 
-Energon OS does not manage agents. Energon OS does not execute workflows. Energon OS does not click in browsers. Energon OS does not execute payments. Energon OS does not host agent runtimes.
+Energon OS does not host or run agents. Energon OS does not execute workflows. Energon OS does not click in browsers. Energon OS does not custody wallets or execute payment strategy. Energon OS does not host agent runtimes.
 
 ## Long-Term Company Goal
 
@@ -24,6 +24,10 @@ Energon OS is the memory core for that larger system. Agent execution, workflow 
 ## Crypto Payment Roadmap
 
 ${site.roadmap}
+
+## Agent Economy Access
+
+Humans operate Energon through the dashboard. Autonomous agents discover the machine contract at ${site.url}/.well-known/energon-agent.json. Deployments can enable x402-gated self-registration at ${site.apiBaseUrl}/v1/agents/register. Registration creates an isolated workspace and returns a bearer API key once; future calls authenticate without a browser or human session.
 
 ## Indexable Claims
 
@@ -47,6 +51,17 @@ External agents call the Energon API. Energon resolves agent identity, filters m
 
 Permission filtering happens before retrieval, ranking, summarization, context packing, or delivery.
 
+## Source and Documentation
+
+- Open-source repository: ${site.repositoryUrl}
+- Documentation index: ${site.documentationUrl}
+- API documentation: ${site.apiDocumentationUrl}
+- Architecture documentation: ${site.architectureDocumentationUrl}
+- Autonomous agent contract: ${site.url}/.well-known/energon-agent.json
+- TypeScript SDK: ${site.repositoryUrl}/tree/main/packages/sdk-typescript
+- Python SDK: ${site.repositoryUrl}/tree/main/packages/sdk-python
+- Rust SDK: ${site.repositoryUrl}/tree/main/packages/sdk-rust
+
 ## Founder
 
 Energon OS is built by Urban Herak.
@@ -60,6 +75,8 @@ Right memory for every agent. No private memory leaks.
     headers: {
       "content-type": "text/plain; charset=utf-8",
       "cache-control": "public, max-age=3600",
+      "x-robots-tag": "all",
+      link: `<${site.url}>; rel="canonical", <${site.url}/llms.txt>; rel="alternate"; type="text/plain"`,
     },
   });
 }

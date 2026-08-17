@@ -4,6 +4,7 @@ services:
     container_name: energon-api
     command: energon-api
     environment:
+      ENERGON_ENV: development
       ENERGON_BIND_ADDR: 0.0.0.0:3000
       DATABASE_URL: postgres://energon:energon@postgres:5432/energon
       ENERGON_API_KEY_PEPPER: change-me-dev-pepper
@@ -48,8 +49,21 @@ services:
       OPENAI_API_KEY: ${OPENAI_API_KEY}
       ENERGON_EMBEDDING_MODEL: text-embedding-3-small
       ENERGON_EMBEDDING_BATCH_SIZE: "16"
+      ENERGON_NATS_URL: nats://nats:4222
+      ENERGON_EVENT_OUTBOX_BATCH_SIZE: "100"
     depends_on:
       - postgres
+      - nats
+
+  nats:
+    image: nats:2.11-alpine
+    container_name: energon-nats
+    command: ["-js", "-sd", "/data"]
+    ports:
+      - "4222:4222"
+      - "8222:8222"
+    volumes:
+      - nats_data:/data
 
   postgres:
     image: pgvector/pgvector:pg17
@@ -82,3 +96,4 @@ services:
 volumes:
   postgres_data:
   minio_data:
+  nats_data:

@@ -1,17 +1,17 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
+import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import {
-  ArrowRight,
   ArrowUpRight,
-  BarChart3,
   Bot,
   Coins,
   Database,
-  Eye,
+  Download,
   FileSearch,
   Gauge,
+  GitFork,
   KeyRound,
   ListChecks,
   LogOut,
@@ -19,11 +19,20 @@ import {
   RefreshCcw,
   Send,
   ShieldCheck,
+  Scale,
+  SlidersHorizontal,
   Trash2,
   Users,
 } from "lucide-react";
 import { authClient, fetchApiToken } from "../../lib/auth-client";
 import { site } from "../../lib/site";
+import { AnalyticsDeck } from "../../components/dashboard/analytics-deck";
+import { BillingCheckout } from "./billing-checkout";
+
+const MemoryAtlas = dynamic(() => import("../../components/dashboard/memory-atlas"), {
+  ssr: false,
+  loading: () => <div className="memory-atlas-loading" aria-label="Loading Memory Atlas" />,
+});
 
 type ApiResult = {
   label: string;
@@ -66,6 +75,92 @@ type OrgMemory = {
   created_at_unix_ms: number;
 };
 
+type ApiHealth = {
+  status: "ok" | "degraded";
+  storage: "memory" | "postgres";
+  database: "none" | "connected" | "unavailable";
+};
+
+type RouteUsage = {
+  route: string;
+  calls: number;
+  paid_calls: number;
+  amount_usdc_micro: number;
+};
+
+type UsageSummary = {
+  storage: "memory" | "postgres";
+  totals: RouteUsage[];
+};
+
+type MemoryStats = {
+  total_memories: number;
+  scopes: Array<{ scope: MemoryScope; count: number }>;
+};
+
+type OutboxStatus = {
+  storage: "memory" | "postgres";
+  pending: number;
+  leased: number;
+  published: number;
+  retrying: number;
+};
+
+type RolePolicy = {
+  role_id: string;
+  authority_bps: number;
+  can_resolve_conflicts: boolean;
+  policy_version: number;
+  updated_at_unix_ms: number;
+};
+
+type ClaimConflict = {
+  conflict_id: string;
+  subject: string;
+  predicate: string;
+  incumbent_claim_id: string;
+  challenger_claim_id: string;
+  status: "contested" | "resolved";
+  resolved_claim_id: string | null;
+  resolution_reason: string | null;
+  resolved_by_user_id: string | null;
+  created_at_unix_ms: number;
+  resolved_at_unix_ms: number | null;
+};
+
+type ContextAudit = {
+  request_id: string;
+  allowed_memory_ids: string[];
+  denied_memory_count: number;
+  estimated_tokens: number;
+  token_budget: number;
+};
+
+type PromotionAudit = {
+  promotion_id: string;
+  source_memory_id: string;
+  promoted_memory_id: string;
+  target_scope: SharedMemoryScope;
+  reason: string;
+};
+
+type SkillScope = "agent_private" | "org";
+
+type SkillProfile = {
+  skill_id: string;
+  scope: SkillScope;
+  name: string;
+  instructions: string;
+  allowed_tools: string[];
+  requires_approval_for: string[];
+  version: number;
+  created_by_kind: "operator" | "agent";
+  created_by_id: string;
+  created_at_unix_ms: number;
+  assigned_agent_ids: string[];
+  executable: false;
+};
+
 export function DashboardConsole({ userEmail }: { userEmail: string }) {
   const router = useRouter();
   const { data: organizations } = authClient.useListOrganizations();
@@ -73,62 +168,68 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
 
   const [apiBaseUrl, setApiBaseUrl] = useState(site.apiBaseUrl);
   const [agentApiKey, setAgentApiKey] = useState("");
-  const [agentId, setAgentId] = useState("agent_777");
-  const [roleId, setRoleId] = useState("strategist");
-  const [projectId, setProjectId] = useState("apex_verify");
+  const [agentId, setAgentId] = useState("");
+  const [agentName, setAgentName] = useState("");
+  const [roleId, setRoleId] = useState("");
+  const [projectId, setProjectId] = useState("");
   const [newOrgName, setNewOrgName] = useState("");
   const [scope, setScope] = useState<MemoryScope>("agent_private");
   const [memoryId, setMemoryId] = useState("");
   const [promotedMemoryId, setPromotedMemoryId] = useState("");
-  const [promotionTargetScope, setPromotionTargetScope] = useState<SharedMemoryScope>("project");
-  const [promotionReason, setPromotionReason] = useState(
-    "Approved for shared investor positioning.",
-  );
-  const [memory, setMemory] = useState(
-    "Do not position Apex Verify as just another social app. Investor outreach should frame it as trust infrastructure.",
-  );
-  const [task, setTask] = useState("prepare investor outreach");
+  const [promotionTargetScope, setPromotionTargetScope] = useState<"" | SharedMemoryScope>("");
+  const [promotionReason, setPromotionReason] = useState("");
+  const [memory, setMemory] = useState("");
+  const [memoryTags, setMemoryTags] = useState("");
+  const [task, setTask] = useState("");
   const [requestId, setRequestId] = useState("");
   const [orgAgents, setOrgAgents] = useState<OrgAgent[]>([]);
+  const [orgSkills, setOrgSkills] = useState<SkillProfile[]>([]);
   const [orgMemories, setOrgMemories] = useState<OrgMemory[]>([]);
+  const [memoryStats, setMemoryStats] = useState<MemoryStats | null>(null);
+  const [usageSummary, setUsageSummary] = useState<UsageSummary | null>(null);
+  const [outboxStatus, setOutboxStatus] = useState<OutboxStatus | null>(null);
+  const [rolePolicies, setRolePolicies] = useState<RolePolicy[]>([]);
+  const [claimConflicts, setClaimConflicts] = useState<ClaimConflict[]>([]);
+  const [contextAudit, setContextAudit] = useState<ContextAudit | null>(null);
+  const [promotionAudit, setPromotionAudit] = useState<PromotionAudit | null>(null);
+  const [health, setHealth] = useState<ApiHealth | null>(null);
   const [memoryScopeFilter, setMemoryScopeFilter] = useState<"" | MemoryScope>("");
+  const [policyRoleId, setPolicyRoleId] = useState("");
+  const [policyAuthorityBps, setPolicyAuthorityBps] = useState("5000");
+  const [policyCanResolve, setPolicyCanResolve] = useState(false);
+  const [conflictReason, setConflictReason] = useState("");
+  const [skillName, setSkillName] = useState("");
+  const [skillInstructions, setSkillInstructions] = useState("");
+  const [skillScope, setSkillScope] = useState<SkillScope>("agent_private");
+  const [skillAgentIds, setSkillAgentIds] = useState<string[]>([]);
+  const [skillAllowedTools, setSkillAllowedTools] = useState("");
+  const [skillApprovalActions, setSkillApprovalActions] = useState("");
   const [mintedKey, setMintedKey] = useState<string | null>(null);
   const [result, setResult] = useState<ApiResult>({
-    label: "Ready",
-    body: {
-      status: "Waiting for an action",
-      apiBaseUrl: site.apiBaseUrl,
-    },
+    label: "No activity yet",
+    body: null,
   });
   const [apiStatus, setApiStatus] = useState<"unchecked" | "online" | "offline">("unchecked");
   const [x402Status, setX402Status] = useState<"unchecked" | "enabled" | "disabled" | "offline">(
     "unchecked",
   );
   const [busy, setBusy] = useState(false);
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [setupOpen, setSetupOpen] = useState(false);
 
   const cleanBaseUrl = useMemo(() => apiBaseUrl.replace(/\/$/, ""), [apiBaseUrl]);
   const orgId = activeOrganization?.id ?? "";
-  const authMode = agentApiKey.trim() ? "Bearer API key" : "Dev identity headers";
+  const hasAgentApiKey = Boolean(agentApiKey.trim());
   const lifecycle = [
-    ["API health", apiStatus === "online", apiStatus],
+    ["API health", health?.status === "ok", health?.database ?? apiStatus],
     ["Organization", Boolean(orgId), activeOrganization?.name ?? "no active org"],
-    ["Agent identity", Boolean(agentApiKey || agentId), agentApiKey ? "bearer key" : "dev headers"],
+    ["Registered agents", orgAgents.length > 0, `${orgAgents.length} registered`],
     ["Private memory", Boolean(memoryId), memoryId || "not written"],
     ["Promotion", Boolean(promotedMemoryId), promotedMemoryId || "not promoted"],
-    ["Context audit", Boolean(requestId), requestId || "not built"],
+    ["Context audit", Boolean(contextAudit), contextAudit?.request_id ?? "not read"],
   ] as const;
-  const accessBars = [
-    ["Agent API", 86, "paid autonomous usage"],
-    ["Human dashboard", 14, "visual operations"],
-  ] as const;
-  const scopeBars = [
-    ["open", scope === "open" ? 82 : 22],
-    ["org", scope === "org" ? 82 : 38],
-    ["project", scope === "project" ? 82 : 54],
-    ["role", scope === "role" ? 82 : 34],
-    ["private", scope.includes("private") ? 82 : 48],
-    ["session", scope === "session" ? 82 : 28],
-  ] as const;
+  const usageRows = usageSummary?.totals ?? [];
+  const scopeRows = memoryStats?.scopes ?? [];
 
   async function run(label: string, action: () => Promise<unknown>) {
     setBusy(true);
@@ -162,6 +263,167 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
     if (!response.ok) throw new Error(JSON.stringify(body));
     return body;
   }
+
+  async function requestHealth(): Promise<ApiHealth> {
+    const response = await fetch(`${cleanBaseUrl}/health`);
+    const body: unknown = await response.json();
+    if (!response.ok || !isApiHealth(body)) throw new Error(JSON.stringify(body));
+    return body;
+  }
+
+  async function requestX402Status(): Promise<boolean> {
+    const response = await fetch(`${cleanBaseUrl}/v1/billing/x402`);
+    const body: unknown = await response.json();
+    if (!response.ok || !isX402Status(body)) throw new Error(JSON.stringify(body));
+    return body.enabled;
+  }
+
+  async function refreshUsage() {
+    const org = requireOrg();
+    const body = await managementFetch(`/v1/orgs/${encodeURIComponent(org)}/usage`);
+    if (!isUsageSummary(body)) throw new Error("Usage response was invalid.");
+    setUsageSummary(body);
+    return body;
+  }
+
+  async function refreshMemoryStats() {
+    const org = requireOrg();
+    const body = await managementFetch(`/v1/orgs/${encodeURIComponent(org)}/memory-stats`);
+    if (!isMemoryStats(body)) throw new Error("Memory stats response was invalid.");
+    setMemoryStats(body);
+    return body;
+  }
+
+  async function refreshOutboxStatus() {
+    const org = requireOrg();
+    const body = await managementFetch(`/v1/orgs/${encodeURIComponent(org)}/events/outbox`);
+    if (!isOutboxStatus(body)) throw new Error("Outbox response was invalid.");
+    setOutboxStatus(body);
+    return body;
+  }
+
+  async function refreshRolePolicies() {
+    const org = requireOrg();
+    const body = await managementFetch(`/v1/orgs/${encodeURIComponent(org)}/role-policies`);
+    if (!isRolePolicyList(body)) throw new Error("Role policy response was invalid.");
+    setRolePolicies(body.policies);
+    return body;
+  }
+
+  async function refreshClaimConflicts() {
+    const org = requireOrg();
+    const body = await managementFetch(
+      `/v1/orgs/${encodeURIComponent(org)}/conflicts?include_resolved=true`,
+    );
+    if (!isClaimConflictList(body)) throw new Error("Claim conflict response was invalid.");
+    setClaimConflicts(body.conflicts);
+    return body;
+  }
+
+  async function refreshOperationalData() {
+    await Promise.all([
+      refreshAgents(),
+      refreshOrgSkills(),
+      refreshOrgMemories(),
+      refreshUsage(),
+      refreshMemoryStats(),
+      refreshOutboxStatus(),
+      refreshRolePolicies(),
+      refreshClaimConflicts(),
+    ]);
+  }
+
+  useEffect(() => {
+    if (activeOrganization || !organizations) return;
+    if (organizations.length === 1) {
+      void setActiveOrganization(organizations[0].id);
+    } else if (organizations.length === 0) {
+      setSetupOpen(true);
+    }
+  }, [activeOrganization, organizations]);
+
+  useEffect(() => {
+    let current = true;
+
+    async function refreshServiceStatus() {
+      try {
+        const healthResponse = await requestHealth();
+        if (!current) return;
+        setHealth(healthResponse);
+        setApiStatus(healthResponse.status === "ok" ? "online" : "offline");
+      } catch {
+        if (!current) return;
+        setHealth(null);
+        setApiStatus("offline");
+      }
+
+      try {
+        const enabled = await requestX402Status();
+        if (current) setX402Status(enabled ? "enabled" : "disabled");
+      } catch {
+        if (current) setX402Status("offline");
+      }
+    }
+
+    void refreshServiceStatus();
+    return () => {
+      current = false;
+    };
+  }, [cleanBaseUrl]);
+
+  useEffect(() => {
+    let current = true;
+
+    if (!orgId) {
+      setOrgAgents([]);
+      setOrgSkills([]);
+      setOrgMemories([]);
+      setMemoryStats(null);
+      setUsageSummary(null);
+      setOutboxStatus(null);
+      setRolePolicies([]);
+      setClaimConflicts([]);
+      setContextAudit(null);
+      setPromotionAudit(null);
+      return () => {
+        current = false;
+      };
+    }
+
+    async function refreshOrganizationData() {
+      try {
+        await refreshOperationalData();
+      } catch {
+        // The API status tile already reports availability. Leave the last
+        // successful operator data visible while a refresh is unavailable.
+        if (!current) return;
+      }
+    }
+
+    void refreshOrganizationData();
+    return () => {
+      current = false;
+    };
+  }, [cleanBaseUrl, memoryScopeFilter, orgId]);
+
+  useEffect(() => {
+    if (!orgId) return;
+    setAgentId("");
+    setAgentName("");
+    setRoleId("");
+    setProjectId("");
+    setAgentApiKey("");
+    setMintedKey(null);
+    setMemoryId("");
+    setPromotedMemoryId("");
+    setSkillAgentIds([]);
+    setSkillName("");
+    setSkillInstructions("");
+    setSkillAllowedTools("");
+    setSkillApprovalActions("");
+    setContextAudit(null);
+    setPromotionAudit(null);
+  }, [orgId]);
 
   function requireOrg(): string {
     if (!orgId) {
@@ -198,51 +460,42 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
     await run("Switched organization", async () => {
       const outcome = await authClient.organization.setActive({ organizationId });
       if (outcome.error) throw new Error(outcome.error.message ?? "Failed to switch org");
+      setAgentApiKey("");
+      setMintedKey(null);
       return { active_organization_id: organizationId };
     });
   }
 
   async function checkHealth(event?: FormEvent<HTMLFormElement>) {
     event?.preventDefault();
-    setBusy(true);
-    try {
-      const response = await fetch(`${cleanBaseUrl}/health`);
-      const body = await response.json();
-      if (!response.ok) throw new Error(JSON.stringify(body));
-      setApiStatus("online");
-      setResult({ label: "API health", body });
-    } catch (error) {
-      setApiStatus("offline");
-      setResult({
-        label: "API health failed",
-        body:
-          error instanceof Error
-            ? `${error.message}. Start the API on ${cleanBaseUrl}.`
-            : String(error),
-      });
-    } finally {
-      setBusy(false);
-    }
+    await run("API health", async () => {
+      const body = await requestHealth();
+      setHealth(body);
+      setApiStatus(body.status === "ok" ? "online" : "offline");
+      return body;
+    });
   }
 
   async function createAgent(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     await run("Created agent", async () => {
       const org = requireOrg();
+      const cleanAgentId = agentId.trim();
+      if (!cleanAgentId) throw new Error("Agent ID is required.");
       const body = await managementFetch(`/v1/orgs/${encodeURIComponent(org)}/agents`, {
         method: "POST",
         body: JSON.stringify({
-          agent_id: agentId,
-          role_id: roleId || null,
-          project_id: projectId || null,
-          name: `${agentId} operator`,
+          agent_id: cleanAgentId,
+          role_id: roleId.trim() || null,
+          project_id: projectId.trim() || null,
+          name: agentName.trim() || cleanAgentId,
         }),
       });
       if (isKeyGrant(body)) {
         setAgentApiKey(body.api_key);
         setMintedKey(body.api_key);
       }
-      await refreshAgents();
+      await refreshOperationalData();
       return body;
     });
   }
@@ -254,6 +507,44 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
       setOrgAgents(body.agents);
     }
     return body;
+  }
+
+  async function refreshOrgSkills() {
+    const org = requireOrg();
+    const body = await managementFetch(`/v1/orgs/${encodeURIComponent(org)}/skills`);
+    if (!isSkillList(body)) throw new Error("Skill profile response was invalid.");
+    setOrgSkills(body.skills);
+    return body;
+  }
+
+  async function createSkillProfile(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    await run("Created skill profile", async () => {
+      const org = requireOrg();
+      const name = skillName.trim();
+      const instructions = skillInstructions.trim();
+      if (!name) throw new Error("Skill profile name is required.");
+      if (!instructions) throw new Error("Skill instructions are required.");
+      if (skillAgentIds.length === 0) throw new Error("Choose an agent for this skill profile.");
+
+      const body = await managementFetch(`/v1/orgs/${encodeURIComponent(org)}/skills`, {
+        method: "POST",
+        body: JSON.stringify({
+          scope: skillScope,
+          name,
+          instructions,
+          allowed_tools: commaSeparatedValues(skillAllowedTools),
+          requires_approval_for: commaSeparatedValues(skillApprovalActions),
+          assigned_agent_ids: skillAgentIds,
+        }),
+      });
+      setSkillName("");
+      setSkillInstructions("");
+      setSkillAllowedTools("");
+      setSkillApprovalActions("");
+      await refreshOrgSkills();
+      return body;
+    });
   }
 
   async function listAgents(event: FormEvent<HTMLFormElement>) {
@@ -272,7 +563,7 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
         setAgentApiKey(body.api_key);
         setMintedKey(body.api_key);
       }
-      await refreshAgents();
+      await refreshOperationalData();
       return body;
     });
   }
@@ -284,14 +575,61 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
         `/v1/orgs/${encodeURIComponent(org)}/keys/${encodeURIComponent(apiKeyId)}`,
         { method: "DELETE" },
       );
-      await refreshAgents();
+      await refreshOperationalData();
+      return body;
+    });
+  }
+
+  async function saveRolePolicy(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    await run("Updated role policy", async () => {
+      const org = requireOrg();
+      const role = policyRoleId.trim();
+      const authority = Number(policyAuthorityBps);
+      if (!role) throw new Error("Role ID is required.");
+      if (!Number.isInteger(authority) || authority < 0 || authority > 10_000) {
+        throw new Error("Authority must be an integer from 0 to 10000.");
+      }
+      const body = await managementFetch(
+        `/v1/orgs/${encodeURIComponent(org)}/role-policies/${encodeURIComponent(role)}`,
+        {
+          method: "PUT",
+          body: JSON.stringify({
+            authority_bps: authority,
+            can_resolve_conflicts: policyCanResolve,
+          }),
+        },
+      );
+      setPolicyRoleId("");
+      await refreshRolePolicies();
+      return body;
+    });
+  }
+
+  async function resolveClaimConflict(conflict: ClaimConflict, acceptedClaimId: string) {
+    await run("Resolved claim conflict", async () => {
+      const org = requireOrg();
+      const reason = conflictReason.trim();
+      if (!reason) throw new Error("Add a decision reason before resolving a conflict.");
+      const body = await managementFetch(
+        `/v1/orgs/${encodeURIComponent(org)}/conflicts/${encodeURIComponent(conflict.conflict_id)}/resolve`,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            accepted_claim_id: acceptedClaimId,
+            reason,
+          }),
+        },
+      );
+      setConflictReason("");
+      await refreshClaimConflicts();
       return body;
     });
   }
 
   async function refreshOrgMemories() {
     const org = requireOrg();
-    const query = new URLSearchParams({ limit: "50", offset: "0" });
+    const query = new URLSearchParams({ limit: "120", offset: "0" });
     if (memoryScopeFilter) query.set("scope", memoryScopeFilter);
     const body = await managementFetch(
       `/v1/orgs/${encodeURIComponent(org)}/memories?${query.toString()}`,
@@ -314,57 +652,67 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
         `/v1/orgs/${encodeURIComponent(org)}/memories/${encodeURIComponent(deleteMemoryId)}`,
         { method: "DELETE" },
       );
-      await refreshOrgMemories();
+      await Promise.all([refreshOrgMemories(), refreshMemoryStats()]);
       return body;
     });
   }
 
   async function readUsage() {
-    await run("Usage summary", async () => {
-      const org = requireOrg();
-      return managementFetch(`/v1/orgs/${encodeURIComponent(org)}/usage`);
-    });
+    await run("Refreshed live dashboard", refreshOperationalData);
   }
 
   async function checkX402() {
-    setBusy(true);
-    try {
-      const response = await fetch(`${cleanBaseUrl}/v1/billing/x402`);
-      const body = await response.json();
-      if (!response.ok) throw new Error(JSON.stringify(body));
-      setX402Status(Boolean(body.enabled) ? "enabled" : "disabled");
-      setResult({ label: "x402 status", body });
-    } catch (error) {
-      setX402Status("offline");
-      setResult({
-        label: "x402 status failed",
-        body:
-          error instanceof Error
-            ? `${error.message}. Start the API on ${cleanBaseUrl}.`
-            : String(error),
-      });
-    } finally {
-      setBusy(false);
-    }
+    await run("x402 status", async () => {
+      const enabled = await requestX402Status();
+      setX402Status(enabled ? "enabled" : "disabled");
+      return { enabled };
+    });
+  }
+
+  async function downloadOperatorVault() {
+    await run("Downloaded operator vault", async () => {
+      const org = requireOrg();
+      const token = await fetchApiToken();
+      const response = await fetch(
+        `${cleanBaseUrl}/v1/orgs/${encodeURIComponent(org)}/vault/obsidian.zip`,
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+      if (!response.ok) {
+        throw new Error(await response.text());
+      }
+      const filename = response.headers
+        .get("content-disposition")
+        ?.match(/filename="([^"]+)"/)?.[1] ?? "energon-operator-vault.zip";
+      const objectUrl = URL.createObjectURL(await response.blob());
+      const link = document.createElement("a");
+      link.href = objectUrl;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(objectUrl), 0);
+      return { filename };
+    });
   }
 
   async function writeMemory(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     await run("Wrote memory", async () => {
+      const content = memory.trim();
+      if (!content) throw new Error("Private memory content is required.");
       const response = await fetch(`${cleanBaseUrl}/v1/memory/write`, {
         method: "POST",
-        headers: agentRequestHeaders(agentApiKey, agentId, orgId, roleId, projectId),
+        headers: agentRequestHeaders(agentApiKey),
         body: JSON.stringify({
           scope,
-          content: memory,
-          tags: ["positioning", "investor", "trust"],
-          project_id: projectId,
-          role_id: roleId,
+          content,
+          tags: parseTags(memoryTags),
         }),
       });
       const body = await response.json();
       if (!response.ok) throw new Error(JSON.stringify(body));
       if (isMemoryRecord(body)) setMemoryId(body.memory_id);
+      await Promise.all([refreshOrgMemories(), refreshMemoryStats(), refreshUsage()]);
       return body;
     });
   }
@@ -372,9 +720,11 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
   async function promoteMemory(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     await run("Promoted memory", async () => {
+      if (!promotionTargetScope) throw new Error("Choose a scope for shared memory.");
+      if (!promotionReason.trim()) throw new Error("A reason for sharing is required.");
       const response = await fetch(`${cleanBaseUrl}/v1/memory/promote`, {
         method: "POST",
-        headers: agentRequestHeaders(agentApiKey, agentId, orgId, roleId, projectId),
+        headers: agentRequestHeaders(agentApiKey),
         body: JSON.stringify({
           memory_id: memoryId,
           target_scope: promotionTargetScope,
@@ -384,6 +734,7 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
       const body = await response.json();
       if (!response.ok) throw new Error(JSON.stringify(body));
       if (isMemoryRecord(body)) setPromotedMemoryId(body.memory_id);
+      await Promise.all([refreshOrgMemories(), refreshMemoryStats(), refreshUsage()]);
       return body;
     });
   }
@@ -391,17 +742,19 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
   async function buildContext(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     await run("Built context", async () => {
+      const cleanTask = task.trim();
+      if (!cleanTask) throw new Error("Describe the task before building context.");
       const response = await fetch(`${cleanBaseUrl}/v1/context/build`, {
         method: "POST",
-        headers: agentRequestHeaders(agentApiKey, agentId, orgId, roleId, projectId),
+        headers: agentRequestHeaders(agentApiKey),
         body: JSON.stringify({
-          task,
-          project_id: projectId,
+          task: cleanTask,
           token_budget: 6000,
         }),
       });
       const body = await response.json();
       if (!response.ok) throw new Error(JSON.stringify(body));
+      await refreshUsage();
       return body;
     });
   }
@@ -410,10 +763,13 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
     event.preventDefault();
     await run("Read promotion audit", async () => {
       const response = await fetch(`${cleanBaseUrl}/v1/audit/promotion/${promotedMemoryId}`, {
-        headers: agentRequestHeaders(agentApiKey, agentId, orgId, roleId, projectId),
+        headers: agentRequestHeaders(agentApiKey),
       });
       const body = await response.json();
       if (!response.ok) throw new Error(JSON.stringify(body));
+      if (!isPromotionAudit(body)) throw new Error("Promotion audit response was invalid.");
+      setPromotionAudit(body);
+      await refreshUsage();
       return body;
     });
   }
@@ -422,10 +778,12 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
     event.preventDefault();
     await run("Read audit", async () => {
       const response = await fetch(`${cleanBaseUrl}/v1/audit/context/${requestId}`, {
-        headers: agentRequestHeaders(agentApiKey, agentId, orgId, roleId, projectId),
+        headers: agentRequestHeaders(agentApiKey),
       });
       const body = await response.json();
       if (!response.ok) throw new Error(JSON.stringify(body));
+      if (!isContextAudit(body)) throw new Error("Context audit response was invalid.");
+      setContextAudit(body);
       return body;
     });
   }
@@ -434,7 +792,7 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
     <div className="dashboard-console">
       <div className="session-bar" aria-label="Session and organization">
         <span>
-          signed in as <strong>{userEmail}</strong>
+          Signed in: <strong>{userEmail}</strong>
         </span>
         <div className="session-actions">
           <select
@@ -443,7 +801,7 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
             value={orgId}
             onChange={(event) => void setActiveOrganization(event.target.value)}
           >
-            <option value="">no active org</option>
+            <option value="">Choose a workspace</option>
             {(organizations ?? []).map((organization) => (
               <option key={organization.id} value={organization.id}>
                 {organization.name}
@@ -451,9 +809,15 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
             ))}
           </select>
           <button type="button" onClick={() => void readUsage()} disabled={busy || !orgId}>
-            <BarChart3 size={14} aria-hidden="true" />
-            Usage
+            <RefreshCcw size={14} aria-hidden="true" />
+            Refresh workspace
           </button>
+          {showAdvanced ? (
+            <button type="button" onClick={() => void downloadOperatorVault()} disabled={busy || !orgId}>
+              <Download size={14} aria-hidden="true" />
+              Export graph
+            </button>
+          ) : null}
           <button type="button" onClick={() => void signOut()}>
             <LogOut size={14} aria-hidden="true" />
             Sign out
@@ -462,219 +826,173 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
       </div>
 
       <section className="dashboard-overview" aria-label="Energon operating model">
-        <article className="surface-card command-card">
-          <div className="panel-title">
-            <Bot size={18} aria-hidden="true" />
-            <h2>Agent surface</h2>
+        <article className="surface-card overview-strip">
+          <div className="overview-copy">
+            <div className="overview-title">
+              <Bot size={16} aria-hidden="true" />
+              <h2>Private by default</h2>
+            </div>
+            <p>Agents get scoped context. You approve what becomes shared.</p>
           </div>
-          <p>
-            Agents should call the API or SDK. They do not write directly into pgvector, because
-            direct DB access would skip identity, permission filtering, billing, and audit.
-          </p>
-          <div className="route-map" aria-label="Agent request route">
+
+          <div className="overview-route" aria-label="Agent request route">
             <span>agent</span>
-            <ArrowRight size={15} aria-hidden="true" />
-            <span>API</span>
-            <ArrowRight size={15} aria-hidden="true" />
             <span>permissions</span>
-            <ArrowRight size={15} aria-hidden="true" />
-            <span>Postgres + pgvector</span>
+            <span>memory</span>
           </div>
-        </article>
 
-        <article className="surface-card command-card">
-          <div className="panel-title">
-            <Users size={18} aria-hidden="true" />
-            <h2>Human surface</h2>
-          </div>
-          <p>
-            Humans use this dashboard for visual inspection: memory scopes, promotion state,
-            request audits, and operational health.
-          </p>
-          <div className="human-readout">
-            <span>operator view</span>
-            <strong>visual audit layer</strong>
-          </div>
-        </article>
-
-        <article className="surface-card metric-card">
-          <div className="metric-card-head">
-            <Database size={18} aria-hidden="true" />
-            <span>Vector index</span>
-          </div>
-          <strong>pgvector</strong>
-          <p>memory_chunks.embedding vector(1536) with HNSW cosine index</p>
-        </article>
-
-        <article className="surface-card metric-card">
-          <div className="metric-card-head">
-            <Gauge size={18} aria-hidden="true" />
-            <span>API status</span>
-          </div>
-          <strong>{apiStatus}</strong>
-          <p>{authMode} active for dashboard requests</p>
-        </article>
-
-        <article className="surface-card metric-card">
-          <div className="metric-card-head">
-            <Coins size={18} aria-hidden="true" />
-            <span>x402 rail</span>
-          </div>
-          <strong>{x402Status}</strong>
-          <p>USDC payment gate for paid agent API calls</p>
-          <button className="inline-action" type="button" disabled={busy} onClick={checkX402}>
-            <Coins size={16} aria-hidden="true" />
-            Check x402
-          </button>
-        </article>
-      </section>
-
-      <section className="visual-grid" aria-label="Dashboard visual telemetry">
-        <article className="chart-panel">
-          <div className="panel-title">
-            <BarChart3 size={18} aria-hidden="true" />
-            <h2>Usage split</h2>
-          </div>
-          <div className="split-chart" aria-label="Target usage split: agents versus humans">
-            {accessBars.map(([label, value, detail]) => (
-              <div className="split-row" key={label}>
-                <div>
-                  <strong>{label}</strong>
-                  <span>{detail}</span>
-                </div>
-                <div className="bar-track">
-                  <span style={{ width: `${value}%` }} />
-                </div>
-                <em>{value}%</em>
-              </div>
-            ))}
-          </div>
-        </article>
-
-        <article className="chart-panel">
-          <div className="panel-title">
-            <ShieldCheck size={18} aria-hidden="true" />
-            <h2>Permission funnel</h2>
-          </div>
-          <div className="funnel-chart" aria-label="Permission funnel">
-            <span style={{ width: "100%" }}>identity</span>
-            <span style={{ width: "84%" }}>scope filter</span>
-            <span style={{ width: "62%" }}>retrieval</span>
-            <span style={{ width: "42%" }}>packed context</span>
-          </div>
-        </article>
-
-        <article className="chart-panel">
-          <div className="panel-title">
-            <Eye size={18} aria-hidden="true" />
-            <h2>Current scope pressure</h2>
-          </div>
-          <div className="scope-chart" aria-label="Current memory scope chart">
-            {scopeBars.map(([label, value]) => (
-              <div className="scope-bar" key={label}>
-                <span>{label}</span>
-                <div>
-                  <i style={{ height: `${value}%` }} />
-                </div>
-              </div>
-            ))}
-          </div>
-        </article>
-
-        <article className="chart-panel">
-          <div className="panel-title">
-            <FileSearch size={18} aria-hidden="true" />
-            <h2>Session lifecycle</h2>
-          </div>
-          <div className="lifecycle-list">
-            {lifecycle.map(([label, done, detail]) => (
-              <div className={done ? "lifecycle-item active" : "lifecycle-item"} key={label}>
-                <span />
-                <div>
-                  <strong>{label}</strong>
-                  <p>{detail}</p>
-                </div>
-              </div>
-            ))}
+          <div className="overview-statuses" aria-label="System status">
+            <span className="overview-status">
+              <Database size={14} aria-hidden="true" />
+              <span>Memory</span>
+              <strong>{health?.storage ?? "checking"}</strong>
+            </span>
+            <span className="overview-status">
+              <Gauge size={14} aria-hidden="true" />
+              <span>API</span>
+              <strong>{health?.status ?? apiStatus}</strong>
+            </span>
+            <span className="overview-status">
+              <Coins size={14} aria-hidden="true" />
+              <span>Payments</span>
+              <strong>{x402Status}</strong>
+            </span>
+            <button
+              className="overview-payment-action"
+              type="button"
+              disabled={busy}
+              onClick={checkX402}
+            >
+              Check
+            </button>
           </div>
         </article>
       </section>
 
-      <div className="console-grid">
-      <section id="agents" className="ops-panel" aria-labelledby="agents-title">
-        <div className="panel-title">
-          <KeyRound size={18} aria-hidden="true" />
-          <h2 id="agents-title">Agent access</h2>
+      <AnalyticsDeck
+        usage={usageRows}
+        scopes={scopeRows}
+        totalMemories={memoryStats?.total_memories ?? 0}
+        agentCount={orgAgents.length}
+        contextAudit={contextAudit}
+        outbox={outboxStatus}
+        lifecycle={lifecycle}
+      />
+
+      <section id="advanced" className="advanced-toggle" aria-label="Advanced workspace controls">
+        <div>
+          <SlidersHorizontal size={17} aria-hidden="true" />
+          <span>
+            <strong>Advanced workspace tools</strong>
+            <small>Skills, authority, context audits and the memory atlas.</small>
+          </span>
         </div>
+        <button type="button" aria-expanded={showAdvanced} onClick={() => setShowAdvanced((value) => !value)}>
+          {showAdvanced ? "Hide advanced" : "Show advanced"}
+        </button>
+      </section>
+
+      {showAdvanced ? (
+        <MemoryAtlas
+          organizationName={activeOrganization?.name ?? "Active workspace"}
+          agents={orgAgents}
+          memories={orgMemories}
+          totalMemories={memoryStats?.total_memories ?? 0}
+          rolePolicies={rolePolicies}
+          conflicts={claimConflicts}
+        />
+      ) : null}
+
+      <div className={`console-grid${showAdvanced ? " show-advanced" : ""}`}>
+      <details
+        id="agents"
+        className="ops-panel wide setup-panel setup-disclosure"
+        open={setupOpen}
+        onToggle={(event) => setSetupOpen(event.currentTarget.open)}
+      >
+        <summary>
+          <KeyRound size={18} aria-hidden="true" />
+          <span>
+            <strong>Workspace setup</strong>
+            <small>Connection, organization and agent credentials</small>
+          </span>
+        </summary>
         <form onSubmit={checkHealth}>
           <label>
-            API base URL
+            API address
             <input value={apiBaseUrl} onChange={(event) => setApiBaseUrl(event.target.value)} />
           </label>
           <button type="submit" disabled={busy}>
             <Gauge size={16} aria-hidden="true" />
-            Check API health
+            Check connection
           </button>
         </form>
         <div className="panel-divider" />
         <form onSubmit={createOrganization}>
           <label>
-            New organization name
+            New workspace name
             <input
               value={newOrgName}
               onChange={(event) => setNewOrgName(event.target.value)}
-              placeholder="acme swarm"
             />
           </label>
           <button type="submit" disabled={busy || !newOrgName.trim()}>
             <Users size={16} aria-hidden="true" />
-            Create organization
+            Create workspace
           </button>
         </form>
         <div className="panel-divider" />
         <form onSubmit={createAgent}>
           <div className="form-row">
             <label>
-              Agent ID
-              <input value={agentId} onChange={(event) => setAgentId(event.target.value)} />
+              Agent name (optional)
+              <input value={agentName} onChange={(event) => setAgentName(event.target.value)} />
             </label>
             <label>
-              Org ID (active org)
-              <input value={orgId} readOnly placeholder="create an organization first" />
+              Agent ID
+              <input value={agentId} onChange={(event) => setAgentId(event.target.value)} />
             </label>
           </div>
           <div className="form-row">
             <label>
-              Role
+              Current workspace
+              <input value={orgId} readOnly placeholder="create a workspace first" />
+            </label>
+          </div>
+          <div className="form-row">
+            <label>
+              Role (optional)
               <input value={roleId} onChange={(event) => setRoleId(event.target.value)} />
             </label>
             <label>
-              Project
+              Project (optional)
               <input value={projectId} onChange={(event) => setProjectId(event.target.value)} />
             </label>
           </div>
-          <button type="submit" disabled={busy || !orgId}>
+          <button type="submit" disabled={busy || !orgId || !agentId.trim()}>
             <PackageCheck size={16} aria-hidden="true" />
-            Create agent + API key
+            Create agent and API key
           </button>
         </form>
         {mintedKey ? (
           <p className="key-once">
-            API key (shown once, store it now): <br />
+            Your agent's API key. Copy it now; it is shown only once: <br />
             {mintedKey}
           </p>
         ) : null}
-      </section>
+      </details>
 
-      <section id="org-agents" className="ops-panel" aria-labelledby="org-agents-title">
+      <BillingCheckout apiBaseUrl={cleanBaseUrl} orgId={orgId} />
+
+      <section id="org-agents" className="ops-panel wide" aria-labelledby="org-agents-title">
         <div className="panel-title">
           <ListChecks size={18} aria-hidden="true" />
-          <h2 id="org-agents-title">Org agents and keys</h2>
+          <h2 id="org-agents-title">Agents &amp; API keys</h2>
         </div>
         <form onSubmit={listAgents}>
           <button type="submit" disabled={busy || !orgId}>
             <RefreshCcw size={16} aria-hidden="true" />
-            List agents
+            Refresh agents
           </button>
         </form>
         {orgAgents.length > 0 ? (
@@ -721,37 +1039,169 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
         ) : null}
       </section>
 
+      <section id="skills" className="ops-panel wide advanced-panel" aria-labelledby="skills-title">
+        <div className="panel-title">
+          <Bot size={18} aria-hidden="true" />
+          <h2 id="skills-title">Skill profiles</h2>
+        </div>
+        <p className="panel-copy">
+          Declarative instructions for how an agent works. They are separate from memory and never
+          execute code; a private profile belongs to one agent, while an organization profile can
+          be reused deliberately.
+        </p>
+        <form onSubmit={createSkillProfile}>
+          <div className="form-row">
+            <label>
+              Profile name
+              <input
+                value={skillName}
+                onChange={(event) => setSkillName(event.target.value)}
+                placeholder="security reviewer"
+              />
+            </label>
+            <label>
+              {skillScope === "org" ? "Assign to agents" : "Give to"}
+              <select
+                multiple={skillScope === "org"}
+                size={skillScope === "org" ? Math.min(Math.max(orgAgents.length, 2), 5) : undefined}
+                value={skillScope === "org" ? skillAgentIds : (skillAgentIds[0] ?? "")}
+                onChange={(event) => {
+                  const selected = Array.from(event.currentTarget.selectedOptions, (option) => option.value);
+                  setSkillAgentIds(skillScope === "org" ? selected : selected.slice(-1));
+                }}
+              >
+                {skillScope === "agent_private" ? <option value="">select an agent</option> : null}
+                {orgAgents.map((agent) => (
+                  <option key={agent.agent_id} value={agent.agent_id}>
+                    {agent.name} · {agent.agent_id}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Visibility
+              <select
+                value={skillScope}
+                onChange={(event) => {
+                  const nextScope = event.target.value as SkillScope;
+                  setSkillScope(nextScope);
+                  if (nextScope === "agent_private") setSkillAgentIds((ids) => ids.slice(0, 1));
+                }}
+              >
+                <option value="agent_private">private to this agent</option>
+                <option value="org">reusable organization profile</option>
+              </select>
+            </label>
+          </div>
+          <label>
+            Instructions
+            <textarea
+              value={skillInstructions}
+              onChange={(event) => setSkillInstructions(event.target.value)}
+              rows={4}
+              placeholder="Review code for security risks. Never deploy or modify production."
+            />
+          </label>
+          <div className="form-row">
+            <label>
+              Allowed tools (optional, comma-separated)
+              <input
+                value={skillAllowedTools}
+                onChange={(event) => setSkillAllowedTools(event.target.value)}
+                placeholder="read_repo, create_report"
+              />
+            </label>
+            <label>
+              Require approval for (optional, comma-separated)
+              <input
+                value={skillApprovalActions}
+                onChange={(event) => setSkillApprovalActions(event.target.value)}
+                placeholder="write_code, deploy"
+              />
+            </label>
+          </div>
+          <button
+            type="submit"
+            disabled={
+              busy ||
+              !orgId ||
+              skillAgentIds.length === 0 ||
+              !skillName.trim() ||
+              !skillInstructions.trim()
+            }
+          >
+            <Bot size={16} aria-hidden="true" />
+            Create and assign skill
+          </button>
+        </form>
+        {orgSkills.length > 0 ? (
+          <div className="skill-profile-list" aria-label="Skill profiles in the active organization">
+            {orgSkills.map((skill) => (
+              <article className="skill-profile" key={skill.skill_id}>
+                <div className="skill-profile-heading">
+                  <div>
+                    <strong>{skill.name}</strong>
+                    <span>{skill.scope === "agent_private" ? "private" : "organization"}</span>
+                    <span>v{skill.version}</span>
+                  </div>
+                  <span className="skill-profile-assignment">
+                    {skill.assigned_agent_ids.join(", ")}
+                  </span>
+                </div>
+                <p>{skill.instructions}</p>
+                <div className="skill-profile-meta">
+                  <span>
+                    tools: {skill.allowed_tools.length > 0 ? skill.allowed_tools.join(", ") : "none declared"}
+                  </span>
+                  <span>
+                    approval: {skill.requires_approval_for.length > 0
+                      ? skill.requires_approval_for.join(", ")
+                      : "none declared"}
+                  </span>
+                  <span>created by {skill.created_by_kind}</span>
+                </div>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <div className="empty-operator-state">
+            <Bot size={18} aria-hidden="true" />
+            <p>No skill profiles yet. Create one after you have added an agent.</p>
+          </div>
+        )}
+      </section>
+
       <section id="org-memories" className="ops-panel wide" aria-labelledby="org-memories-title">
         <div className="panel-title">
           <Database size={18} aria-hidden="true" />
-          <h2 id="org-memories-title">Org memories</h2>
+          <h2 id="org-memories-title">Saved memory in this workspace</h2>
         </div>
         <form onSubmit={listOrgMemories}>
           <div className="form-row">
             <label>
-              Scope filter
+              Show memories
               <select
                 value={memoryScopeFilter}
                 onChange={(event) => setMemoryScopeFilter(event.target.value as "" | MemoryScope)}
               >
-                <option value="">all scopes</option>
-                <option value="open">open</option>
-                <option value="org">org</option>
-                <option value="project">project</option>
-                <option value="role">role</option>
-                <option value="agent_private">agent_private</option>
-                <option value="user_private">user_private</option>
-                <option value="session">session</option>
+                <option value="">all memories</option>
+                <option value="open">shared with everyone</option>
+                <option value="org">shared with workspace</option>
+                <option value="project">shared with project</option>
+                <option value="role">shared with role</option>
+                <option value="agent_private">private to one agent</option>
+                <option value="user_private">private to one user</option>
+                <option value="session">private to this session</option>
               </select>
             </label>
             <label>
-              Active org
+              Current workspace
               <input value={orgId} readOnly />
             </label>
           </div>
           <button type="submit" disabled={busy || !orgId}>
             <RefreshCcw size={16} aria-hidden="true" />
-            List memories
+            Refresh memory
           </button>
         </form>
         {orgMemories.length > 0 ? (
@@ -775,156 +1225,260 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
         ) : null}
       </section>
 
-      <section id="memory" className="ops-panel" aria-labelledby="memory-title">
+      <section id="conflicts" className="ops-panel wide advanced-panel" aria-labelledby="conflicts-title">
+        <div className="panel-title">
+          <Scale size={18} aria-hidden="true" />
+          <h2 id="conflicts-title">Authority and conflict resolution</h2>
+        </div>
+        <p className="panel-copy">
+          Agents submit evidence and confidence. You set role authority, while close contradictions
+          remain as separate branches until an operator resolves them.
+        </p>
+        <form onSubmit={saveRolePolicy}>
+          <div className="form-row">
+            <label>
+              Role ID
+              <input
+                value={policyRoleId}
+                onChange={(event) => setPolicyRoleId(event.target.value)}
+                placeholder="researcher"
+              />
+            </label>
+            <label>
+              Authority (0 to 10000)
+              <input
+                value={policyAuthorityBps}
+                onChange={(event) => setPolicyAuthorityBps(event.target.value)}
+                inputMode="numeric"
+              />
+            </label>
+          </div>
+          <label className="policy-checkbox">
+            <input
+              type="checkbox"
+              checked={policyCanResolve}
+              onChange={(event) => setPolicyCanResolve(event.target.checked)}
+            />
+            May resolve delegated conflicts
+          </label>
+          <button type="submit" disabled={busy || !orgId || !policyRoleId.trim()}>
+            <Scale size={16} aria-hidden="true" />
+            Save role policy
+          </button>
+        </form>
+        {rolePolicies.length > 0 ? (
+          <div className="data-table" aria-label="Role authority policies">
+            {rolePolicies.map((policy) => (
+              <div className="data-table-row" key={policy.role_id}>
+                <strong>{policy.role_id}</strong>
+                <span>{policy.authority_bps} authority</span>
+                <span>{policy.can_resolve_conflicts ? "can resolve" : "assert only"}</span>
+              </div>
+            ))}
+          </div>
+        ) : null}
+        <div className="panel-divider" />
+        <label>
+          Decision reason for the next resolution
+          <textarea
+            value={conflictReason}
+            onChange={(event) => setConflictReason(event.target.value)}
+            rows={2}
+            placeholder="Explain why this branch is the verified result."
+          />
+        </label>
+        {claimConflicts.length > 0 ? (
+          <div className="conflict-list" aria-label="Claim conflicts">
+            {claimConflicts.map((conflict) => (
+              <article className="conflict-item" key={conflict.conflict_id}>
+                <div>
+                  <span className={`conflict-state ${conflict.status}`}>{conflict.status}</span>
+                  <strong>{conflict.subject} / {conflict.predicate}</strong>
+                  <p>{conflict.conflict_id}</p>
+                </div>
+                {conflict.status === "contested" ? (
+                  <div className="conflict-actions">
+                    <button
+                      type="button"
+                      disabled={busy || !conflictReason.trim()}
+                      onClick={() => void resolveClaimConflict(conflict, conflict.incumbent_claim_id)}
+                    >
+                      Accept incumbent
+                    </button>
+                    <button
+                      type="button"
+                      disabled={busy || !conflictReason.trim()}
+                      onClick={() => void resolveClaimConflict(conflict, conflict.challenger_claim_id)}
+                    >
+                      Accept challenger
+                    </button>
+                  </div>
+                ) : (
+                  <span className="conflict-resolution">
+                    accepted {conflict.resolved_claim_id ?? "branch"}
+                  </span>
+                )}
+              </article>
+            ))}
+          </div>
+        ) : (
+          <div className="empty-operator-state">
+            <GitFork size={18} aria-hidden="true" />
+            <p>No conflicting claims have been asserted in this workspace.</p>
+          </div>
+        )}
+      </section>
+
+      <section id="memory" className="ops-panel wide memory-panel" aria-labelledby="memory-title">
         <div className="panel-title">
           <ShieldCheck size={18} aria-hidden="true" />
-          <h2 id="memory-title">Memory write</h2>
+          <h2 id="memory-title">Write private memory</h2>
         </div>
-        <form onSubmit={writeMemory}>
+        <form className="memory-write-form" onSubmit={writeMemory}>
           <label>
             Agent API key
             <input
               value={agentApiKey}
               onChange={(event) => setAgentApiKey(event.target.value)}
               type="password"
-              placeholder="optional: empty uses dev identity headers"
+              placeholder="created or rotated above"
             />
           </label>
           <label>
-            Scope
+            Sharing
             <select value={scope} onChange={(event) => setScope(event.target.value as MemoryScope)}>
-              <option value="agent_private">agent_private</option>
-              <option value="project">project</option>
-              <option value="org">org</option>
-              <option value="open">open</option>
-              <option value="role">role</option>
-              <option value="session">session</option>
-              <option value="user_private">user_private</option>
+              <option value="agent_private">private to this agent</option>
             </select>
           </label>
           <label>
-            Memory
-            <textarea value={memory} onChange={(event) => setMemory(event.target.value)} rows={5} />
+            Private note
+            <textarea value={memory} onChange={(event) => setMemory(event.target.value)} rows={5} required />
           </label>
-          <button type="submit" disabled={busy}>
+          <label>
+            Tags (optional, comma-separated)
+            <input value={memoryTags} onChange={(event) => setMemoryTags(event.target.value)} />
+          </label>
+          <button type="submit" disabled={busy || !hasAgentApiKey || !memory.trim()}>
             <Send size={16} aria-hidden="true" />
-            Write memory
+            Save private memory
           </button>
         </form>
         <div className="panel-divider" />
         <form onSubmit={promoteMemory}>
           <div className="form-row">
             <label>
-              Source memory ID
+              Private memory ID to share
               <input value={memoryId} onChange={(event) => setMemoryId(event.target.value)} />
             </label>
             <label>
-              Target scope
+              Share with
               <select
                 value={promotionTargetScope}
                 onChange={(event) =>
-                  setPromotionTargetScope(event.target.value as SharedMemoryScope)
+                  setPromotionTargetScope(event.target.value as "" | SharedMemoryScope)
                 }
               >
-                <option value="project">project</option>
-                <option value="org">org</option>
-                <option value="role">role</option>
-                <option value="open">open</option>
+                <option value="" disabled>choose a scope</option>
+                <option value="project">this project</option>
+                <option value="org">this workspace</option>
+                <option value="role">this role</option>
+                <option value="open">everyone approved by policy</option>
               </select>
             </label>
           </div>
           <label>
-            Promotion reason
+            Why share this note?
             <textarea
               value={promotionReason}
               onChange={(event) => setPromotionReason(event.target.value)}
               rows={3}
+              required
             />
           </label>
-          <button type="submit" disabled={busy || !memoryId}>
+          <button
+            type="submit"
+            disabled={busy || !memoryId || !promotionTargetScope || !promotionReason.trim() || !hasAgentApiKey}
+          >
             <ArrowUpRight size={16} aria-hidden="true" />
-            Promote private memory
+            Share this memory
           </button>
         </form>
       </section>
 
-      <section id="context" className="ops-panel wide" aria-labelledby="context-title">
+      <section id="context" className="ops-panel wide advanced-panel" aria-labelledby="context-title">
         <div className="panel-title">
           <Send size={18} aria-hidden="true" />
-          <h2 id="context-title">Context build</h2>
+          <h2 id="context-title">Context inspector</h2>
         </div>
         <form onSubmit={buildContext}>
           <label>
-            Task
-            <input value={task} onChange={(event) => setTask(event.target.value)} />
+            What does the agent need to do?
+            <input value={task} onChange={(event) => setTask(event.target.value)} required />
           </label>
-          <button type="submit" disabled={busy}>
+          <button type="submit" disabled={busy || !hasAgentApiKey || !task.trim()}>
             <ShieldCheck size={16} aria-hidden="true" />
-            Build context
+            Build safe context
           </button>
         </form>
         <form onSubmit={readAudit} className="audit-form">
           <label>
-            Request ID
+            Context request ID
             <input value={requestId} onChange={(event) => setRequestId(event.target.value)} />
           </label>
-          <button type="submit" disabled={busy || !requestId}>
+          <button type="submit" disabled={busy || !requestId || !hasAgentApiKey}>
             <KeyRound size={16} aria-hidden="true" />
-            Read audit
+            Show context record
           </button>
         </form>
         <form onSubmit={readPromotionAudit} className="audit-form">
           <label>
-            Promoted memory ID
+            Shared memory ID
             <input
               value={promotedMemoryId}
               onChange={(event) => setPromotedMemoryId(event.target.value)}
             />
           </label>
-          <button type="submit" disabled={busy || !promotedMemoryId}>
+          <button type="submit" disabled={busy || !promotedMemoryId || !hasAgentApiKey}>
             <FileSearch size={16} aria-hidden="true" />
-            Read promotion audit
+            Show sharing record
           </button>
         </form>
       </section>
 
-      <section id="audit" className="result-panel" aria-live="polite" aria-label="API result">
+      <section id="audit" className="result-panel advanced-panel" aria-live="polite" aria-label="API result">
         <div className="panel-title">
           <ShieldCheck size={18} aria-hidden="true" />
-          <h2>{result.label}</h2>
+          <h2>Recent activity: {result.label}</h2>
         </div>
         <pre>{JSON.stringify(result.body, null, 2)}</pre>
+        {promotionAudit ? (
+          <p className="chart-note">
+            Latest promotion: {promotionAudit.source_memory_id} to {promotionAudit.target_scope}
+          </p>
+        ) : null}
       </section>
       </div>
     </div>
   );
 }
 
-function agentRequestHeaders(
-  apiKey: string,
-  agentId: string,
-  orgId: string,
-  roleId?: string,
-  projectId?: string,
-) {
+function agentRequestHeaders(apiKey: string) {
   const cleanApiKey = apiKey.trim();
-  if (cleanApiKey) {
-    return {
-      "content-type": "application/json",
-      Authorization: `Bearer ${cleanApiKey}`,
-    };
+  if (!cleanApiKey) {
+    throw new Error("Create or rotate an agent API key before using memory operations.");
   }
 
-  const headers: Record<string, string> = {
+  return {
     "content-type": "application/json",
-    "x-energon-agent-id": agentId,
-    "x-energon-org-id": orgId || "org_1",
+    Authorization: `Bearer ${cleanApiKey}`,
   };
+}
 
-  if (roleId?.trim()) headers["x-energon-role-id"] = roleId.trim();
-  if (projectId?.trim()) headers["x-energon-project-id"] = projectId.trim();
-
-  return headers;
+function parseTags(value: string) {
+  return value
+    .split(",")
+    .map((tag) => tag.trim())
+    .filter(Boolean);
 }
 
 function isContextPack(value: unknown): value is { request_id: string } {
@@ -963,11 +1517,139 @@ function isAgentList(value: unknown): value is { agents: OrgAgent[] } {
   );
 }
 
+function isSkillList(value: unknown): value is { skills: SkillProfile[] } {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "skills" in value &&
+    Array.isArray((value as { skills: unknown }).skills)
+  );
+}
+
+function commaSeparatedValues(value: string): string[] {
+  return value
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
 function isMemoryList(value: unknown): value is { memories: OrgMemory[] } {
   return (
     typeof value === "object" &&
     value !== null &&
     "memories" in value &&
     Array.isArray((value as { memories: unknown }).memories)
+  );
+}
+
+function isApiHealth(value: unknown): value is ApiHealth {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "status" in value &&
+    "storage" in value &&
+    "database" in value &&
+    ((value as { status: unknown }).status === "ok" ||
+      (value as { status: unknown }).status === "degraded")
+  );
+}
+
+function isX402Status(value: unknown): value is { enabled: boolean } {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "enabled" in value &&
+    typeof (value as { enabled: unknown }).enabled === "boolean"
+  );
+}
+
+function isUsageSummary(value: unknown): value is UsageSummary {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "storage" in value &&
+    "totals" in value &&
+    Array.isArray((value as { totals: unknown }).totals)
+  );
+}
+
+function isMemoryStats(value: unknown): value is MemoryStats {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "total_memories" in value &&
+    typeof (value as { total_memories: unknown }).total_memories === "number" &&
+    "scopes" in value &&
+    Array.isArray((value as { scopes: unknown }).scopes)
+  );
+}
+
+function isOutboxStatus(value: unknown): value is OutboxStatus {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "storage" in value &&
+    ((value as { storage: unknown }).storage === "memory" ||
+      (value as { storage: unknown }).storage === "postgres") &&
+    "pending" in value &&
+    typeof (value as { pending: unknown }).pending === "number" &&
+    "leased" in value &&
+    typeof (value as { leased: unknown }).leased === "number" &&
+    "published" in value &&
+    typeof (value as { published: unknown }).published === "number" &&
+    "retrying" in value &&
+    typeof (value as { retrying: unknown }).retrying === "number"
+  );
+}
+
+function isRolePolicyList(value: unknown): value is { policies: RolePolicy[] } {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "policies" in value &&
+    Array.isArray((value as { policies: unknown }).policies)
+  );
+}
+
+function isClaimConflictList(value: unknown): value is { conflicts: ClaimConflict[] } {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "conflicts" in value &&
+    Array.isArray((value as { conflicts: unknown }).conflicts)
+  );
+}
+
+function isContextAudit(value: unknown): value is ContextAudit {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "request_id" in value &&
+    typeof (value as { request_id: unknown }).request_id === "string" &&
+    "allowed_memory_ids" in value &&
+    Array.isArray((value as { allowed_memory_ids: unknown }).allowed_memory_ids) &&
+    "denied_memory_count" in value &&
+    typeof (value as { denied_memory_count: unknown }).denied_memory_count === "number" &&
+    "estimated_tokens" in value &&
+    typeof (value as { estimated_tokens: unknown }).estimated_tokens === "number" &&
+    "token_budget" in value &&
+    typeof (value as { token_budget: unknown }).token_budget === "number"
+  );
+}
+
+function isPromotionAudit(value: unknown): value is PromotionAudit {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "promotion_id" in value &&
+    typeof (value as { promotion_id: unknown }).promotion_id === "string" &&
+    "source_memory_id" in value &&
+    typeof (value as { source_memory_id: unknown }).source_memory_id === "string" &&
+    "promoted_memory_id" in value &&
+    typeof (value as { promoted_memory_id: unknown }).promoted_memory_id === "string" &&
+    "target_scope" in value &&
+    typeof (value as { target_scope: unknown }).target_scope === "string" &&
+    "reason" in value &&
+    typeof (value as { reason: unknown }).reason === "string"
   );
 }

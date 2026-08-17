@@ -1,13 +1,16 @@
-use energon_core::{AgentIdentity, MemoryRecord, MemoryScope, PromotionAuditRecord};
+use energon_core::{
+    AgentIdentity, ControlPlaneEvent, MemoryRecord, MemoryScope, PromotionAuditRecord,
+};
 use sqlx::{PgPool, Postgres, Row, Transaction, postgres::PgRow};
 
-use crate::{DbError, audit, errors::i64_to_u128, identity};
+use crate::{DbError, audit, errors::i64_to_u128, event_outbox, identity};
 
 pub async fn insert_memory(pool: &PgPool, record: &MemoryRecord) -> Result<(), DbError> {
     identity::ensure_memory_record_refs(pool, record).await?;
 
     let mut tx = pool.begin().await?;
     insert_memory_in_tx(&mut tx, record).await?;
+    event_outbox::enqueue_in_tx(&mut tx, &ControlPlaneEvent::memory_written(record)).await?;
     tx.commit().await?;
 
     Ok(())
@@ -23,6 +26,8 @@ pub async fn insert_promoted_memory(
     let mut tx = pool.begin().await?;
     insert_memory_in_tx(&mut tx, record).await?;
     audit::insert_promotion_audit_in_tx(&mut tx, promotion).await?;
+    event_outbox::enqueue_in_tx(&mut tx, &ControlPlaneEvent::memory_written(record)).await?;
+    event_outbox::enqueue_in_tx(&mut tx, &ControlPlaneEvent::memory_promoted(promotion)).await?;
     tx.commit().await?;
 
     Ok(())
@@ -123,6 +128,46 @@ pub async fn list_org_memories(pool: &PgPool, org_id: &str) -> Result<Vec<Memory
     rows.into_iter().map(row_to_memory).collect()
 }
 
+/// Bounded full records for the read-only operator vault export. The dashboard
+/// list deliberately uses previews; this repository is only for an explicit
+/// export with a hard server-side limit.
+pub async fn list_org_memories_for_export(
+    pool: &PgPool,
+    org_id: &str,
+    limit: i64,
+    content_limit_chars: i32,
+) -> Result<Vec<MemoryRecord>, DbError> {
+    let rows = sqlx::query(
+        r#"
+        SELECT
+            memory_id,
+            org_id,
+            scope,
+            left(content, $3) AS content,
+            tags,
+            project_id,
+            role_id,
+            owner_agent_id,
+            user_id,
+            session_id,
+            source,
+            promoted_from,
+            floor(extract(epoch from created_at) * 1000)::bigint AS created_at_unix_ms
+        FROM memory_entries
+        WHERE org_id = $1
+        ORDER BY created_at DESC
+        LIMIT $2
+        "#,
+    )
+    .bind(org_id)
+    .bind(limit.clamp(1, 5_000))
+    .bind(content_limit_chars.clamp(1, 65_536))
+    .fetch_all(pool)
+    .await?;
+
+    rows.into_iter().map(row_to_memory).collect()
+}
+
 #[derive(Debug, Clone)]
 pub struct OrgMemorySummary {
     pub memory_id: String,
@@ -133,6 +178,12 @@ pub struct OrgMemorySummary {
     pub role_id: Option<String>,
     pub owner_agent_id: Option<String>,
     pub created_at_unix_ms: i64,
+}
+
+#[derive(Debug, Clone)]
+pub struct OrgMemoryScopeCount {
+    pub scope: MemoryScope,
+    pub count: i64,
 }
 
 const PREVIEW_CHARS: i32 = 160;
@@ -185,6 +236,36 @@ pub async fn list_org_memories_page(
                 role_id: row.try_get("role_id")?,
                 owner_agent_id: row.try_get("owner_agent_id")?,
                 created_at_unix_ms: row.try_get("created_at_unix_ms")?,
+            })
+        })
+        .collect()
+}
+
+/// Count all memory entries by scope for the operator dashboard. Unlike the
+/// paginated memory list, this remains accurate for large organizations.
+pub async fn count_org_memories_by_scope(
+    pool: &PgPool,
+    org_id: &str,
+) -> Result<Vec<OrgMemoryScopeCount>, DbError> {
+    let rows = sqlx::query(
+        r#"
+        SELECT scope, count(*)::bigint AS count
+        FROM memory_entries
+        WHERE org_id = $1
+        GROUP BY scope
+        ORDER BY scope
+        "#,
+    )
+    .bind(org_id)
+    .fetch_all(pool)
+    .await?;
+
+    rows.into_iter()
+        .map(|row| {
+            let scope: String = row.try_get("scope")?;
+            Ok(OrgMemoryScopeCount {
+                scope: scope_from_str(&scope)?,
+                count: row.try_get("count")?,
             })
         })
         .collect()

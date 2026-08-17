@@ -1,6 +1,7 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use energon_core::{AgentIdentity, AuditRecord, MemoryRecord, MemoryScope, PromotionAuditRecord};
+use energon_db::claims::{AuditChainEvent, ClaimConflict, ClaimRecord};
 
 #[derive(Debug, Clone)]
 pub struct VaultArchive {
@@ -82,6 +83,468 @@ pub fn build_obsidian_vault(
         filename: format!("{vault_name}.zip"),
         bytes: zip_store(files),
     }
+}
+
+/// Operator exports are intentionally a separate vault shape from the
+/// agent-facing export. They include organization-level claims and audit chain
+/// nodes, while the caller redacts private memory content before it reaches
+/// this builder.
+pub fn build_operator_obsidian_vault(
+    org_id: &str,
+    memories: &[MemoryRecord],
+    context_audits: &[AuditRecord],
+    promotion_audits: &[PromotionAuditRecord],
+    claims: &[ClaimRecord],
+    conflicts: &[ClaimConflict],
+    audit_events: &[AuditChainEvent],
+) -> VaultArchive {
+    let mut files = BTreeMap::new();
+    let vault_name = format!("energon-operator-vault-{}", slug(org_id));
+
+    files.insert(
+        "README.md".to_owned(),
+        operator_readme(
+            org_id,
+            memories,
+            context_audits,
+            promotion_audits,
+            claims,
+            conflicts,
+            audit_events,
+        ),
+    );
+    files.insert(
+        "Index/Swarm Graph.md".to_owned(),
+        operator_graph_index(
+            org_id,
+            memories,
+            context_audits,
+            promotion_audits,
+            claims,
+            conflicts,
+            audit_events,
+        ),
+    );
+    files.insert(
+        org_path(org_id),
+        org_note(org_id, memories, context_audits, promotion_audits),
+    );
+
+    let mut agent_ids = BTreeSet::new();
+    for memory in memories {
+        if let Some(agent_id) = &memory.owner_agent_id {
+            agent_ids.insert(agent_id.clone());
+        }
+        files.insert(
+            memory_path(&memory.memory_id),
+            memory_note(memory, context_audits, promotion_audits),
+        );
+    }
+    for audit in context_audits {
+        agent_ids.insert(audit.agent_id.clone());
+        files.insert(context_path(&audit.request_id), context_note(audit));
+    }
+    for promotion in promotion_audits {
+        agent_ids.insert(promotion.agent_id.clone());
+        files.insert(
+            promotion_path(&promotion.promotion_id),
+            promotion_note(promotion),
+        );
+    }
+    for claim in claims {
+        agent_ids.insert(claim.asserted_by_agent_id.clone());
+        files.insert(claim_path(&claim.claim_id), claim_note(claim));
+    }
+    for conflict in conflicts {
+        files.insert(
+            conflict_path(&conflict.conflict_id),
+            conflict_note(conflict),
+        );
+    }
+    for agent_id in agent_ids {
+        files.insert(
+            agent_path(&agent_id),
+            operator_agent_note(
+                &agent_id,
+                org_id,
+                memories,
+                context_audits,
+                promotion_audits,
+                claims,
+            ),
+        );
+    }
+
+    let event_paths = audit_events
+        .iter()
+        .map(|event| (event.event_hash.clone(), audit_chain_path(event)))
+        .collect::<BTreeMap<_, _>>();
+    for event in audit_events {
+        files.insert(
+            audit_chain_path(event),
+            audit_chain_note(
+                event,
+                event_paths.get(event.previous_hash.as_deref().unwrap_or("")),
+            ),
+        );
+    }
+
+    VaultArchive {
+        filename: format!("{vault_name}.zip"),
+        bytes: zip_store(files),
+    }
+}
+
+fn operator_readme(
+    org_id: &str,
+    memories: &[MemoryRecord],
+    context_audits: &[AuditRecord],
+    promotion_audits: &[PromotionAuditRecord],
+    claims: &[ClaimRecord],
+    conflicts: &[ClaimConflict],
+    audit_events: &[AuditChainEvent],
+) -> String {
+    format!(
+        r#"---
+type: energon_operator_vault
+org_id: {}
+memory_count: {}
+context_build_count: {}
+promotion_count: {}
+claim_count: {}
+conflict_count: {}
+audit_event_count: {}
+private_memory_content: redacted
+---
+
+# Energon Operator Vault
+
+This is a read-only inspection export. It does not write to Energon OS or alter
+Postgres, pgvector, permissions, claim state, or the audit ledger.
+
+Private agent, user, and session memory remains present as graph metadata, but
+its content is redacted in this organization-wide export.
+
+- [[Index/Swarm Graph]]
+- {}
+"#,
+        yaml_string(org_id),
+        memories.len(),
+        context_audits.len(),
+        promotion_audits.len(),
+        claims.len(),
+        conflicts.len(),
+        audit_events.len(),
+        wikilink(&org_path(org_id), org_id),
+    )
+}
+
+fn operator_graph_index(
+    org_id: &str,
+    memories: &[MemoryRecord],
+    context_audits: &[AuditRecord],
+    promotion_audits: &[PromotionAuditRecord],
+    claims: &[ClaimRecord],
+    conflicts: &[ClaimConflict],
+    audit_events: &[AuditChainEvent],
+) -> String {
+    let mut content = format!(
+        r#"---
+type: energon_operator_graph
+org_id: {}
+---
+
+# Swarm Graph
+
+- Organization: {}
+
+## Memory
+
+"#,
+        yaml_string(org_id),
+        wikilink(&org_path(org_id), org_id),
+    );
+    for memory in memories {
+        content.push_str(&format!(
+            "- {} `{}`\n",
+            wikilink(&memory_path(&memory.memory_id), &memory.memory_id),
+            scope_name(&memory.scope),
+        ));
+    }
+
+    push_section_links(
+        &mut content,
+        "Context Builds",
+        context_audits
+            .iter()
+            .map(|audit| (context_path(&audit.request_id), audit.request_id.as_str())),
+    );
+    push_section_links(
+        &mut content,
+        "Promotions",
+        promotion_audits.iter().map(|promotion| {
+            (
+                promotion_path(&promotion.promotion_id),
+                promotion.promotion_id.as_str(),
+            )
+        }),
+    );
+    push_section_links(
+        &mut content,
+        "Claims",
+        claims
+            .iter()
+            .map(|claim| (claim_path(&claim.claim_id), claim.claim_id.as_str())),
+    );
+    push_section_links(
+        &mut content,
+        "Conflict Branches",
+        conflicts.iter().map(|conflict| {
+            (
+                conflict_path(&conflict.conflict_id),
+                conflict.conflict_id.as_str(),
+            )
+        }),
+    );
+    push_section_links(
+        &mut content,
+        "Audit Chain",
+        audit_events
+            .iter()
+            .map(|event| (audit_chain_path(event), event.event_id.as_str())),
+    );
+    content
+}
+
+fn operator_agent_note(
+    agent_id: &str,
+    org_id: &str,
+    memories: &[MemoryRecord],
+    context_audits: &[AuditRecord],
+    promotion_audits: &[PromotionAuditRecord],
+    claims: &[ClaimRecord],
+) -> String {
+    let mut content = format!(
+        r#"---
+type: agent
+agent_id: {}
+org_id: {}
+---
+
+# Agent {}
+
+Organization: {}
+"#,
+        yaml_string(agent_id),
+        yaml_string(org_id),
+        agent_id,
+        wikilink(&org_path(org_id), org_id),
+    );
+    push_section_links(
+        &mut content,
+        "Owned Memory",
+        memories
+            .iter()
+            .filter(|memory| memory.owner_agent_id.as_deref() == Some(agent_id))
+            .map(|memory| (memory_path(&memory.memory_id), memory.memory_id.as_str())),
+    );
+    push_section_links(
+        &mut content,
+        "Context Builds",
+        context_audits
+            .iter()
+            .filter(|audit| audit.agent_id == agent_id)
+            .map(|audit| (context_path(&audit.request_id), audit.request_id.as_str())),
+    );
+    push_section_links(
+        &mut content,
+        "Promotions",
+        promotion_audits
+            .iter()
+            .filter(|promotion| promotion.agent_id == agent_id)
+            .map(|promotion| {
+                (
+                    promotion_path(&promotion.promotion_id),
+                    promotion.promotion_id.as_str(),
+                )
+            }),
+    );
+    push_section_links(
+        &mut content,
+        "Asserted Claims",
+        claims
+            .iter()
+            .filter(|claim| claim.asserted_by_agent_id == agent_id)
+            .map(|claim| (claim_path(&claim.claim_id), claim.claim_id.as_str())),
+    );
+    content
+}
+
+fn claim_note(claim: &ClaimRecord) -> String {
+    let mut content = format!(
+        r#"---
+type: claim
+claim_id: {}
+org_id: {}
+subject: {}
+predicate: {}
+state: {}
+confidence_bps: {}
+authority_bps: {}
+score: {}
+asserted_by_agent_id: {}
+conflict_id: {}
+created_at_unix_ms: {}
+---
+
+# Claim {}
+
+Subject: `{}`
+
+Predicate: `{}`
+
+Value:
+
+```json
+{}
+```
+
+Asserted by: {}
+"#,
+        yaml_string(&claim.claim_id),
+        yaml_string(&claim.org_id),
+        yaml_string(&claim.subject),
+        yaml_string(&claim.predicate),
+        yaml_string(&claim.state),
+        claim.confidence_bps,
+        claim.authority_bps,
+        claim.score,
+        yaml_string(&claim.asserted_by_agent_id),
+        yaml_optional(claim.conflict_id.as_deref()),
+        claim.created_at_unix_ms,
+        claim.claim_id,
+        claim.subject,
+        claim.predicate,
+        serde_json::to_string_pretty(&claim.value).unwrap_or_else(|_| "null".to_owned()),
+        wikilink(
+            &agent_path(&claim.asserted_by_agent_id),
+            &claim.asserted_by_agent_id
+        ),
+    );
+    if let Some(conflict_id) = claim.conflict_id.as_deref() {
+        content.push_str(&format!(
+            "\nConflict branch: {}\n",
+            wikilink(&conflict_path(conflict_id), conflict_id)
+        ));
+    }
+    push_section_links(
+        &mut content,
+        "Evidence Memory",
+        claim
+            .evidence_memory_ids
+            .iter()
+            .map(|memory_id| (memory_path(memory_id), memory_id.as_str())),
+    );
+    content
+}
+
+fn conflict_note(conflict: &ClaimConflict) -> String {
+    let mut content = format!(
+        r#"---
+type: claim_conflict
+conflict_id: {}
+org_id: {}
+subject: {}
+predicate: {}
+status: {}
+resolved_claim_id: {}
+resolved_by_user_id: {}
+created_at_unix_ms: {}
+resolved_at_unix_ms: {}
+---
+
+# Conflict {}
+
+Status: `{}`
+
+Incumbent: {}
+
+Challenger: {}
+"#,
+        yaml_string(&conflict.conflict_id),
+        yaml_string(&conflict.org_id),
+        yaml_string(&conflict.subject),
+        yaml_string(&conflict.predicate),
+        yaml_string(&conflict.status),
+        yaml_optional(conflict.resolved_claim_id.as_deref()),
+        yaml_optional(conflict.resolved_by_user_id.as_deref()),
+        conflict.created_at_unix_ms,
+        conflict
+            .resolved_at_unix_ms
+            .map(|value| value.to_string())
+            .unwrap_or_else(|| "null".to_owned()),
+        conflict.conflict_id,
+        conflict.status,
+        wikilink(
+            &claim_path(&conflict.incumbent_claim_id),
+            &conflict.incumbent_claim_id
+        ),
+        wikilink(
+            &claim_path(&conflict.challenger_claim_id),
+            &conflict.challenger_claim_id
+        ),
+    );
+    if let Some(reason) = &conflict.resolution_reason {
+        content.push_str(&format!("\n## Resolution Reason\n\n{reason}\n"));
+    }
+    content
+}
+
+fn audit_chain_note(event: &AuditChainEvent, previous_path: Option<&String>) -> String {
+    let mut content = format!(
+        r#"---
+type: audit_chain_event
+sequence: {}
+event_id: {}
+event_type: {}
+actor_agent_id: {}
+event_hash: {}
+previous_hash: {}
+created_at_unix_ms: {}
+---
+
+# Audit Event {}: {}
+
+Event hash: `{}`
+"#,
+        event.sequence,
+        yaml_string(&event.event_id),
+        yaml_string(&event.event_type),
+        yaml_optional(event.actor_agent_id.as_deref()),
+        yaml_string(&event.event_hash),
+        yaml_optional(event.previous_hash.as_deref()),
+        event.created_at_unix_ms,
+        event.sequence,
+        event.event_type,
+        event.event_hash,
+    );
+    if let Some(agent_id) = event.actor_agent_id.as_deref() {
+        content.push_str(&format!(
+            "\nActor: {}\n",
+            wikilink(&agent_path(agent_id), agent_id)
+        ));
+    }
+    if let Some(previous_path) = previous_path {
+        content.push_str(&format!(
+            "\nPrevious event: {}\n",
+            wikilink(previous_path, "previous")
+        ));
+    }
+    content.push_str(&format!(
+        "\n## Payload\n\n```json\n{}\n```\n",
+        serde_json::to_string_pretty(&event.payload).unwrap_or_else(|_| "null".to_owned())
+    ));
+    content
 }
 
 fn readme_note(
@@ -664,6 +1127,22 @@ fn promotion_path(promotion_id: &str) -> String {
     format!("Promotions/{}.md", slug(promotion_id))
 }
 
+fn claim_path(claim_id: &str) -> String {
+    format!("Claims/{}.md", slug(claim_id))
+}
+
+fn conflict_path(conflict_id: &str) -> String {
+    format!("Conflicts/{}.md", slug(conflict_id))
+}
+
+fn audit_chain_path(event: &AuditChainEvent) -> String {
+    format!(
+        "Audit Chain/{:020}-{}.md",
+        event.sequence,
+        slug(&event.event_id)
+    )
+}
+
 fn wikilink(path: &str, label: &str) -> String {
     let target = path.strip_suffix(".md").unwrap_or(path);
     format!("[[{target}|{label}]]")
@@ -845,5 +1324,52 @@ mod tests {
         let archive = build_obsidian_vault(&agent(), &[memory("mem_1")], &[], &[]);
 
         assert_eq!(&archive.bytes[..4], &[0x50, 0x4b, 0x03, 0x04]);
+    }
+
+    #[test]
+    fn operator_vault_links_claims_without_private_memory_content() {
+        let mut private_memory = memory("mem_private");
+        private_memory.content =
+            "[Private memory content redacted in operator vault export.]".to_owned();
+        let claim = ClaimRecord {
+            claim_id: "claim_1".to_owned(),
+            org_id: "org_1".to_owned(),
+            subject: "vendor:acme".to_owned(),
+            predicate: "security_status".to_owned(),
+            value: serde_json::json!({ "status": "review_required" }),
+            confidence_bps: 8_700,
+            authority_bps: 5_000,
+            score: 43_500_000,
+            asserted_by_agent_id: "agent_777".to_owned(),
+            evidence_memory_ids: vec!["mem_private".to_owned()],
+            state: "accepted".to_owned(),
+            conflict_id: None,
+            created_at_unix_ms: 1,
+        };
+        let audit_event = AuditChainEvent {
+            sequence: 1,
+            event_id: "audit_claim_claim_1".to_owned(),
+            event_type: "claim.accepted".to_owned(),
+            actor_agent_id: Some("agent_777".to_owned()),
+            payload: serde_json::json!({ "claim_id": "claim_1" }),
+            previous_hash: None,
+            event_hash: "hash_1".to_owned(),
+            created_at_unix_ms: 1,
+        };
+        let archive = build_operator_obsidian_vault(
+            "org_1",
+            &[private_memory],
+            &[],
+            &[],
+            &[claim],
+            &[],
+            &[audit_event],
+        );
+        let bytes = String::from_utf8_lossy(&archive.bytes);
+
+        assert!(bytes.contains("[Private memory content redacted in operator vault export.]"));
+        assert!(!bytes.contains("Investor memory"));
+        assert!(bytes.contains("[[Claims/claim_1|claim_1]]"));
+        assert!(bytes.contains("Audit Chain/00000000000000000001-audit_claim_claim_1.md"));
     }
 }

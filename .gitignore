@@ -1,12 +1,20 @@
 /target
 /node_modules
 /apps/web/node_modules
+/packages/*/node_modules
 /apps/web/.next
 /apps/web/out
+/packages/*/dist
 /.env
 /.env.local
 /.DS_Store
 /data
 *.log
 *.tsbuildinfo
+__pycache__/
+*.py[cod]
 /.tmp
+
+# Private local security artifacts — never commit or publish.
+/security_best_practices_report.md
+/Energon OS-threat-model.md
