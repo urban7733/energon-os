@@ -657,8 +657,8 @@
   }
 
   .image-hero-art {
-    width: 178vw;
-    max-width: none;
+    width: min(calc(100% - 32px), 560px);
+    margin-inline: auto;
   }
 
   .image-hero-meta {
