@@ -192,7 +192,6 @@ export function LandingHero() {
   return (
     <section className="lx-hero" aria-labelledby="hero-title">
       <div className="lx-hero-backdrop" aria-hidden="true">
-        <div className="lx-hero-grid" />
         <div className="lx-hero-beam" />
       </div>
 

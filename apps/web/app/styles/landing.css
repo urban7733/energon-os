@@ -320,18 +320,6 @@
   pointer-events: none;
 }
 
-.lx-hero-grid {
-  position: absolute;
-  inset: 0;
-  background-image:
-    linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
-  background-size: 72px 72px;
-  background-position: center top;
-  mask-image: radial-gradient(ellipse 70% 60% at 50% 30%, #000 10%, transparent 75%);
-  -webkit-mask-image: radial-gradient(ellipse 70% 60% at 50% 30%, #000 10%, transparent 75%);
-}
-
 .lx-hero-orb {
   --orb: min(920px, 150vw);
   width: var(--orb);
