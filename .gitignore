@@ -4,6 +4,8 @@
 /packages/*/node_modules
 /apps/web/.next
 /apps/web/out
+/apps/web/.open-next
+/apps/web/.wrangler
 /packages/*/dist
 /.env
 /.env.local
@@ -18,3 +20,9 @@ __pycache__/
 # Private local security artifacts — never commit or publish.
 /security_best_practices_report.md
 /Energon OS-threat-model.md
+
+# Temporary local renders and inspection files
+/tmp/*
+!/tmp/pdfs/
+/tmp/pdfs/*
+!/tmp/pdfs/*.py

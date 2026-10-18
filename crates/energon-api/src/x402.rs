@@ -716,3 +716,21 @@ mod tests {
         assert_eq!(payload["x402Version"], 2);
     }
 }
+
+#[cfg(test)]
+impl X402Config {
+    pub(crate) fn disabled_for_dream_tests() -> Self {
+        Self {
+            enabled: false,
+            accept_unverified: false,
+            network: default_network(),
+            asset: default_asset(),
+            pay_to: None,
+            facilitator_url: default_facilitator_url(),
+            facilitator_bearer: None,
+            max_timeout_seconds: 60,
+            pricing: RoutePricing::default(),
+            client: reqwest::Client::new(),
+        }
+    }
+}

@@ -16,6 +16,8 @@ const devWatchIgnored = [
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  // Preserve the Workers-specific TCP implementation used by node-postgres.
+  serverExternalPackages: ["pg", "pg-cloudflare"],
   // No static export: Better Auth API routes and server-side session checks
   // require a Node/Bun server runtime (`next start`).
   poweredByHeader: false,

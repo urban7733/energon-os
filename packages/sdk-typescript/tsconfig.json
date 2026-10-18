@@ -5,6 +5,7 @@
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
     "strict": true,
+    "types": [],
     "declaration": true,
     "declarationMap": true,
     "sourceMap": true,

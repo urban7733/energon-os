@@ -62,6 +62,7 @@ pub struct UsageCounter {
 
 #[derive(Clone)]
 pub struct InMemoryStorage {
+    pub dreams: Arc<RwLock<Vec<energon_core::dreams::DreamRecord>>>,
     pub memories: Arc<RwLock<Vec<MemoryRecord>>>,
     pub audits: Arc<RwLock<HashMap<String, AuditRecord>>>,
     pub promotion_audits: Arc<RwLock<HashMap<String, PromotionAuditRecord>>>,
@@ -281,6 +282,7 @@ fn required_env(name: &'static str) -> Result<String, Box<dyn std::error::Error 
 impl InMemoryStorage {
     fn new() -> Self {
         Self {
+            dreams: Arc::new(RwLock::new(Vec::new())),
             memories: Arc::new(RwLock::new(Vec::new())),
             audits: Arc::new(RwLock::new(HashMap::new())),
             promotion_audits: Arc::new(RwLock::new(HashMap::new())),
@@ -313,5 +315,12 @@ mod tests {
         assert!(validate_agent_self_registration(false, false).is_ok());
         assert!(validate_agent_self_registration(true, true).is_ok());
         assert!(validate_agent_self_registration(true, false).is_err());
+    }
+}
+
+#[cfg(test)]
+impl AppState {
+    pub(crate) fn for_dream_tests() -> Self {
+        Self::new_with_x402(X402Config::disabled_for_dream_tests(), None)
     }
 }

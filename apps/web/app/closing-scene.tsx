@@ -5,68 +5,21 @@ import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 
 export function ClosingScene() {
-  const sectionRef = useRef<HTMLElement>(null);
-  const eyebrowRef = useRef<HTMLParagraphElement>(null);
-  const titleRef = useRef<HTMLPreElement>(null);
-  const statementRef = useRef<HTMLParagraphElement>(null);
-
+  const section = useRef<HTMLElement>(null);
   useLayoutEffect(() => {
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-      return;
-    }
-
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     gsap.registerPlugin(ScrollTrigger);
-
     const context = gsap.context(() => {
-      gsap
-        .timeline({
-          scrollTrigger: {
-            trigger: sectionRef.current,
-            start: "top 82%",
-            end: "bottom 26%",
-            scrub: 1.25,
-            invalidateOnRefresh: true,
-          },
-        })
-        .fromTo(
-          eyebrowRef.current,
-          { autoAlpha: 0, y: 42 },
-          { autoAlpha: 1, y: -12, ease: "none" },
-          0,
-        )
-        .fromTo(
-          titleRef.current,
-          { autoAlpha: 0, y: 72 },
-          { autoAlpha: 1, y: -22, ease: "none" },
-          0.1,
-        )
-        .fromTo(
-          statementRef.current,
-          { autoAlpha: 0, y: 50 },
-          { autoAlpha: 1, y: -16, ease: "none" },
-          0.2,
-        );
-    }, sectionRef);
-
+      gsap.timeline({ scrollTrigger: { trigger: section.current, start: "top 90%", end: "center 45%", scrub: 0.8 } })
+        .fromTo(".footer-emblem", { scale: 0.72, y: 80, opacity: 0.2 }, { scale: 1, y: 0, opacity: 1, ease: "none" })
+        .fromTo(".footer-brand-caption", { y: 24, opacity: 0 }, { y: 0, opacity: 1, ease: "none" }, 0.35);
+    }, section);
     return () => context.revert();
   }, []);
-
   return (
-    <section className="closing-scene" ref={sectionRef} aria-labelledby="closing-scene-title">
-      <div className="closing-scene-content">
-        <p className="closing-scene-kicker" ref={eyebrowRef}>
-          Memory, with boundaries.
-        </p>
-        <h2 id="closing-scene-title" className="sr-only">Energon OS</h2>
-        <pre className="closing-ascii-wordmark" ref={titleRef} aria-hidden="true">{`████████    ██      ██  ████████    ████████      ██████      ██████    ██      ██            ██████      ████████
-██          ████    ██  ██          ██      ██  ██          ██      ██  ████    ██          ██      ██  ██
-████████    ██  ██  ██  ████████    ████████    ██  ██████  ██      ██  ██  ██  ██          ██      ██    ██████
-██          ██    ████  ██          ██  ██      ██      ██  ██      ██  ██    ████          ██      ██          ██
-████████    ██      ██  ████████    ██    ██      ██████      ██████    ██      ██            ██████    ████████`}</pre>
-        <p className="closing-scene-statement" ref={statementRef}>
-          The infrastructure for agentic swarms.
-        </p>
-      </div>
+    <section className="footer-brand-scene" ref={section} aria-label="Energon OS">
+      <img className="footer-emblem" src="/energon-footer-logo-gradient.png" alt="Energon emblem with an ice blue rim" width="1536" height="1024" loading="lazy" />
+      <div className="footer-brand-caption"><span>ENERGON OS</span><p>Memory, with boundaries.</p></div>
     </section>
   );
 }

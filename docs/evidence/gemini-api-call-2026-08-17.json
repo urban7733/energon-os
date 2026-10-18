@@ -1,0 +1,18 @@
+{
+  "provider": "Google Gemini API",
+  "endpoint": "https://generativelanguage.googleapis.com/v1beta/interactions",
+  "interaction_id": "v1_ChdrVzZDYXR6OE04bkVuc0VQcmYtbnlBURIXa1c2Q2F0ejhNOG5FbnNFUHJmLW55QVE",
+  "model": "gemini-3.6-flash",
+  "status": "completed",
+  "http_status": 200,
+  "created_at": "2026-08-17T02:14:41Z",
+  "output": "Energon OS confirms that Gemini successfully completed a production-style language model API request.",
+  "usage": {
+    "total_tokens": 378,
+    "input_tokens": 35,
+    "output_tokens": 17,
+    "thought_tokens": 326,
+    "tool_use_tokens": 0
+  },
+  "contains_credentials": false
+}

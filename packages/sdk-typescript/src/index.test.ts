@@ -242,3 +242,38 @@ test("operations.overview exposes agent-safe dashboard telemetry", async () => {
   expect(capturedRequest?.url).toBe("https://api.energon.test/v1/agent/overview");
   expect(capturedRequest?.method).toBe("GET");
 });
+
+test("dream reflection may decline storage and never shares automatically", async () => {
+  const paths: string[] = [];
+  const client = new Energon({ baseUrl: "https://api.energon.test", apiKey: "test", fetch: async (url) => {
+    paths.push(String(url));
+    return Response.json({ context_pack: ["allowed knowledge"], items: [] });
+  }});
+  const result = await client.dreams.reflect({ task: "Reflect", generate: async (context) => {
+    expect(context.context_pack).toEqual(["allowed knowledge"]);
+    return null;
+  }});
+  expect(result).toBeNull();
+  expect(paths).toEqual(["https://api.energon.test/v1/context/build"]);
+});
+
+test("dream sharing sends only the selected excerpt and an explicit reason", async () => {
+  let body: unknown;
+  const client = new Energon({ baseUrl: "https://api.energon.test", apiKey: "test", fetch: async (url, init) => {
+    expect(String(url)).toEndWith("/v1/dreams/share");
+    body = JSON.parse(String(init?.body));
+    return Response.json({ speculative: true, content: "Selected idea" });
+  }});
+  await client.dreams.share({ dreamId: "dream_1", content: "Selected idea", target: "project", reason: "Brainstorm" });
+  expect(body).toEqual({ dream_id: "dream_1", content: "Selected idea", target_scope: "project", reason: "Brainstorm" });
+});
+
+test("failed external dream generation never writes a dream", async () => {
+  const paths: string[] = [];
+  const client = new Energon({ baseUrl: "https://api.energon.test", apiKey: "test", fetch: async (url) => {
+    paths.push(String(url));
+    return Response.json({ context_pack: [] });
+  }});
+  await expect(client.dreams.reflect({ task: "Reflect", generate: async () => { throw new Error("runtime failed"); } })).rejects.toThrow("runtime failed");
+  expect(paths).toEqual(["https://api.energon.test/v1/context/build"]);
+});

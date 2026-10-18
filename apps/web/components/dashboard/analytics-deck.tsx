@@ -53,10 +53,11 @@ type AnalyticsDeckProps = {
   contextAudit: ContextAuditData;
   outbox: OutboxStatus;
   lifecycle: readonly LifecycleItem[];
+  demo?: boolean;
 };
 
-const chartColors = ["#7dd3fc", "#c4b5fd", "#e5e7eb", "#94a3b8", "#67e8f9", "#ddd6fe"];
-const usageColors = ["#60a5fa", "#34d399", "#f59e0b", "#a78bfa", "#fb7185", "#22d3ee"];
+const chartColors = ["#9bdcff", "#7bb5d4", "#5e91b0", "#436c85", "#b9e6ff", "#729eb8"];
+const usageColors = ["#9bdcff", "#80bfdc", "#659dbd", "#4d7b96", "#375c73", "#294554"];
 type UsageMetric = "calls" | "paid" | "usdc";
 
 export function AnalyticsDeck({
@@ -67,6 +68,7 @@ export function AnalyticsDeck({
   contextAudit,
   outbox,
   lifecycle,
+  demo = false,
 }: AnalyticsDeckProps) {
   const [usageMetric, setUsageMetric] = useState<UsageMetric>("calls");
   const [selectedRoute, setSelectedRoute] = useState<string | null>(null);
@@ -105,12 +107,12 @@ export function AnalyticsDeck({
     <section id="overview" className="analytics-deck" aria-labelledby="analytics-title">
       <div className="analytics-deck-heading">
         <div>
-          <p className="dashboard-eyebrow">Live analytics</p>
+          <p className="dashboard-eyebrow">{demo ? "Interactive dashboard demo" : "Live analytics"}</p>
           <h2 id="analytics-title">Understand how the swarm uses memory.</h2>
         </div>
         <span className="status-pill">
           <Activity size={14} aria-hidden="true" />
-          live workspace data
+          {demo ? "sample workspace data" : "live workspace data"}
         </span>
       </div>
 
@@ -183,17 +185,17 @@ export function AnalyticsDeck({
               <div className="recharts-frame" aria-label="API request volume by route">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart layout="vertical" data={sortedUsageData} margin={{ top: 4, right: 18, left: 8, bottom: 0 }}>
-                    <CartesianGrid stroke="#27272a" horizontal={false} />
+                    <CartesianGrid stroke="#242424" horizontal={false} />
                     <XAxis type="number" stroke="#71717a" tickLine={false} axisLine={false} fontSize={10} allowDecimals={usageMetric === "usdc"} />
                     <YAxis type="category" dataKey="route" width={112} stroke="#a1a1aa" tickLine={false} axisLine={false} fontSize={10} />
                     <Tooltip
                       cursor={{ fill: "rgba(255,255,255,0.04)" }}
                       formatter={(value) => formatUsageMetric(Number(value), usageMetric)}
                       contentStyle={{
-                        border: "1px solid #37373f",
-                        borderRadius: 8,
-                        background: "#17171c",
-                        color: "#f4f4f5",
+                        border: "1px solid #333333",
+                        borderRadius: 6,
+                        background: "#111111",
+                        color: "#f2f2f2",
                         fontSize: 12,
                       }}
                     />
@@ -247,10 +249,10 @@ export function AnalyticsDeck({
                     <PieChart>
                       <Tooltip
                         contentStyle={{
-                          border: "1px solid #37373f",
-                          borderRadius: 8,
-                          background: "#17171c",
-                          color: "#f4f4f5",
+                          border: "1px solid #333333",
+                          borderRadius: 6,
+                          background: "#111111",
+                          color: "#f2f2f2",
                           fontSize: 12,
                         }}
                       />

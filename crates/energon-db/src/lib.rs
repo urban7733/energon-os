@@ -10,3 +10,4 @@ pub mod pool;
 pub mod skills;
 
 pub use errors::DbError;
+pub mod dreams;

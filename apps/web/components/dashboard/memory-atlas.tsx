@@ -91,15 +91,16 @@ type MemoryAtlasProps = {
   totalMemories: number;
   rolePolicies: AtlasRolePolicy[];
   conflicts: AtlasConflict[];
+  animated?: boolean;
 };
 
 const atlasColors: Record<AtlasNodeType, string> = {
-  workspace: "#f8fafc",
-  agent: "#7dd3fc",
-  memory: "#c4b5fd",
-  role: "#d8b4fe",
-  project: "#a5b4fc",
-  conflict: "#fbbf24",
+  workspace: "#f5f5f5",
+  agent: "#dddddd",
+  memory: "#aaaaaa",
+  role: "#777777",
+  project: "#bcbcbc",
+  conflict: "#9bdcff",
 };
 
 const filterOptions: Array<{ value: AtlasFilter; label: string; icon: typeof Network }> = [
@@ -117,6 +118,7 @@ export default function MemoryAtlas({
   totalMemories,
   rolePolicies,
   conflicts,
+  animated = false,
 }: MemoryAtlasProps) {
   const [filter, setFilter] = useState<AtlasFilter>("all");
   const [labelsVisible, setLabelsVisible] = useState(true);
@@ -221,7 +223,7 @@ export default function MemoryAtlas({
             <Canvas
               key={cameraVersion}
               dpr={[1, 1.75]}
-              camera={{ fov: 42, near: 0.1, far: 100, position: [0, 0.15, 8.7] }}
+              camera={{ fov: 42, near: 0.1, far: 100, position: [0, 0.15, 6.2] }}
               gl={{ antialias: true, alpha: true, powerPreference: "high-performance" }}
             >
               <AtlasScene
@@ -230,6 +232,7 @@ export default function MemoryAtlas({
                 labelsVisible={labelsVisible}
                 selectedNodeId={selectedNodeId}
                 onSelectNode={setSelectedNodeId}
+                animated={animated}
               />
             </Canvas>
           ) : (
@@ -293,21 +296,31 @@ function AtlasScene({
   labelsVisible,
   selectedNodeId,
   onSelectNode,
+  animated,
 }: {
   nodes: AtlasNode[];
   edges: AtlasEdge[];
   labelsVisible: boolean;
   selectedNodeId: string | null;
   onSelectNode: (nodeId: string) => void;
+  animated: boolean;
 }) {
   const nodeById = useMemo(() => new Map(nodes.map((node) => [node.id, node])), [nodes]);
+  const [reduceMotion, setReduceMotion] = useState(false);
+
+  useEffect(() => {
+    const preference = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const syncPreference = () => setReduceMotion(preference.matches);
+    syncPreference();
+    preference.addEventListener("change", syncPreference);
+    return () => preference.removeEventListener("change", syncPreference);
+  }, []);
 
   return (
     <>
-      <ambientLight intensity={0.58} />
-      <pointLight position={[3.5, 4, 5]} intensity={8} color="#d8b4fe" distance={16} />
-      <pointLight position={[-4, -2, 3]} intensity={5} color="#7dd3fc" distance={14} />
-      <BrainEnvelope />
+      <ambientLight intensity={0.72} />
+      <pointLight position={[3.5, 4, 5]} intensity={7} color="#e8f4ff" distance={16} />
+      <pointLight position={[-4, -2, 3]} intensity={3} color="#9bdcff" distance={14} />
       {edges.map((edge) => {
         const from = nodeById.get(edge.from);
         const to = nodeById.get(edge.to);
@@ -316,7 +329,7 @@ function AtlasScene({
           <Line
             key={edge.id}
             points={[from.position, to.position]}
-            color={edge.kind === "relationship" ? "#b9a8eb" : "#5f6c8d"}
+            color={edge.kind === "relationship" ? "#7da9c2" : "#454545"}
             transparent
             opacity={edge.kind === "relationship" ? 0.62 : 0.3}
             lineWidth={edge.kind === "relationship" ? 1.25 : 0.8}
@@ -335,10 +348,10 @@ function AtlasScene({
       <OrbitControls
         enablePan={false}
         enableZoom
-        minDistance={5.8}
+        minDistance={4.5}
         maxDistance={13}
-        autoRotate
-        autoRotateSpeed={0.36}
+        autoRotate={animated && !reduceMotion}
+        autoRotateSpeed={0.28}
         makeDefault
       />
     </>
@@ -390,7 +403,7 @@ function AtlasNodeMesh({
   onSelectNode: (nodeId: string) => void;
 }) {
   const [hovered, setHovered] = useState(false);
-  const showLabel = labelsVisible && (hovered || selected || node.type === "workspace");
+  const showLabel = labelsVisible && (hovered || selected || node.type === "workspace" || node.type === "agent");
 
   return (
     <group position={node.position}>
@@ -413,9 +426,9 @@ function AtlasNodeMesh({
         <meshStandardMaterial
           color={node.color}
           emissive={node.color}
-          emissiveIntensity={selected ? 2.2 : hovered ? 1.35 : 0.72}
-          roughness={0.25}
-          metalness={0.35}
+          emissiveIntensity={selected ? 0.5 : hovered ? 0.3 : 0.08}
+          roughness={0.85}
+          metalness={0.05}
         />
       </mesh>
       {selected ? (
@@ -674,7 +687,7 @@ function formatAuthority(authorityBps: number): string {
 }
 
 function memoryColor(scope: MemoryScope): string {
-  if (["agent_private", "user_private", "session"].includes(scope)) return "#b8a8f7";
-  if (scope === "open" || scope === "org") return "#7dd3fc";
+  if (["agent_private", "user_private", "session"].includes(scope)) return "#6a9ab7";
+  if (scope === "open" || scope === "org") return "#9bdcff";
   return atlasColors.memory;
 }

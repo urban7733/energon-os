@@ -3,7 +3,7 @@
 import { siPython, siRust, siTypescript, type SimpleIcon } from "simple-icons";
 import { useState } from "react";
 
-const syntaxParts = /(\/\/.*$|#.*$|"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|\b(?:import|from|const|await|new|use|let|mut|Some|None|pub|fn|struct|impl|return|as|in)\b|\b\d[\d_]*\b)/gm;
+const syntaxParts = /(\/\/.*$|#.*$|"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|\b(?:import|from|const|await|new|use|let|mut|Some|None|pub|fn|struct|impl|return|as|in)\b|\b\d[\d_]*\b|::|=>|->|[{}[\]();:,.!?&=])/gm;
 const syntaxKeywords = new Set([
   "import", "from", "const", "await", "new", "use", "let", "mut", "Some",
   "None", "pub", "fn", "struct", "impl", "return", "as", "in",
@@ -17,6 +17,7 @@ function renderSyntax(code: string) {
     else if (part.startsWith('"') || part.startsWith("'")) className = "syntax-string";
     else if (/^\d/.test(part)) className = "syntax-number";
     else if (syntaxKeywords.has(part)) className = "syntax-keyword";
+    else if (/^(?:::|=>|->|[{}[\]();:,.!?&=])$/.test(part)) className = "syntax-operator";
 
     return className ? <span className={className} key={index}>{part}</span> : part;
   });
@@ -125,6 +126,7 @@ export function SdkQuickstart() {
                     key={quickstart.id}
                     id={`${quickstart.id}-sdk-tab`}
                     className="sdk-language-tab"
+                    data-language={quickstart.id}
                     type="button"
                     title={quickstart.label}
                     role="tab"

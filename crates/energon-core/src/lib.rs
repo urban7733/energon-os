@@ -17,3 +17,4 @@ pub use events::ControlPlaneEvent;
 pub use identity::AgentIdentity;
 pub use memory::{MemoryRecord, MemoryScope, PromoteMemoryRequest, WriteMemoryRequest};
 pub use permissions::{AccessContext, can_read_memory};
+pub mod dreams;

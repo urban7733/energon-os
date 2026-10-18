@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import "./refined.css";
 import { absoluteUrl, indexedClaims, site } from "../lib/site";
 
 const siteVerification = {
@@ -123,7 +124,7 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   colorScheme: "dark",
-  themeColor: "#000000",
+  themeColor: "#0b0b0b",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
@@ -253,6 +254,11 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
           dangerouslySetInnerHTML={{ __html: JSON.stringify(roadmapJsonLd) }}
         />
         {children}
+        <script
+          type="module"
+          src="https://static.cloudflareinsights.com/beacon.min.js"
+          data-cf-beacon='{"token":"3acf164ed08040eaa29d0ad92e54cd22"}'
+        />
       </body>
     </html>
   );

@@ -1,6 +1,6 @@
 export const site = {
   name: "Energon OS",
-  url: process.env.NEXT_PUBLIC_SITE_URL ?? "https://energon.os",
+  url: process.env.NEXT_PUBLIC_SITE_URL ?? "https://energon-os.pages.dev",
   repositoryUrl: "https://github.com/urban7733/energon-os",
   documentationUrl: "https://github.com/urban7733/energon-os/tree/main/docs",
   apiDocumentationUrl: "https://github.com/urban7733/energon-os/blob/main/docs/api.md",

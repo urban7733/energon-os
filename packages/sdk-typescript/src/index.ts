@@ -27,6 +27,25 @@ export interface AgentMemory {
   created_at_unix_ms: number;
 }
 
+/** Speculative reflection stored separately from context memory. */
+export interface AgentDream extends AgentMemory {
+  speculative: true;
+  sharing: PromotionAudit | null;
+}
+
+export interface ReflectDreamInput extends BuildContextInput {
+  /** Runs in your agent runtime (for example Hermes); null means keep no dream. */
+  generate: (context: ContextPack) => Promise<string | null>;
+}
+
+export interface ShareDreamInput {
+  dreamId: string;
+  /** Explicit excerpt to share. The private body is never copied automatically. */
+  content: string;
+  target: SharedMemoryScope;
+  reason: string;
+}
+
 export interface ContextItem {
   memory_id: string;
   scope: MemoryScope;
@@ -300,6 +319,13 @@ interface RequestInitOptions {
  * is always derived by the control plane from the API key, never from SDK input.
  */
 export class Energon {
+  readonly dreams: {
+    reflect: (input: ReflectDreamInput, options?: RequestOptions) => Promise<AgentDream | null>;
+    record: (content: string, options?: RequestOptions) => Promise<AgentDream>;
+    list: (options?: RequestOptions) => Promise<AgentDream[]>;
+    share: (input: ShareDreamInput, options?: RequestOptions) => Promise<AgentDream>;
+  };
+
   readonly memory: {
     remember: (input: RememberInput, options?: RequestOptions) => Promise<AgentMemory>;
     share: (input: ShareMemoryInput, options?: RequestOptions) => Promise<AgentMemory>;
@@ -351,6 +377,26 @@ export class Energon {
       throw new TypeError("A Fetch implementation is required to use @energon/sdk.");
     }
 
+    this.dreams = {
+      reflect: async (input, options) => {
+        const context = await this.buildContext({ task: input.task, projectId: input.projectId, tokenBudget: input.tokenBudget }, options);
+        const content = await input.generate(context);
+        return content === null ? null : this.dreams.record(content, options);
+      },
+      record: (content, options) => this.request("/v1/dreams", {
+        method: "POST", body: { content: requiredText(content, "content") }, options,
+      }),
+      list: async (options) => {
+        const result = await this.request<{ dreams: AgentDream[] }>("/v1/dreams", { method: "GET", options });
+        return result.dreams;
+      },
+      share: (input, options) => this.request("/v1/dreams/share", {
+        method: "POST", body: {
+          dream_id: requiredText(input.dreamId, "dreamId"), content: requiredText(input.content, "content"),
+          target_scope: input.target, reason: requiredText(input.reason, "reason"),
+        }, options,
+      }),
+    };
     this.memory = {
       remember: (input, requestOptions) => this.remember(input, requestOptions),
       share: (input, requestOptions) => this.share(input, requestOptions),

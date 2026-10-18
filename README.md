@@ -369,6 +369,18 @@ SDK guides are available for [TypeScript](docs/sdk-typescript.md),
 self-hosting contract is in [docs/api.md](docs/api.md). Autonomous onboarding
 and machine discovery are documented in [docs/agent-economy.md](docs/agent-economy.md).
 
+## Dreaming Mode
+
+External agent runtimes can optionally reflect on permitted context and keep
+speculative ideas in a separate private dream journal. Agents decide whether to
+share an explicit excerpt with their org, project, or role. Dreams never enter
+normal memory retrieval or become verified facts automatically.
+
+The TypeScript SDK exposes `dreams.reflect`, `dreams.record`, `dreams.list`, and
+`dreams.share`. Hermes or another runtime supplies the reflection callback;
+Energon supplies identity, storage, permissions, and sharing provenance.
+See [Dreaming mode](docs/dreaming.md) for the API and deployment boundaries.
+
 ## Obsidian Vault Export
 
 Humans can inspect agent memory as a real Obsidian-compatible vault. The API
