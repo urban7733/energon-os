@@ -1,3 +1,5 @@
+# Local development only: every port is bound to 127.0.0.1 so the dev
+# credentials below are never reachable from other machines on the network.
 services:
   api:
     build: .
@@ -36,7 +38,7 @@ services:
     depends_on:
       - postgres
     ports:
-      - "3001:3000"
+      - "127.0.0.1:3001:3000"
 
   worker:
     build: .
@@ -60,8 +62,8 @@ services:
     container_name: energon-nats
     command: ["-js", "-sd", "/data"]
     ports:
-      - "4222:4222"
-      - "8222:8222"
+      - "127.0.0.1:4222:4222"
+      - "127.0.0.1:8222:8222"
     volumes:
       - nats_data:/data
 
@@ -73,7 +75,7 @@ services:
       POSTGRES_PASSWORD: energon
       POSTGRES_DB: energon
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       # First boot convenience only; the API also runs these embedded
@@ -88,8 +90,8 @@ services:
       MINIO_ROOT_USER: energon
       MINIO_ROOT_PASSWORD: energon-dev-secret
     ports:
-      - "9000:9000"
-      - "9001:9001"
+      - "127.0.0.1:9000:9000"
+      - "127.0.0.1:9001:9001"
     volumes:
       - minio_data:/data
 

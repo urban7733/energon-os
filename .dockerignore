@@ -6,3 +6,9 @@ target
 .env
 .env.*
 *.log
+*.pem
+*.key
+.github
+output
+tmp
+docs

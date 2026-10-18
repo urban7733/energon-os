@@ -7,8 +7,9 @@
 /apps/web/.open-next
 /apps/web/.wrangler
 /packages/*/dist
-/.env
-/.env.local
+.env
+.env.*
+!.env.example
 /.DS_Store
 /data
 *.log
@@ -26,3 +27,16 @@ __pycache__/
 !/tmp/pdfs/
 /tmp/pdfs/*
 !/tmp/pdfs/*.py
+
+# Credentials and key material — never commit.
+*.pem
+*.key
+*.p12
+*.pfx
+*.keystore
+id_rsa*
+id_ed25519*
+.npmrc
+.pypirc
+credentials.json
+service-account*.json
