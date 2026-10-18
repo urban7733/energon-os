@@ -21,6 +21,9 @@ export const demoAgents = [
   { agent_id: "review-01", name: "Reviewer", role_id: "reviewer", project_id: "launch" },
   { agent_id: "ops-01", name: "Operations", role_id: "operator", project_id: "company" },
   { agent_id: "support-03", name: "Support", role_id: "support", project_id: "customer" },
+  { agent_id: "finance-01", name: "Finance", role_id: "operator", project_id: "company" },
+  { agent_id: "eng-04", name: "Engineering", role_id: "builder", project_id: "platform" },
+  { agent_id: "growth-02", name: "Growth", role_id: "sales", project_id: "customer" },
 ];
 
 export const demoMemories = [
@@ -34,6 +37,26 @@ export const demoMemories = [
   ["mem-org-02", "org", "Company pricing source-of-truth", null, null, null],
   ["mem-open-01", "open", "Public product boundary", null, null, null],
   ["mem-session-01", "session", "Current pricing investigation", "launch", "researcher", "research-01"],
+  ["mem-private-03", "agent_private", "Draft reply to Acme renewal", "customer", "support", "support-03"],
+  ["mem-private-04", "agent_private", "Unconfirmed churn signal", "customer", "sales", "growth-02"],
+  ["mem-private-05", "agent_private", "Runway model, scenario B", "company", "operator", "finance-01"],
+  ["mem-private-06", "agent_private", "Flaky test in context packer", "platform", "builder", "eng-04"],
+  ["mem-private-07", "agent_private", "Vendor contract notes", "company", "operator", "ops-01"],
+  ["mem-private-08", "agent_private", "Partner intro shortlist", "launch", "sales", "sales-02"],
+  ["mem-private-09", "agent_private", "Benchmark raw results", "platform", "builder", "eng-04"],
+  ["mem-private-10", "agent_private", "Review checklist v2 draft", "launch", "reviewer", "review-01"],
+  ["mem-project-03", "project", "Launch date: second week", "launch", null, null],
+  ["mem-project-04", "project", "Customer onboarding flow", "customer", null, null],
+  ["mem-project-05", "project", "Platform latency budget 120 ms", "platform", null, null],
+  ["mem-project-06", "project", "Q3 hiring plan", "company", null, null],
+  ["mem-project-07", "project", "Support SLA: 4 business hours", "customer", null, null],
+  ["mem-role-03", "role", "Operator approval thresholds", null, "operator", null],
+  ["mem-role-04", "role", "Sales discount guardrails", null, "sales", null],
+  ["mem-role-05", "role", "Builder deploy policy", null, "builder", null],
+  ["mem-org-03", "org", "Brand voice guidelines", null, null, null],
+  ["mem-org-04", "org", "Data retention: 90 days", null, null, null],
+  ["mem-open-02", "open", "Public API rate limits", null, null, null],
+  ["mem-session-02", "session", "Ticket #4821 context", "customer", "support", "support-03"],
 ].map(([memory_id, scope, content_preview, project_id, role_id, owner_agent_id], index) => ({
   memory_id: memory_id!,
   scope: scope as "open" | "org" | "project" | "role" | "agent_private" | "user_private" | "session",
@@ -41,15 +64,17 @@ export const demoMemories = [
   project_id: project_id ?? null,
   role_id: role_id ?? null,
   owner_agent_id: owner_agent_id ?? null,
-  created_at_unix_ms: Date.UTC(2026, 7, 26, 9, index * 4),
+  created_at_unix_ms: Date.UTC(2026, 7, 26, 9, index * 2),
 }));
 
 export const demoRolePolicies = [
   { role_id: "reviewer", authority_bps: 8500, can_resolve_conflicts: true },
   { role_id: "operator", authority_bps: 9500, can_resolve_conflicts: true },
   { role_id: "researcher", authority_bps: 6200, can_resolve_conflicts: false },
+  { role_id: "builder", authority_bps: 7000, can_resolve_conflicts: false },
 ];
 
 export const demoConflicts = [
   { conflict_id: "conflict-pricing", subject: "enterprise", predicate: "annual_price", status: "contested" as const },
+  { conflict_id: "conflict-launch", subject: "launch", predicate: "release_date", status: "contested" as const },
 ];

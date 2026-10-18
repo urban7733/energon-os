@@ -1,0 +1,231 @@
+/*
+ * Energon design system.
+ * One token set for the public site (.lx), the operator dashboard (.dx)
+ * and the Memory Atlas (.ax). Deep black, glass surfaces, ice-blue rim light.
+ */
+:root {
+  --ex-font: var(--font-geist), "Inter", "Helvetica Neue", Arial, sans-serif;
+  --ex-mono: var(--font-geist-mono), "SF Mono", ui-monospace, monospace;
+
+  --ex-bg: #050607;
+  --ex-bg-2: #08090b;
+  --ex-surface: #0b0c0f;
+  --ex-raised: #101216;
+  --ex-overlay: rgba(14, 16, 20, 0.72);
+
+  --ex-line: rgba(255, 255, 255, 0.065);
+  --ex-line-2: rgba(255, 255, 255, 0.1);
+  --ex-line-3: rgba(255, 255, 255, 0.16);
+
+  --ex-ink: #f5f7fa;
+  --ex-text: #b4bac3;
+  --ex-muted: #7b828c;
+  --ex-dim: #4c525a;
+
+  --ex-ice: #9bdcff;
+  --ex-ice-2: #c7ecff;
+  --ex-ice-deep: #3d7fa6;
+  --ex-ice-glow: rgba(155, 220, 255, 0.16);
+  --ex-violet: #b7a6ff;
+  --ex-mint: #84e3c0;
+  --ex-amber: #ffcf8a;
+  --ex-coral: #ff8f86;
+
+  --ex-radius-xs: 6px;
+  --ex-radius-sm: 10px;
+  --ex-radius: 14px;
+  --ex-radius-lg: 20px;
+  --ex-radius-xl: 28px;
+
+  --ex-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --ex-shadow: 0 1px 0 rgba(255, 255, 255, 0.04) inset, 0 24px 60px -24px rgba(0, 0, 0, 0.8);
+}
+
+::selection {
+  background: rgba(155, 220, 255, 0.28);
+  color: #fff;
+}
+
+/* Shared primitives */
+.ex-mark {
+  display: inline-block;
+  flex: none;
+  color: var(--ex-ink);
+}
+
+.ex-wordmark {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--ex-ink);
+  font: 600 15px/1 var(--ex-font);
+  letter-spacing: -0.02em;
+}
+
+.ex-wordmark em {
+  margin-left: 5px;
+  color: var(--ex-muted);
+  font-style: normal;
+  font-weight: 500;
+}
+
+.ex-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 0 18px;
+  border: 1px solid var(--ex-line-2);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--ex-ink);
+  font: 500 13.5px/1 var(--ex-font);
+  letter-spacing: -0.01em;
+  text-transform: none;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background 0.25s var(--ex-ease),
+    border-color 0.25s var(--ex-ease),
+    color 0.25s var(--ex-ease),
+    transform 0.25s var(--ex-ease),
+    box-shadow 0.25s var(--ex-ease);
+}
+
+.ex-btn:hover {
+  border-color: var(--ex-line-3);
+  background: rgba(255, 255, 255, 0.06);
+  color: #fff;
+}
+
+.ex-btn:active {
+  transform: scale(0.98);
+}
+
+.ex-btn:focus-visible,
+.ex-focus:focus-visible {
+  outline: 2px solid var(--ex-ice);
+  outline-offset: 2px;
+}
+
+.ex-btn-primary {
+  border-color: transparent;
+  background: linear-gradient(180deg, #ffffff 0%, #dfe7ef 100%);
+  color: #050607;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.35) inset, 0 8px 30px -8px rgba(155, 220, 255, 0.45);
+}
+
+.ex-btn-primary:hover {
+  border-color: transparent;
+  background: linear-gradient(180deg, #ffffff 0%, #eef4f9 100%);
+  color: #000;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.5) inset, 0 10px 40px -6px rgba(155, 220, 255, 0.6);
+}
+
+.ex-btn-lg {
+  min-height: 48px;
+  padding: 0 24px;
+  font-size: 14.5px;
+}
+
+.ex-btn svg {
+  flex: none;
+}
+
+.ex-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 28px;
+  padding: 0 12px;
+  border: 1px solid var(--ex-line-2);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.025);
+  color: var(--ex-text);
+  font: 500 12px/1 var(--ex-font);
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.ex-dot {
+  width: 6px;
+  height: 6px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--ex-ice);
+  box-shadow: 0 0 0 3px rgba(155, 220, 255, 0.14), 0 0 12px rgba(155, 220, 255, 0.8);
+}
+
+.ex-dot-live {
+  animation: ex-pulse 2.4s var(--ex-ease) infinite;
+}
+
+.ex-dot-ok {
+  background: var(--ex-mint);
+  box-shadow: 0 0 0 3px rgba(132, 227, 192, 0.14), 0 0 12px rgba(132, 227, 192, 0.7);
+}
+
+.ex-dot-warn {
+  background: var(--ex-amber);
+  box-shadow: 0 0 0 3px rgba(255, 207, 138, 0.14), 0 0 12px rgba(255, 207, 138, 0.6);
+}
+
+.ex-dot-off {
+  background: var(--ex-dim);
+  box-shadow: none;
+}
+
+.ex-kbd {
+  display: inline-grid;
+  place-items: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  border: 1px solid var(--ex-line-2);
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--ex-muted);
+  font: 500 11px/1 var(--ex-mono);
+}
+
+.ex-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  color: var(--ex-ice);
+  font: 500 11.5px/1 var(--ex-mono);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.ex-eyebrow::before {
+  content: "";
+  width: 18px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--ex-ice));
+}
+
+@keyframes ex-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+
+@keyframes ex-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ex-dot-live {
+    animation: none;
+  }
+}

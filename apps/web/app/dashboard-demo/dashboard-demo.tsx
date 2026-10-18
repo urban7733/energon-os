@@ -1,10 +1,9 @@
 "use client";
 
-import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { Bot, Coins, Database, Gauge, RefreshCcw } from "lucide-react";
+import dynamic from "next/dynamic";
+import { Activity, Coins, Database, Gauge } from "lucide-react";
 import { AnalyticsDeck } from "../../components/dashboard/analytics-deck";
-import MemoryAtlas from "../../components/dashboard/memory-atlas";
+import { DashboardFrame, type DashboardNavItem } from "../../components/dashboard/dashboard-frame";
 import {
   demoAgents,
   demoConflicts,
@@ -14,112 +13,184 @@ import {
   demoUsage,
 } from "../../lib/demo-workspace";
 
-export function DashboardDemo({ view }: { view: "overview" | "graph" | "agents" | "records" | "billing" }) {
-  const router = useRouter();
+const MemoryAtlas = dynamic(() => import("../../components/dashboard/memory-atlas"), {
+  ssr: false,
+  loading: () => <div className="ax-loading" aria-label="Loading Memory Atlas" />,
+});
+
+type DemoView = "overview" | "graph" | "agents" | "records" | "billing";
+
+const views: Record<DemoView, { section: string; title: string; subtitle: string }> = {
+  overview: {
+    section: "Overview",
+    title: "Control your autonomous company.",
+    subtitle: "Usage, agents and memory in one focused operating view.",
+  },
+  graph: {
+    section: "Memory Atlas",
+    title: "See how memory connects.",
+    subtitle: "Agents, scopes and policies in one live topology.",
+  },
+  agents: {
+    section: "Agents",
+    title: "Your agent team.",
+    subtitle: "Every agent has its own identity, role and project boundary.",
+  },
+  records: {
+    section: "Memory",
+    title: "Workspace memory.",
+    subtitle: "Private overlays and shared records, by scope.",
+  },
+  billing: {
+    section: "Billing",
+    title: "Usage and settlement.",
+    subtitle: "Metered requests settled in USDC.",
+  },
+};
+
+export function DashboardDemo({ view }: { view: DemoView }) {
+  const copy = views[view];
+  const nav: DashboardNavItem[] = [
+    { label: "Overview", href: "/dashboard-demo?view=overview", icon: "overview", active: view === "overview" },
+    { label: "Memory Atlas", href: "/dashboard-demo?view=graph", icon: "atlas", active: view === "graph" },
+    { label: "Agents", href: "/dashboard-demo?view=agents", icon: "agents", active: view === "agents" },
+    { label: "Memory", href: "/dashboard-demo?view=records", icon: "memory", active: view === "records" },
+    { label: "Billing", href: "/dashboard-demo?view=billing", icon: "billing", active: view === "billing" },
+  ];
+
   return (
-    <main className="dashboard-shell dashboard-demo-capture-shell">
-      <aside className="dashboard-rail" aria-label="Dashboard navigation">
-        <Link className="brand" href="/" aria-label="Energon OS home">
-          <span className="brand-mark" aria-hidden="true" />
-          <span>Energon</span>
-        </Link>
-        <nav>
-          <Link className={view === "overview" ? "is-active" : ""} href="/dashboard-demo?view=overview">Overview</Link>
-          <Link className={view === "graph" ? "is-active" : ""} href="/dashboard-demo?view=graph">Memory Atlas</Link>
-          {(["agents", "records", "billing"] as const).map((item) => (
-            <Link key={item} className={view === item ? "is-active" : ""} href={`/dashboard-demo?view=${item}`}>
-              {item[0].toUpperCase() + item.slice(1)}
-            </Link>
-          ))}
-        </nav>
-        <div className="dashboard-demo-capture-note">
-          <strong>Demo workspace</strong>
-          <span>Sample data only</span>
+    <DashboardFrame
+      nav={nav}
+      userEmail="demo@energon.dev"
+      workspaceLabel="Energon Labs"
+      section={copy.section}
+      title={copy.title}
+      subtitle={copy.subtitle}
+      badge="Sample data"
+    >
+      <div className="dashboard-console">
+        <div className="dx-status" aria-label="System status">
+          <span className="dx-status-item">
+            <Gauge size={14} aria-hidden="true" /> API <strong>online</strong>
+            <span className="ex-dot ex-dot-ok" />
+          </span>
+          <span className="dx-status-item">
+            <Database size={14} aria-hidden="true" /> Storage <strong>postgres</strong>
+          </span>
+          <span className="dx-status-item">
+            <Coins size={14} aria-hidden="true" /> x402 <strong>enabled</strong>
+          </span>
+          <span className="dx-status-item">
+            <Activity size={14} aria-hidden="true" /> Policy <strong>private by default</strong>
+          </span>
         </div>
-      </aside>
 
-      <section className="dashboard-main">
-        <header className="dashboard-header">
-          <div>
-            <p className="eyebrow">Workspace overview</p>
-            <h1>{view === "graph" ? "See how memory connects." : "Control your autonomous company."}</h1>
-          </div>
-          <p>{view === "graph" ? "Agents, scopes and policies in one live topology." : "Usage, agents and memory in one focused operating view."}</p>
-        </header>
-
-        <div className="dashboard-console">
-          <div className="session-bar" aria-label="Demo session and organization">
-            <span>Signed in: <strong>demo@energon.os</strong></span>
-            <div className="session-actions">
-              <span className="demo-org-select">Energon Labs</span>
-              <button type="button" onClick={() => router.refresh()}><RefreshCcw size={14} aria-hidden="true" /> Refresh workspace</button>
-            </div>
-          </div>
-
-          <section className="dashboard-overview" aria-label="Energon operating model">
-            <article className="surface-card overview-strip">
-              <div className="overview-copy">
-                <div className="overview-title"><Bot size={16} aria-hidden="true" /><h2>Private by default</h2></div>
-                <p>Agents get scoped context. You approve what becomes shared.</p>
-              </div>
-              <div className="overview-route" aria-label="Agent request route">
-                <span>agent</span><span>permissions</span><span>memory</span>
-              </div>
-              <div className="overview-statuses" aria-label="System status">
-                <span className="overview-status"><Database size={14} aria-hidden="true" /><span>Memory</span><strong>postgres</strong></span>
-                <span className="overview-status"><Gauge size={14} aria-hidden="true" /><span>API</span><strong>online</strong></span>
-                <span className="overview-status"><Coins size={14} aria-hidden="true" /><span>Payments</span><strong>enabled</strong></span>
-              </div>
-            </article>
+        {view === "overview" ? (
+          <AnalyticsDeck
+            usage={demoUsage}
+            scopes={demoScopes}
+            totalMemories={2847}
+            agentCount={12}
+            contextAudit={{
+              allowed_memory_ids: Array.from({ length: 12 }, (_, index) => `mem_${index + 1}`),
+              denied_memory_count: 3,
+              estimated_tokens: 1842,
+              token_budget: 2000,
+            }}
+            outbox={{ storage: "postgres", pending: 4, leased: 1, published: 18392, retrying: 2 }}
+            lifecycle={[
+              ["API health", true, "connected"],
+              ["Organization", true, "Energon Labs"],
+              ["Registered agents", true, "12 registered"],
+              ["Private memory", true, "1,624 records"],
+              ["Promotion", true, "audited"],
+              ["Context audit", true, "sealed"],
+            ]}
+            demo
+          />
+        ) : view === "graph" ? (
+          <MemoryAtlas
+            organizationName="Energon Labs"
+            agents={demoAgents}
+            memories={demoMemories}
+            totalMemories={2847}
+            rolePolicies={demoRolePolicies}
+            conflicts={demoConflicts}
+            animated
+          />
+        ) : (
+          <section className="dx-card dx-table-card" aria-label={`${view} sample data`}>
+            {view === "agents" ? (
+              <DemoTable
+                columns={["Agent", "Role", "Project", "Keys", "Status"]}
+                rows={demoAgents.map((agent, index) => [
+                  <span className="dx-entity" key="a">
+                    <span className="dx-entity-avatar">{agent.name.charAt(0)}</span>
+                    <span>
+                      <strong>{agent.name}</strong>
+                      <small>{agent.agent_id}</small>
+                    </span>
+                  </span>,
+                  agent.role_id,
+                  agent.project_id,
+                  `${1 + (index % 2)} active`,
+                  <span className="dx-pill dx-pill-ok" key="s">active</span>,
+                ])}
+              />
+            ) : view === "records" ? (
+              <DemoTable
+                columns={["Memory", "Scope", "Owner", "Project"]}
+                rows={demoMemories.map((memory) => [
+                  <span className="dx-entity" key="m">
+                    <span>
+                      <strong>{memory.content_preview}</strong>
+                      <small>{memory.memory_id}</small>
+                    </span>
+                  </span>,
+                  <span className={`dx-pill dx-scope-${memory.scope}`} key="s">
+                    {memory.scope.replaceAll("_", " ")}
+                  </span>,
+                  memory.owner_agent_id ?? "—",
+                  memory.project_id ?? "—",
+                ])}
+              />
+            ) : (
+              <DemoTable
+                columns={["Route", "Calls", "Metered", "Settled"]}
+                rows={demoUsage.map((usage) => [
+                  <code key="r">{usage.route}</code>,
+                  usage.calls.toLocaleString(),
+                  usage.paid_calls.toLocaleString(),
+                  `${(usage.amount_usdc_micro / 1_000_000).toFixed(2)} USDC`,
+                ])}
+              />
+            )}
           </section>
+        )}
+      </div>
+    </DashboardFrame>
+  );
+}
 
-          {view === "overview" ? (
-            <AnalyticsDeck
-              usage={demoUsage}
-              scopes={demoScopes}
-              totalMemories={2847}
-              agentCount={12}
-              contextAudit={{
-                allowed_memory_ids: Array.from({ length: 12 }, (_, index) => `mem_${index + 1}`),
-                denied_memory_count: 3,
-                estimated_tokens: 1842,
-                token_budget: 6000,
-              }}
-              outbox={{ storage: "postgres", pending: 4, leased: 1, published: 18392, retrying: 2 }}
-              lifecycle={[
-                ["API health", true, "connected"],
-                ["Organization", true, "Energon Labs"],
-                ["Registered agents", true, "12 registered"],
-                ["Private memory", true, "1,624 records"],
-                ["Promotion", true, "audited"],
-                ["Context audit", true, "sealed"],
-              ]}
-              demo
-            />
-          ) : view === "graph" ? (
-            <MemoryAtlas
-              organizationName="Energon Labs"
-              agents={demoAgents}
-              memories={demoMemories}
-              totalMemories={2847}
-              rolePolicies={demoRolePolicies}
-              conflicts={demoConflicts}
-            />
-          ) : (
-            <section className="demo-records" aria-label={`${view} sample data`}>
-              <p className="eyebrow">Sample workspace · {view}</p>
-              <h2>{view === "agents" ? "Your agent team." : view === "records" ? "Workspace memory." : "Usage and settlement."}</h2>
-              {view === "agents" ? demoAgents.map((agent) => (
-                <article key={agent.agent_id}><strong>{agent.name}</strong><span>{agent.role_id}</span><span>{agent.project_id}</span></article>
-              )) : view === "records" ? demoMemories.map((memory) => (
-                <article key={memory.memory_id}><strong>{memory.content_preview}</strong><span>{memory.scope}</span></article>
-              )) : demoUsage.map((usage) => (
-                <article key={usage.route}><strong>{usage.route}</strong><span>{usage.calls.toLocaleString()} calls</span><span>{(usage.amount_usdc_micro / 1_000_000).toFixed(3)} USDC</span></article>
-              ))}
-            </section>
-          )}
+function DemoTable({ columns, rows }: { columns: string[]; rows: React.ReactNode[][] }) {
+  return (
+    <div className="dx-table" role="table">
+      <div className="dx-table-head" role="row" style={{ gridTemplateColumns: `2fr repeat(${columns.length - 1}, 1fr)` }}>
+        {columns.map((column) => (
+          <span role="columnheader" key={column}>
+            {column}
+          </span>
+        ))}
+      </div>
+      {rows.map((row, index) => (
+        <div className="dx-table-row" role="row" key={index} style={{ gridTemplateColumns: `2fr repeat(${columns.length - 1}, 1fr)` }}>
+          {row.map((cell, cellIndex) => (
+            <span role="cell" key={cellIndex}>
+              {cell}
+            </span>
+          ))}
         </div>
-      </section>
-    </main>
+      ))}
+    </div>
   );
 }

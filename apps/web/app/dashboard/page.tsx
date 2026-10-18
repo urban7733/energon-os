@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { auth } from "../../lib/auth";
+import { DashboardFrame } from "../../components/dashboard/dashboard-frame";
 import { DashboardConsole } from "./dashboard-console";
 
 export const metadata: Metadata = {
@@ -23,31 +23,23 @@ export default async function DashboardPage() {
   }
 
   return (
-    <main className="dashboard-shell">
-      <aside className="dashboard-rail" aria-label="Dashboard navigation">
-        <Link className="brand" href="/" aria-label="Energon OS home">
-          <span className="brand-mark" aria-hidden="true" />
-          <span>Energon</span>
-        </Link>
-        <nav>
-          <a href="#overview">Overview</a>
-          <a href="#org-agents">Agents</a>
-          <a href="#memory">Memory</a>
-          <a href="#org-memories">Records</a>
-          <a href="#billing">Billing</a>
-          <a href="#advanced">Advanced</a>
-        </nav>
-      </aside>
-      <section className="dashboard-main">
-        <header className="dashboard-header">
-          <div>
-            <p className="eyebrow">Workspace overview</p>
-            <h1>Control your autonomous company.</h1>
-          </div>
-          <p>Usage, agents and memory in one focused operating view.</p>
-        </header>
-        <DashboardConsole userEmail={session.user.email} />
-      </section>
-    </main>
+    <DashboardFrame
+      userEmail={session.user.email}
+      workspaceLabel="Energon"
+      section="Overview"
+      title="Control your autonomous company."
+      subtitle="Usage, agents and memory in one focused operating view."
+      badge="Live"
+      nav={[
+        { label: "Overview", href: "#overview", icon: "overview", active: true },
+        { label: "Agents & keys", href: "#org-agents", icon: "agents" },
+        { label: "Memory", href: "#org-memories", icon: "memory" },
+        { label: "Write memory", href: "#memory", icon: "write" },
+        { label: "Billing", href: "#billing", icon: "billing" },
+        { label: "Advanced", href: "#advanced", icon: "advanced" },
+      ]}
+    >
+      <DashboardConsole userEmail={session.user.email} />
+    </DashboardFrame>
   );
 }

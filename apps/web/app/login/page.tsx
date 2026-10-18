@@ -3,6 +3,7 @@ import Link from "next/link";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { auth, enabledSocialProviders } from "../../lib/auth";
+import { EnergonWordmark } from "../../components/brand/energon-mark";
 import { LoginForm, type SocialProviderId } from "./login-form";
 
 export const metadata: Metadata = {
@@ -26,11 +27,11 @@ export default async function LoginPage() {
   );
 
   return (
-    <main className="auth-shell">
+    <main className="auth-shell ex-auth">
+      <div className="ex-auth-glow" aria-hidden="true" />
       <div className="auth-card">
-        <Link className="brand" href="/" aria-label="Energon OS home">
-          <span className="brand-mark" aria-hidden="true" />
-          <span>Energon</span>
+        <Link className="ex-auth-brand" href="/" aria-label="Energon OS home">
+          <EnergonWordmark size={26} />
         </Link>
         <header className="auth-header">
           <p className="eyebrow">Operator access</p>

@@ -114,47 +114,47 @@ export function SdkQuickstart() {
   const active = quickstarts.find((quickstart) => quickstart.id === activeId) ?? quickstarts[0];
 
   return (
-    <div className="sdk-visual-stage">
-      <div className="sdk-device">
-        <span className="sdk-device-camera" aria-hidden="true" />
-        <div className="sdk-device-screen">
-          <div className="sdk-terminal" aria-label={`${active.label} SDK quickstart`}>
-            <div className="sdk-terminal-bar">
-              <div className="sdk-language-tabs" role="tablist" aria-label="Choose an SDK language">
-                {quickstarts.map((quickstart) => (
-                  <button
-                    key={quickstart.id}
-                    id={`${quickstart.id}-sdk-tab`}
-                    className="sdk-language-tab"
-                    data-language={quickstart.id}
-                    type="button"
-                    title={quickstart.label}
-                    role="tab"
-                    aria-label={quickstart.label}
-                    aria-selected={quickstart.id === active.id}
-                    aria-controls={`${quickstart.id}-sdk-panel`}
-                    onClick={() => setActiveId(quickstart.id)}
-                  >
-                    <LanguageIcon icon={quickstart.icon} />
-                  </button>
-                ))}
-              </div>
-              <span>{active.filename}</span>
-            </div>
-            <div id={`${active.id}-sdk-panel`} role="tabpanel" aria-labelledby={`${active.id}-sdk-tab`}>
-              <pre>
-                <code>{renderSyntax(active.code)}</code>
-              </pre>
-            </div>
-            <div className="sdk-terminal-note">
-              <span>SERVER-SIDE</span>
-              <code>ENERGON_AGENT_API_KEY</code>
-              <a href={active.guide} target="_blank" rel="noreferrer" aria-label={`Open the ${active.label} SDK guide`}>
-                GUIDE ↗
-              </a>
-            </div>
-          </div>
+    <div className="lx-code" aria-label={`${active.label} SDK quickstart`}>
+      <div className="lx-code-bar">
+        <div className="lx-code-tabs" role="tablist" aria-label="Choose an SDK language">
+          {quickstarts.map((quickstart) => (
+            <button
+              key={quickstart.id}
+              id={`${quickstart.id}-sdk-tab`}
+              data-language={quickstart.id}
+              type="button"
+              role="tab"
+              aria-selected={quickstart.id === active.id}
+              aria-controls={`${quickstart.id}-sdk-panel`}
+              onClick={() => setActiveId(quickstart.id)}
+            >
+              <LanguageIcon icon={quickstart.icon} />
+              {quickstart.label}
+            </button>
+          ))}
         </div>
+        <span className="lx-code-file">{active.filename}</span>
+      </div>
+      <div id={`${active.id}-sdk-panel`} role="tabpanel" aria-labelledby={`${active.id}-sdk-tab`} className="lx-code-body">
+        <pre>
+          <code>
+            {active.code.split("\n").map((line, index) => (
+              <span className="lx-code-line" key={index}>
+                <i aria-hidden="true">{index + 1}</i>
+                {renderSyntax(line)}
+                {"\n"}
+              </span>
+            ))}
+          </code>
+        </pre>
+      </div>
+      <div className="lx-code-foot">
+        <span>
+          <span className="ex-dot ex-dot-ok" /> Server-side · <code>ENERGON_AGENT_API_KEY</code>
+        </span>
+        <a href={active.guide} target="_blank" rel="noreferrer" aria-label={`Open the ${active.label} SDK guide`}>
+          Guide ↗
+        </a>
       </div>
     </div>
   );

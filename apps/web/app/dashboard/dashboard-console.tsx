@@ -31,7 +31,7 @@ import { BillingCheckout } from "./billing-checkout";
 
 const MemoryAtlas = dynamic(() => import("../../components/dashboard/memory-atlas"), {
   ssr: false,
-  loading: () => <div className="memory-atlas-loading" aria-label="Loading Memory Atlas" />,
+  loading: () => <div className="ax-loading" aria-label="Loading Memory Atlas" />,
 });
 
 type ApiResult = {
@@ -825,49 +825,24 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
         </div>
       </div>
 
-      <section className="dashboard-overview" aria-label="Energon operating model">
-        <article className="surface-card overview-strip">
-          <div className="overview-copy">
-            <div className="overview-title">
-              <Bot size={16} aria-hidden="true" />
-              <h2>Private by default</h2>
-            </div>
-            <p>Agents get scoped context. You approve what becomes shared.</p>
-          </div>
-
-          <div className="overview-route" aria-label="Agent request route">
-            <span>agent</span>
-            <span>permissions</span>
-            <span>memory</span>
-          </div>
-
-          <div className="overview-statuses" aria-label="System status">
-            <span className="overview-status">
-              <Database size={14} aria-hidden="true" />
-              <span>Memory</span>
-              <strong>{health?.storage ?? "checking"}</strong>
-            </span>
-            <span className="overview-status">
-              <Gauge size={14} aria-hidden="true" />
-              <span>API</span>
-              <strong>{health?.status ?? apiStatus}</strong>
-            </span>
-            <span className="overview-status">
-              <Coins size={14} aria-hidden="true" />
-              <span>Payments</span>
-              <strong>{x402Status}</strong>
-            </span>
-            <button
-              className="overview-payment-action"
-              type="button"
-              disabled={busy}
-              onClick={checkX402}
-            >
-              Check
-            </button>
-          </div>
-        </article>
-      </section>
+      <div className="dx-status" aria-label="System status">
+        <span className="dx-status-item">
+          <Gauge size={14} aria-hidden="true" /> API <strong>{health?.status ?? apiStatus}</strong>
+          <span className={`ex-dot ${health?.status === "ok" ? "ex-dot-ok" : health ? "ex-dot-warn" : "ex-dot-off"}`} />
+        </span>
+        <span className="dx-status-item">
+          <Database size={14} aria-hidden="true" /> Storage <strong>{health?.storage ?? "checking"}</strong>
+        </span>
+        <span className="dx-status-item">
+          <Coins size={14} aria-hidden="true" /> x402 <strong>{x402Status}</strong>
+          <button className="dx-status-action" type="button" disabled={busy} onClick={checkX402}>
+            Check
+          </button>
+        </span>
+        <span className="dx-status-item">
+          <Bot size={14} aria-hidden="true" /> Policy <strong>private by default</strong>
+        </span>
+      </div>
 
       <AnalyticsDeck
         usage={usageRows}

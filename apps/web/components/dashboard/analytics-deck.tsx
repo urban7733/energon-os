@@ -13,7 +13,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { Activity, BarChart3, BrainCircuit, Database, RadioTower, ShieldCheck } from "lucide-react";
+import { BarChart3, Database, RadioTower, ShieldCheck } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
 
 type UsageRoute = {
@@ -56,8 +56,26 @@ type AnalyticsDeckProps = {
   demo?: boolean;
 };
 
-const chartColors = ["#9bdcff", "#7bb5d4", "#5e91b0", "#436c85", "#b9e6ff", "#729eb8"];
-const usageColors = ["#9bdcff", "#80bfdc", "#659dbd", "#4d7b96", "#375c73", "#294554"];
+const scopeColors: Record<string, string> = {
+  agent_private: "#b7a6ff",
+  user_private: "#9d8cf0",
+  session: "#7d70c9",
+  project: "#9bdcff",
+  role: "#84e3c0",
+  org: "#c7ecff",
+  open: "#ffffff",
+};
+const fallbackColors = ["#9bdcff", "#b7a6ff", "#84e3c0", "#c7ecff", "#ffcf8a", "#7d8691"];
+const tooltipStyle = {
+  border: "1px solid rgba(255,255,255,0.1)",
+  borderRadius: 10,
+  background: "rgba(12,14,18,0.96)",
+  boxShadow: "0 20px 40px -12px rgba(0,0,0,0.8)",
+  color: "#f5f7fa",
+  fontSize: 12,
+  padding: "8px 12px",
+};
+
 type UsageMetric = "calls" | "paid" | "usdc";
 
 export function AnalyticsDeck({
@@ -98,77 +116,72 @@ export function AnalyticsDeck({
   }));
   const sortedUsageData = [...usageData].sort((a, b) => b[usageMetric] - a[usageMetric]);
   const activeRoute = sortedUsageData.find((route) => route.route === selectedRoute) ?? sortedUsageData[0];
-  const scopeData = scopes.map((scope) => ({
+  const scopeData = scopes.map((scope, index) => ({
+    key: scope.scope,
     name: scope.scope.replaceAll("_", " "),
     value: scope.count,
+    color: scopeColors[scope.scope] ?? fallbackColors[index % fallbackColors.length],
   }));
+  const scopeTotal = scopeData.reduce((total, scope) => total + scope.value, 0);
 
   return (
-    <section id="overview" className="analytics-deck" aria-labelledby="analytics-title">
-      <div className="analytics-deck-heading">
-        <div>
-          <p className="dashboard-eyebrow">{demo ? "Interactive dashboard demo" : "Live analytics"}</p>
-          <h2 id="analytics-title">Understand how the swarm uses memory.</h2>
-        </div>
-        <span className="status-pill">
-          <Activity size={14} aria-hidden="true" />
-          {demo ? "sample workspace data" : "live workspace data"}
-        </span>
+    <section id="overview" className="dx-analytics" aria-labelledby="analytics-title">
+      <h2 id="analytics-title" className="dx-visually-hidden">
+        {demo ? "Sample workspace analytics" : "Live workspace analytics"}
+      </h2>
+
+      <div className="dx-kpis">
+        <Kpi label="API operations" value={totalCalls.toLocaleString()} foot={`${paidCalls.toLocaleString()} metered`}>
+          <Meter value={totalCalls ? paidCalls / totalCalls : 0} />
+        </Kpi>
+        <Kpi
+          label="Memory records"
+          value={totalMemories.toLocaleString()}
+          foot={`${privateMemories.toLocaleString()} private · ${sharedMemories.toLocaleString()} shared`}
+        >
+          <Meter value={totalMemories ? privateMemories / totalMemories : 0} tone="violet" />
+        </Kpi>
+        <Kpi label="Active agents" value={agentCount.toLocaleString()} foot="registered identities">
+          <span className="dx-kpi-dots" aria-hidden="true">
+            {Array.from({ length: Math.min(agentCount, 16) }, (_, index) => (
+              <i key={index} />
+            ))}
+          </span>
+        </Kpi>
+        <Kpi label="USDC settled" value={formatUsdcValue(paidUsdcMicro)} unit="USDC" foot="from recorded paid actions" />
+        <Kpi
+          label="Event delivery"
+          value={eventDeliveryRate === null ? "—" : `${eventDeliveryRate}%`}
+          foot={outbox ? `${outbox.pending} pending · ${outbox.retrying} retrying` : "awaiting durable storage"}
+        >
+          <Ring value={eventDeliveryRate === null ? 0 : eventDeliveryRate / 100} />
+        </Kpi>
       </div>
 
-      <div className="analytics-kpis">
-        <article>
-          <span>API operations</span>
-          <strong>{totalCalls.toLocaleString()}</strong>
-          <p>{paidCalls.toLocaleString()} metered request(s)</p>
-        </article>
-        <article>
-          <span>Memory records</span>
-          <strong>{totalMemories.toLocaleString()}</strong>
-          <p>{privateMemories} private · {sharedMemories} shared</p>
-        </article>
-        <article>
-          <span>Active agents</span>
-          <strong>{agentCount.toLocaleString()}</strong>
-          <p>registered in this workspace</p>
-        </article>
-        <article>
-          <span>USDC settled</span>
-          <strong>{formatUsdc(paidUsdcMicro)}</strong>
-          <p>from recorded paid actions</p>
-        </article>
-        <article>
-          <span>Event delivery</span>
-          <strong>{eventDeliveryRate === null ? "--" : `${eventDeliveryRate}%`}</strong>
-          <p>{outbox ? `${outbox.pending} pending · ${outbox.retrying} retrying` : "awaiting durable storage"}</p>
-        </article>
-      </div>
+      <Tabs defaultValue="usage" className="dx-tabs">
+        <TabsList aria-label="Analytics views">
+          <TabsTrigger value="usage">
+            <BarChart3 size={14} aria-hidden="true" />
+            Usage
+          </TabsTrigger>
+          <TabsTrigger value="memory">
+            <Database size={14} aria-hidden="true" />
+            Memory
+          </TabsTrigger>
+          <TabsTrigger value="audit">
+            <ShieldCheck size={14} aria-hidden="true" />
+            Audit
+          </TabsTrigger>
+        </TabsList>
 
-      <div className="analytics-tabs">
-        <Tabs defaultValue="usage">
-          <TabsList aria-label="Analytics views">
-            <TabsTrigger value="usage">
-              <BarChart3 size={15} aria-hidden="true" />
-              Usage
-            </TabsTrigger>
-            <TabsTrigger value="memory">
-              <Database size={15} aria-hidden="true" />
-              Memory
-            </TabsTrigger>
-            <TabsTrigger value="audit">
-              <ShieldCheck size={15} aria-hidden="true" />
-              Audit
-            </TabsTrigger>
-          </TabsList>
-
-        <TabsContent value="usage" className="analytics-tab-content">
-          <article className="analytics-chart analytics-chart-wide">
-            <div className="analytics-chart-header">
+        <TabsContent value="usage" className="dx-tab-grid">
+          <article className="dx-card dx-chart">
+            <header className="dx-card-head">
               <div>
-                <span>Usage by route</span>
+                <h3>Usage by route</h3>
                 <p>Select a metric, then inspect any route.</p>
               </div>
-              <div className="analytics-metric-switch" aria-label="Usage metric">
+              <div className="dx-segment" role="group" aria-label="Usage metric">
                 {(["calls", "paid", "usdc"] as const).map((metric) => (
                   <button
                     type="button"
@@ -180,33 +193,55 @@ export function AnalyticsDeck({
                   </button>
                 ))}
               </div>
-            </div>
+            </header>
             {sortedUsageData.length > 0 ? (
-              <div className="recharts-frame" aria-label="API request volume by route">
+              <div className="dx-chart-frame" aria-label="API request volume by route">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart layout="vertical" data={sortedUsageData} margin={{ top: 4, right: 18, left: 8, bottom: 0 }}>
-                    <CartesianGrid stroke="#242424" horizontal={false} />
-                    <XAxis type="number" stroke="#71717a" tickLine={false} axisLine={false} fontSize={10} allowDecimals={usageMetric === "usdc"} />
-                    <YAxis type="category" dataKey="route" width={112} stroke="#a1a1aa" tickLine={false} axisLine={false} fontSize={10} />
-                    <Tooltip
-                      cursor={{ fill: "rgba(255,255,255,0.04)" }}
-                      formatter={(value) => formatUsageMetric(Number(value), usageMetric)}
-                      contentStyle={{
-                        border: "1px solid #333333",
-                        borderRadius: 6,
-                        background: "#111111",
-                        color: "#f2f2f2",
-                        fontSize: 12,
-                      }}
+                  <BarChart layout="vertical" data={sortedUsageData} margin={{ top: 4, right: 16, left: 4, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="dx-bar" x1="0" y1="0" x2="1" y2="0">
+                        <stop offset="0" stopColor="#9bdcff" stopOpacity={0.35} />
+                        <stop offset="1" stopColor="#c7ecff" stopOpacity={1} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid stroke="rgba(255,255,255,0.05)" horizontal={false} />
+                    <XAxis
+                      type="number"
+                      stroke="#5b636e"
+                      tickLine={false}
+                      axisLine={false}
+                      fontSize={11}
+                      allowDecimals={usageMetric === "usdc"}
                     />
-                    <Bar dataKey={usageMetric} name={usageMetric === "calls" ? "Calls" : usageMetric === "paid" ? "Metered calls" : "USDC"} radius={[0, 5, 5, 0]} barSize={16}>
-                      {sortedUsageData.map((route, index) => (
+                    <YAxis
+                      type="category"
+                      dataKey="route"
+                      width={120}
+                      stroke="#9aa1ab"
+                      tickLine={false}
+                      axisLine={false}
+                      fontSize={12}
+                    />
+                    <Tooltip
+                      cursor={{ fill: "rgba(255,255,255,0.03)" }}
+                      formatter={(value) => formatUsageMetric(Number(value), usageMetric)}
+                      contentStyle={tooltipStyle}
+                      itemStyle={{ color: "#c7ecff" }}
+                      labelStyle={{ color: "#9aa1ab", marginBottom: 4 }}
+                    />
+                    <Bar
+                      dataKey={usageMetric}
+                      name={usageMetric === "calls" ? "Calls" : usageMetric === "paid" ? "Metered calls" : "USDC"}
+                      radius={[0, 6, 6, 0]}
+                      barSize={14}
+                    >
+                      {sortedUsageData.map((route) => (
                         <Cell
                           key={route.route}
-                          fill={usageColors[index % usageColors.length]}
-                          fillOpacity={!selectedRoute || selectedRoute === route.route ? 1 : 0.35}
+                          fill="url(#dx-bar)"
+                          fillOpacity={!selectedRoute || selectedRoute === route.route ? 1 : 0.3}
                           onClick={() => setSelectedRoute(route.route)}
-                          className="usage-bar-cell"
+                          className="dx-bar-cell"
                         />
                       ))}
                     </Bar>
@@ -217,139 +252,198 @@ export function AnalyticsDeck({
               <EmptyAnalytics message="No API operations have been recorded for this workspace." />
             )}
           </article>
-          <article className="analytics-aside route-detail">
-            <div className="analytics-aside-icon"><RadioTower size={18} aria-hidden="true" /></div>
-            <span>Selected route</span>
-            <strong>{activeRoute?.route ?? "No traffic"}</strong>
+          <article className="dx-card dx-aside">
+            <span className="dx-aside-icon">
+              <RadioTower size={16} aria-hidden="true" />
+            </span>
+            <span className="dx-label">Selected route</span>
+            <strong className="dx-aside-title">{activeRoute?.route ?? "No traffic"}</strong>
             {activeRoute ? (
-              <div className="route-detail-grid">
-                <p><b>{activeRoute.calls.toLocaleString()}</b> calls</p>
-                <p><b>{activeRoute.paid.toLocaleString()}</b> metered</p>
-                <p><b>{formatUsdc(activeRoute.usdc * 1_000_000)}</b> settled</p>
-              </div>
+              <dl className="dx-stats">
+                <div>
+                  <dt>Calls</dt>
+                  <dd>{activeRoute.calls.toLocaleString()}</dd>
+                </div>
+                <div>
+                  <dt>Metered</dt>
+                  <dd>{activeRoute.paid.toLocaleString()}</dd>
+                </div>
+                <div>
+                  <dt>Settled</dt>
+                  <dd>{formatUsdc(activeRoute.usdc * 1_000_000)}</dd>
+                </div>
+              </dl>
             ) : (
-              <p>Route details appear after the first API operation.</p>
+              <p className="dx-muted">Route details appear after the first API operation.</p>
             )}
           </article>
         </TabsContent>
 
-        <TabsContent value="memory" className="analytics-tab-content">
-          <article className="analytics-chart analytics-chart-wide">
-            <div className="analytics-chart-header">
+        <TabsContent value="memory" className="dx-tab-grid">
+          <article className="dx-card dx-chart">
+            <header className="dx-card-head">
               <div>
-                <span>Memory distribution</span>
-                <p>Every note is counted in the scope where it can be read.</p>
+                <h3>Memory distribution</h3>
+                <p>Every record is counted in the scope where it can be read.</p>
               </div>
-              <strong>{totalMemories.toLocaleString()} records</strong>
-            </div>
+            </header>
             {scopeData.length > 0 ? (
-              <div className="memory-chart-layout">
-                <div className="recharts-frame memory-pie" aria-label="Memory distribution by scope">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Tooltip
-                        contentStyle={{
-                          border: "1px solid #333333",
-                          borderRadius: 6,
-                          background: "#111111",
-                          color: "#f2f2f2",
-                          fontSize: 12,
-                        }}
-                      />
+              <div className="dx-donut-layout">
+                <div className="dx-donut" aria-label="Memory distribution by scope">
+                    <PieChart width={240} height={240}>
+                      <Tooltip contentStyle={tooltipStyle} itemStyle={{ color: "#f5f7fa" }} />
                       <Pie
                         data={scopeData}
                         dataKey="value"
                         nameKey="name"
-                        innerRadius={54}
-                        outerRadius={78}
-                        paddingAngle={3}
+                        innerRadius={86}
+                        outerRadius={116}
+                        paddingAngle={2}
+                        cornerRadius={4}
                         stroke="none"
                       >
-                        {scopeData.map((entry, index) => (
-                          <Cell key={`${entry.name}-${index}`} fill={chartColors[index % chartColors.length]} />
+                        {scopeData.map((entry) => (
+                          <Cell key={entry.key} fill={entry.color} />
                         ))}
                       </Pie>
                     </PieChart>
-                  </ResponsiveContainer>
+                  <div className="dx-donut-center">
+                    <strong>{totalMemories.toLocaleString()}</strong>
+                    <span>records</span>
+                  </div>
                 </div>
-                <div className="scope-legend">
-                  {scopeData.map((entry, index) => (
-                    <div key={entry.name}>
-                      <span style={{ backgroundColor: chartColors[index % chartColors.length] }} />
-                      <strong>{entry.name}</strong>
-                      <em>{entry.value}</em>
-                    </div>
+                <ul className="dx-legend">
+                  {scopeData.map((entry) => (
+                    <li key={entry.key}>
+                      <i style={{ background: entry.color }} />
+                      <span>{entry.name}</span>
+                      <em>{entry.value.toLocaleString()}</em>
+                      <b>{scopeTotal ? Math.round((entry.value / scopeTotal) * 100) : 0}%</b>
+                    </li>
                   ))}
-                </div>
+                </ul>
               </div>
             ) : (
               <EmptyAnalytics message="Memory scope analytics appear after an agent saves its first note." />
             )}
           </article>
-          <article className="analytics-aside">
-            <div className="analytics-aside-icon"><Database size={18} aria-hidden="true" /></div>
-            <span>Private by default</span>
-            <strong>{privateMemories}</strong>
-            <p>Private records remain isolated until you explicitly promote them.</p>
+          <article className="dx-card dx-aside">
+            <span className="dx-aside-icon">
+              <Database size={16} aria-hidden="true" />
+            </span>
+            <span className="dx-label">Private by default</span>
+            <strong className="dx-aside-figure">{privateMemories.toLocaleString()}</strong>
+            <p className="dx-muted">Private records stay isolated until an agent explicitly promotes them.</p>
           </article>
         </TabsContent>
 
-        <TabsContent value="audit" className="analytics-tab-content">
-          <article className="analytics-chart analytics-chart-wide audit-summary">
-            <div className="analytics-chart-header">
+        <TabsContent value="audit" className="dx-tab-grid">
+          <article className="dx-card dx-chart">
+            <header className="dx-card-head">
               <div>
-                <span>Latest context decision</span>
+                <h3>Latest context decision</h3>
                 <p>Permission evaluation from the most recently inspected context request.</p>
               </div>
-              <strong>{approvedRate === null ? "No audit yet" : `${approvedRate}% allowed`}</strong>
-            </div>
+              {approvedRate === null ? null : <span className="dx-pill dx-pill-ok">{approvedRate}% allowed</span>}
+            </header>
             {contextAudit ? (
-              <div className="audit-analytics-grid">
+              <div className="dx-audit">
                 <div>
-                  <span>Allowed</span>
+                  <span className="dx-label">Allowed</span>
                   <strong>{contextAudit.allowed_memory_ids.length}</strong>
-                  <p>memory record(s) released to the agent</p>
+                  <p>records released to the agent</p>
                 </div>
                 <div>
-                  <span>Denied</span>
+                  <span className="dx-label">Denied</span>
                   <strong>{contextAudit.denied_memory_count}</strong>
-                  <p>memory record(s) kept outside the context pack</p>
+                  <p>records kept outside the pack</p>
                 </div>
                 <div>
-                  <span>Token budget</span>
+                  <span className="dx-label">Token budget</span>
                   <strong>{contextAudit.estimated_tokens.toLocaleString()}</strong>
-                  <p>of {contextAudit.token_budget.toLocaleString()} tokens selected</p>
+                  <p>of {contextAudit.token_budget.toLocaleString()} tokens</p>
+                  <Meter value={contextAudit.token_budget ? contextAudit.estimated_tokens / contextAudit.token_budget : 0} />
                 </div>
               </div>
             ) : (
               <EmptyAnalytics message="Build a context pack and inspect its audit record to see real permission outcomes." />
             )}
           </article>
-          <article className="analytics-aside readiness-aside">
-            <span>Workspace readiness</span>
-            <div className="readiness-list">
-              {lifecycle.map(([label, complete]) => (
-                <div key={label}>
-                  <i className={complete ? "ready" : ""} />
-                  <strong>{label}</strong>
-                </div>
+          <article className="dx-card dx-aside">
+            <span className="dx-label">Workspace readiness</span>
+            <ul className="dx-checklist">
+              {lifecycle.map(([label, complete, detail]) => (
+                <li key={label} className={complete ? "is-done" : ""}>
+                  <i aria-hidden="true" />
+                  <span>{label}</span>
+                  <em>{detail}</em>
+                </li>
               ))}
-            </div>
+            </ul>
           </article>
         </TabsContent>
-        </Tabs>
-      </div>
+      </Tabs>
     </section>
   );
 }
 
+function Kpi({
+  label,
+  value,
+  unit,
+  foot,
+  children,
+}: {
+  label: string;
+  value: string;
+  unit?: string;
+  foot: string;
+  children?: React.ReactNode;
+}) {
+  return (
+    <article className="dx-kpi">
+      <span className="dx-label">{label}</span>
+      <strong>
+        {value}
+        {unit ? <small>{unit}</small> : null}
+      </strong>
+      <div className="dx-kpi-foot">
+        <p>{foot}</p>
+        {children}
+      </div>
+    </article>
+  );
+}
+
+function Meter({ value, tone = "ice" }: { value: number; tone?: "ice" | "violet" }) {
+  const clamped = Math.max(0, Math.min(1, value));
+  return (
+    <span className={`dx-meter dx-meter-${tone}`} aria-hidden="true">
+      <span style={{ width: `${clamped * 100}%` }} />
+    </span>
+  );
+}
+
+function Ring({ value }: { value: number }) {
+  const circumference = 2 * Math.PI * 9;
+  return (
+    <svg className="dx-ring" viewBox="0 0 24 24" aria-hidden="true">
+      <circle cx="12" cy="12" r="9" />
+      <circle cx="12" cy="12" r="9" strokeDasharray={`${circumference * value} ${circumference}`} />
+    </svg>
+  );
+}
+
 function EmptyAnalytics({ message }: { message: string }) {
-  return <p className="analytics-empty">{message}</p>;
+  return <p className="dx-empty">{message}</p>;
+}
+
+function formatUsdcValue(microUsdc: number) {
+  return (microUsdc / 1_000_000).toLocaleString(undefined, { maximumFractionDigits: 2 });
 }
 
 function formatUsdc(microUsdc: number) {
-  const value = microUsdc / 1_000_000;
-  return `${value.toLocaleString(undefined, { maximumFractionDigits: 4 })} USDC`;
+  return `${(microUsdc / 1_000_000).toLocaleString(undefined, { maximumFractionDigits: 4 })} USDC`;
 }
 
 function formatUsageMetric(value: number, metric: UsageMetric) {
