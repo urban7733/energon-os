@@ -24,5 +24,6 @@ pub struct PromotionAuditRecord {
     pub org_id: String,
     pub target_scope: MemoryScope,
     pub reason: String,
+    #[serde(deserialize_with = "crate::unix_ms::deserialize")]
     pub created_at_unix_ms: u128,
 }

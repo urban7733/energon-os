@@ -17,6 +17,19 @@ pub fn hash_api_key(api_key: &str, pepper: &str) -> String {
     hex_encode(&hasher.finalize())
 }
 
+/// Compares secrets without an early exit, so response timing does not reveal
+/// how many leading bytes of a guessed token were correct. Both inputs are
+/// hashed first, which also hides the configured token's length.
+pub fn constant_time_eq(left: &[u8], right: &[u8]) -> bool {
+    let left = Sha256::digest(left);
+    let right = Sha256::digest(right);
+
+    left.iter()
+        .zip(right.iter())
+        .fold(0u8, |difference, (a, b)| difference | (a ^ b))
+        == 0
+}
+
 fn hex_encode(bytes: &[u8]) -> String {
     const HEX: &[u8; 16] = b"0123456789abcdef";
     let mut encoded = String::with_capacity(bytes.len() * 2);
@@ -31,7 +44,7 @@ fn hex_encode(bytes: &[u8]) -> String {
 
 #[cfg(test)]
 mod tests {
-    use crate::secrets::{generate_api_key, hash_api_key};
+    use crate::secrets::{constant_time_eq, generate_api_key, hash_api_key};
 
     #[test]
     fn generated_api_keys_are_prefixed_and_long() {
@@ -46,5 +59,13 @@ mod tests {
         let key = "eos_live_test";
 
         assert_ne!(hash_api_key(key, "pepper_1"), hash_api_key(key, "pepper_2"));
+    }
+
+    #[test]
+    fn constant_time_eq_matches_only_identical_secrets() {
+        assert!(constant_time_eq(b"admin-token", b"admin-token"));
+        assert!(!constant_time_eq(b"admin-token", b"admin-tokeN"));
+        assert!(!constant_time_eq(b"admin-token", b"admin"));
+        assert!(!constant_time_eq(b"", b"admin-token"));
     }
 }

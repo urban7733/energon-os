@@ -762,7 +762,7 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
   async function readPromotionAudit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     await run("Read promotion audit", async () => {
-      const response = await fetch(`${cleanBaseUrl}/v1/audit/promotion/${promotedMemoryId}`, {
+      const response = await fetch(`${cleanBaseUrl}/v1/audit/promotion/${encodeURIComponent(promotedMemoryId.trim())}`, {
         headers: agentRequestHeaders(agentApiKey),
       });
       const body = await response.json();
@@ -777,7 +777,7 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
   async function readAudit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     await run("Read audit", async () => {
-      const response = await fetch(`${cleanBaseUrl}/v1/audit/context/${requestId}`, {
+      const response = await fetch(`${cleanBaseUrl}/v1/audit/context/${encodeURIComponent(requestId.trim())}`, {
         headers: agentRequestHeaders(agentApiKey),
       });
       const body = await response.json();

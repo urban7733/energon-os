@@ -28,13 +28,10 @@ pub async fn get_context_audit(
             energon_db::audit::get_context_audit(pool, &request_id).await?
         }
     }
+    // Another agent's record answers exactly like a missing one, so audit ids
+    // cannot be probed across agents or tenants.
+    .filter(|audit| audit.agent_id == agent.agent_id && audit.org_id == agent.org_id)
     .ok_or_else(|| ApiError::NotFound(format!("audit record not found: {request_id}")))?;
-
-    if audit.agent_id != agent.agent_id || audit.org_id != agent.org_id {
-        return Err(ApiError::Forbidden(
-            "agent cannot read this audit record".to_owned(),
-        ));
-    }
 
     Ok(attach_payment_response(
         Json(audit),
@@ -62,17 +59,12 @@ pub async fn get_promotion_audit(
             energon_db::audit::get_promotion_audit(pool, &promoted_memory_id).await?
         }
     }
+    .filter(|audit| audit.agent_id == agent.agent_id && audit.org_id == agent.org_id)
     .ok_or_else(|| {
         ApiError::NotFound(format!(
             "promotion audit record not found for memory: {promoted_memory_id}"
         ))
     })?;
-
-    if audit.agent_id != agent.agent_id || audit.org_id != agent.org_id {
-        return Err(ApiError::Forbidden(
-            "agent cannot read this promotion audit record".to_owned(),
-        ));
-    }
 
     Ok(attach_payment_response(
         Json(audit),

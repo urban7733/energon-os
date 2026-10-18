@@ -201,8 +201,8 @@ export function BillingCheckout({ apiBaseUrl, orgId }: { apiBaseUrl: string; org
       {walletAddress ? <p className="billing-state">wallet: {walletAddress}</p> : null}
       {notice ? (
         <p className="billing-state">
-          {notice.startsWith("Plan unlocked. Transaction:") ? (
-            <a href={notice.replace("Plan unlocked. Transaction: ", "")} target="_blank" rel="noreferrer">
+          {notice.startsWith("Plan unlocked. Transaction:") && isHttpsUrl(notice.replace("Plan unlocked. Transaction: ", "")) ? (
+            <a href={notice.replace("Plan unlocked. Transaction: ", "")} target="_blank" rel="noopener noreferrer">
               Plan unlocked. View transaction <ExternalLink size={13} aria-hidden="true" />
             </a>
           ) : (
@@ -232,4 +232,13 @@ function readError(body: unknown) {
     if (typeof value === "string") return value;
   }
   return JSON.stringify(body);
+}
+
+/** Only render explorer links that cannot execute script (no `javascript:` URLs). */
+function isHttpsUrl(value: string): boolean {
+  try {
+    return new URL(value).protocol === "https:";
+  } catch {
+    return false;
+  }
 }

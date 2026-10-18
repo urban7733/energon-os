@@ -64,6 +64,24 @@ export const auth = betterAuth({
     accountLinking: {
       enabled: true,
       trustedProviders: ["github"],
+      // Never attach a GitHub login to a password account whose email was not
+      // verified: otherwise someone could pre-register a victim's email and
+      // later share the victim's linked account (pre-account takeover).
+      requireLocalEmailVerified: true,
+    },
+  },
+  // On in every environment (Better Auth only enables it in production by
+  // default). Credential endpoints get much tighter budgets than reads.
+  rateLimit: {
+    enabled: true,
+    window: 60,
+    max: 100,
+    customRules: {
+      "/sign-in/email": { window: 60, max: 5 },
+      "/sign-up/email": { window: 60, max: 3 },
+      "/forget-password": { window: 300, max: 3 },
+      "/reset-password": { window: 300, max: 5 },
+      "/change-password": { window: 300, max: 5 },
     },
   },
   session: {

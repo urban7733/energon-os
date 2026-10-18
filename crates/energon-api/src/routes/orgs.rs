@@ -75,7 +75,8 @@ pub async fn create_org_agent(
         clean_optional(request.role_id),
         clean_optional(request.project_id),
     );
-    let name = clean_optional(request.name).unwrap_or_else(|| agent.agent_id.clone());
+    agent.validate()?;
+    let name = agent_display_name(request.name, &agent.agent_id)?;
     let pepper = api_key_pepper(&state)?;
     let api_key = generate_api_key();
     let key_hash = hash_api_key(&api_key, &pepper);
@@ -493,6 +494,7 @@ pub async fn set_role_policy(
     authorize_operator(&state, &headers, &org_id).await?;
     let pool = postgres_pool(&state)?;
     let role_id = required_text(role_id, "role_id")?;
+    energon_core::identity::validate_identifier("role_id", &role_id)?;
     if !(0..=10_000).contains(&request.authority_bps) {
         return Err(ApiError::BadRequest(
             "authority_bps must be between 0 and 10000".to_owned(),
@@ -669,6 +671,21 @@ fn required_text(value: String, field: &'static str) -> Result<String, ApiError>
     }
 
     Ok(value)
+}
+
+const MAX_AGENT_NAME_CHARS: usize = 120;
+
+/// Display names are free text but bounded; they default to the agent id.
+pub(crate) fn agent_display_name(name: Option<String>, agent_id: &str) -> Result<String, ApiError> {
+    let name = clean_optional(name).unwrap_or_else(|| agent_id.to_owned());
+
+    if name.chars().count() > MAX_AGENT_NAME_CHARS {
+        return Err(ApiError::BadRequest(format!(
+            "name must be at most {MAX_AGENT_NAME_CHARS} characters"
+        )));
+    }
+
+    Ok(name)
 }
 
 fn clean_optional(value: Option<String>) -> Option<String> {

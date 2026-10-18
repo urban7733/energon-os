@@ -31,11 +31,25 @@ export interface AgentMemory {
 export interface AgentDream extends AgentMemory {
   speculative: true;
   sharing: PromotionAudit | null;
+  /** Memories or earlier dreams this reflection builds on (private originals only). */
+  inspired_by: string[];
+}
+
+export interface RecordDreamInput {
+  content: string;
+  /** Up to 32 short labels for filtering the journal. */
+  tags?: string[];
+  /** Up to 16 memory or dream ids the author can already read. */
+  inspiredBy?: string[];
 }
 
 export interface ReflectDreamInput extends BuildContextInput {
-  /** Runs in your agent runtime (for example Hermes); null means keep no dream. */
-  generate: (context: ContextPack) => Promise<string | null>;
+  /**
+   * Runs in your agent runtime (for example Hermes); null means keep no dream.
+   * The dream automatically cites the context items it was generated from.
+   */
+  generate: (context: ContextPack) => Promise<string | RecordDreamInput | null>;
+  tags?: string[];
 }
 
 export interface ShareDreamInput {
@@ -44,6 +58,24 @@ export interface ShareDreamInput {
   content: string;
   target: SharedMemoryScope;
   reason: string;
+  /** Tags to publish with the excerpt. Private tags are never copied. */
+  tags?: string[];
+}
+
+export type DreamView = "all" | "private" | "shared";
+
+export interface DreamQuery {
+  /** Page size, 1 to 100. Defaults to 100. */
+  limit?: number;
+  /** `nextCursor` from a previous page. */
+  cursor?: string;
+  view?: DreamView;
+  tag?: string;
+}
+
+export interface DreamPage {
+  dreams: AgentDream[];
+  nextCursor: string | null;
 }
 
 export interface ContextItem {
@@ -268,6 +300,12 @@ export interface EnergonClientOptions {
   timeoutMs?: number;
   /** Injected for tests or runtimes that provide a custom Fetch implementation. */
   fetch?: typeof fetch;
+  /**
+   * Plain `http://` sends the API key unencrypted, so it is refused except for
+   * localhost. Set this only for trusted private networks (for example a
+   * Docker network between your agent and a self-hosted control plane).
+   */
+  allowInsecureHttp?: boolean;
 }
 
 export interface RequestOptions {
@@ -306,7 +344,8 @@ const DEFAULT_TIMEOUT_MS = 15_000;
 const RETRYABLE_GET_STATUS = new Set([429, 502, 503, 504]);
 const MAX_GET_ATTEMPTS = 3;
 
-type RequestMethod = "GET" | "POST";
+type RequestMethod = "GET" | "POST" | "DELETE";
+const MAX_DREAM_INSPIRATIONS = 16;
 
 interface RequestInitOptions {
   method: RequestMethod;
@@ -321,9 +360,16 @@ interface RequestInitOptions {
 export class Energon {
   readonly dreams: {
     reflect: (input: ReflectDreamInput, options?: RequestOptions) => Promise<AgentDream | null>;
-    record: (content: string, options?: RequestOptions) => Promise<AgentDream>;
+    record: (input: string | RecordDreamInput, options?: RequestOptions) => Promise<AgentDream>;
+    /** The newest 100 permitted dreams. Use `page` or `iterate` for filters and history. */
     list: (options?: RequestOptions) => Promise<AgentDream[]>;
+    page: (query?: DreamQuery, options?: RequestOptions) => Promise<DreamPage>;
+    /** Walks the whole permitted journal, newest first, one page at a time. */
+    iterate: (query?: Omit<DreamQuery, "cursor">, options?: RequestOptions) => AsyncGenerator<AgentDream>;
+    get: (dreamId: string, options?: RequestOptions) => Promise<AgentDream>;
     share: (input: ShareDreamInput, options?: RequestOptions) => Promise<AgentDream>;
+    /** Hard-deletes an own private dream, or retracts an excerpt this agent shared. */
+    forget: (dreamId: string, options?: RequestOptions) => Promise<{ dream_id: string; forgotten: true }>;
   };
 
   readonly memory: {
@@ -367,7 +413,7 @@ export class Energon {
   private readonly fetchFn: typeof fetch;
 
   constructor(options: EnergonClientOptions) {
-    this.baseUrl = normalizeBaseUrl(options.baseUrl);
+    this.baseUrl = normalizeBaseUrl(options.baseUrl, options.allowInsecureHttp === true);
     this.apiKey = requiredText(options.apiKey, "apiKey");
     this.paymentSignature = options.paymentSignature;
     this.timeoutMs = normalizeTimeout(options.timeoutMs);
@@ -380,21 +426,55 @@ export class Energon {
     this.dreams = {
       reflect: async (input, options) => {
         const context = await this.buildContext({ task: input.task, projectId: input.projectId, tokenBudget: input.tokenBudget }, options);
-        const content = await input.generate(context);
-        return content === null ? null : this.dreams.record(content, options);
+        const generated = await input.generate(context);
+        if (generated === null) return null;
+        const dream = typeof generated === "string" ? { content: generated } : generated;
+        const cited = (context.items ?? []).map((item) => item.memory_id);
+        return this.dreams.record({
+          content: dream.content,
+          tags: dream.tags ?? input.tags,
+          inspiredBy: [...(dream.inspiredBy ?? []), ...cited].slice(0, MAX_DREAM_INSPIRATIONS),
+        }, options);
       },
-      record: (content, options) => this.request("/v1/dreams", {
-        method: "POST", body: { content: requiredText(content, "content") }, options,
+      record: (input, options) => {
+        const dream = typeof input === "string" ? { content: input } : input;
+        const inspiredBy = dream.inspiredBy === undefined ? [] : normalizeIds(dream.inspiredBy, "inspiredBy item");
+        return this.request("/v1/dreams", {
+          method: "POST",
+          body: {
+            content: requiredText(dream.content, "content"),
+            tags: dream.tags === undefined ? undefined : normalizeTags(dream.tags),
+            inspired_by: inspiredBy.length ? inspiredBy : undefined,
+          },
+          options,
+        });
+      },
+      list: async (options) => (await this.dreams.page(undefined, options)).dreams,
+      page: async (query, options) => {
+        const result = await this.request<{ dreams: AgentDream[]; next_cursor: string | null }>(
+          `/v1/dreams${dreamQueryString(query)}`,
+          { method: "GET", options },
+        );
+        return { dreams: result.dreams, nextCursor: result.next_cursor ?? null };
+      },
+      iterate: (query, options) => this.iterateDreams(query, options),
+      get: (dreamId, options) => this.request(`/v1/dreams/${requiredPathSegment(dreamId, "dreamId")}`, {
+        method: "GET", options,
       }),
-      list: async (options) => {
-        const result = await this.request<{ dreams: AgentDream[] }>("/v1/dreams", { method: "GET", options });
-        return result.dreams;
+      share: (input, options) => {
+        if (!isSharedScope(input.target)) {
+          throw new TypeError("target must be open, org, project, or role.");
+        }
+        return this.request("/v1/dreams/share", {
+          method: "POST", body: {
+            dream_id: requiredText(input.dreamId, "dreamId"), content: requiredText(input.content, "content"),
+            target_scope: input.target, reason: requiredText(input.reason, "reason"),
+            tags: input.tags === undefined ? undefined : normalizeTags(input.tags),
+          }, options,
+        });
       },
-      share: (input, options) => this.request("/v1/dreams/share", {
-        method: "POST", body: {
-          dream_id: requiredText(input.dreamId, "dreamId"), content: requiredText(input.content, "content"),
-          target_scope: input.target, reason: requiredText(input.reason, "reason"),
-        }, options,
+      forget: (dreamId, options) => this.request(`/v1/dreams/${requiredPathSegment(dreamId, "dreamId")}`, {
+        method: "DELETE", options,
       }),
     };
     this.memory = {
@@ -439,6 +519,18 @@ export class Energon {
         options: requestOptions,
       }),
     };
+  }
+
+  private async *iterateDreams(
+    query: Omit<DreamQuery, "cursor"> | undefined,
+    options?: RequestOptions,
+  ): AsyncGenerator<AgentDream> {
+    let cursor: string | undefined;
+    do {
+      const page = await this.dreams.page({ ...query, cursor }, options);
+      yield* page.dreams;
+      cursor = page.nextCursor ?? undefined;
+    } while (cursor);
   }
 
   private async remember(input: RememberInput, options?: RequestOptions): Promise<AgentMemory> {
@@ -580,6 +672,9 @@ export class Energon {
         method: request.method,
         headers,
         body: request.body === undefined ? undefined : JSON.stringify(request.body),
+        // The control plane never redirects; following one could hand the
+        // bearer key to another host.
+        redirect: "error",
         signal,
       });
     } finally {
@@ -590,11 +685,16 @@ export class Energon {
   }
 }
 
-function normalizeBaseUrl(value: string): string {
+function normalizeBaseUrl(value: string, allowInsecureHttp: boolean): string {
   const raw = requiredText(value, "baseUrl");
   const url = new URL(raw);
   if (url.protocol !== "http:" && url.protocol !== "https:") {
     throw new TypeError("baseUrl must use http or https.");
+  }
+  if (url.protocol === "http:" && !allowInsecureHttp && !isLoopbackHost(url.hostname)) {
+    throw new TypeError(
+      "baseUrl must use https; plain http would expose the API key. Set allowInsecureHttp only for trusted private networks.",
+    );
   }
   return url.toString().replace(/\/$/, "");
 }
@@ -605,6 +705,13 @@ function normalizeTimeout(value: number | undefined): number {
     throw new TypeError("timeoutMs must be a non-negative finite number.");
   }
   return timeout;
+}
+
+function isLoopbackHost(hostname: string): boolean {
+  return hostname === "localhost"
+    || hostname.endsWith(".localhost")
+    || hostname === "[::1]"
+    || /^127(?:\.\d{1,3}){3}$/.test(hostname);
 }
 
 function requiredText(value: string, name: string): string {
@@ -628,9 +735,26 @@ function normalizeTags(tags: string[] | undefined): string[] {
   return (tags ?? []).map((tag) => tag.trim()).filter(Boolean);
 }
 
-function normalizeIds(ids: string[] | undefined): string[] {
+function normalizeIds(ids: string[] | undefined, name = "evidenceMemoryIds item"): string[] {
   if (!ids) return [];
-  return [...new Set(ids.map((id) => requiredText(id, "evidenceMemoryIds item")))];
+  return [...new Set(ids.map((id) => requiredText(id, name)))];
+}
+
+function dreamQueryString(query: DreamQuery | undefined): string {
+  if (!query) return "";
+  const params = new URLSearchParams();
+  if (query.limit !== undefined) {
+    if (!Number.isInteger(query.limit) || query.limit < 1 || query.limit > 100) {
+      throw new TypeError("limit must be an integer from 1 to 100.");
+    }
+    params.set("limit", String(query.limit));
+  }
+  if (query.cursor) params.set("cursor", query.cursor);
+  if (query.view) params.set("view", query.view);
+  const tag = optionalText(query.tag);
+  if (tag) params.set("tag", tag);
+  const encoded = params.toString();
+  return encoded ? `?${encoded}` : "";
 }
 
 function isSharedScope(scope: string): scope is SharedMemoryScope {

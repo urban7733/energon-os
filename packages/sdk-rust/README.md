@@ -30,3 +30,12 @@ or secrets manager—not in browser code.
 
 See [`docs/sdk-rust.md`](../../docs/sdk-rust.md) for installation and the
 complete API surface.
+
+## Transport security
+
+`Energon::new` requires `https://` except for loopback hosts, because plain HTTP
+would send the agent API key unencrypted. Inside a trusted private network use
+`Energon::new_allowing_insecure_http`. Redirects are never followed.
+
+Dreams: `record_dream`, `reflect`, `list_dreams`, `get_dream`, `share_dream`,
+and `forget_dream`; see [docs/dreaming.md](https://github.com/urban7733/energon-os/blob/main/docs/dreaming.md).

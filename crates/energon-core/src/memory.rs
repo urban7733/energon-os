@@ -2,6 +2,12 @@ use serde::{Deserialize, Serialize};
 
 use crate::{EnergonError, identity::AgentIdentity};
 
+pub const MAX_MEMORY_CONTENT_BYTES: usize = 128 * 1024;
+pub const MAX_TAGS: usize = 32;
+pub const MAX_TAG_CHARS: usize = 64;
+pub const MAX_SOURCE_CHARS: usize = 512;
+pub const MAX_REASON_BYTES: usize = 2_000;
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum MemoryScope {
@@ -51,8 +57,62 @@ impl WriteMemoryRequest {
             return Err(EnergonError::DirectSharedMemoryWriteNotAllowed);
         }
 
+        if self.content.len() > MAX_MEMORY_CONTENT_BYTES {
+            return Err(EnergonError::InputTooLarge {
+                field: "content",
+                limit: "131072 bytes",
+            });
+        }
+
+        validate_tags(&self.tags)?;
+
+        if self
+            .source
+            .as_ref()
+            .is_some_and(|source| source.chars().count() > MAX_SOURCE_CHARS)
+        {
+            return Err(EnergonError::InputTooLarge {
+                field: "source",
+                limit: "512 characters",
+            });
+        }
+
         Ok(())
     }
+}
+
+/// Tags are short labels, not storage: bound their number and length.
+pub fn validate_tags(tags: &[String]) -> Result<(), EnergonError> {
+    if tags.len() > MAX_TAGS {
+        return Err(EnergonError::InputTooLarge {
+            field: "tags",
+            limit: "32 tags",
+        });
+    }
+
+    if tags.iter().any(|tag| tag.chars().count() > MAX_TAG_CHARS) {
+        return Err(EnergonError::InputTooLarge {
+            field: "tag",
+            limit: "64 characters",
+        });
+    }
+
+    Ok(())
+}
+
+pub fn validate_reason(reason: &str) -> Result<(), EnergonError> {
+    if reason.trim().is_empty() {
+        return Err(EnergonError::EmptyPromotionReason);
+    }
+
+    if reason.len() > MAX_REASON_BYTES {
+        return Err(EnergonError::InputTooLarge {
+            field: "reason",
+            limit: "2000 bytes",
+        });
+    }
+
+    Ok(())
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -64,9 +124,7 @@ pub struct PromoteMemoryRequest {
 
 impl PromoteMemoryRequest {
     pub fn validate(&self) -> Result<(), EnergonError> {
-        if self.reason.trim().is_empty() {
-            return Err(EnergonError::EmptyPromotionReason);
-        }
+        validate_reason(&self.reason)?;
 
         if !self.target_scope.is_shared_promotion_target() {
             return Err(EnergonError::InvalidPromotionTarget);
@@ -90,6 +148,7 @@ pub struct MemoryRecord {
     pub session_id: Option<String>,
     pub source: Option<String>,
     pub promoted_from: Option<String>,
+    #[serde(deserialize_with = "crate::unix_ms::deserialize")]
     pub created_at_unix_ms: u128,
 }
 
@@ -229,6 +288,41 @@ mod tests {
             session_id: None,
             source: None,
         }
+    }
+
+    #[test]
+    fn writes_reject_oversized_content_tags_and_source() {
+        let mut request = write_request(MemoryScope::AgentPrivate);
+        request.content = "x".repeat(super::MAX_MEMORY_CONTENT_BYTES + 1);
+        assert!(matches!(
+            request.validate(),
+            Err(EnergonError::InputTooLarge {
+                field: "content",
+                ..
+            })
+        ));
+
+        let mut request = write_request(MemoryScope::AgentPrivate);
+        request.tags = vec!["tag".to_owned(); super::MAX_TAGS + 1];
+        assert!(matches!(
+            request.validate(),
+            Err(EnergonError::InputTooLarge { field: "tags", .. })
+        ));
+
+        let mut request = write_request(MemoryScope::AgentPrivate);
+        request.tags = vec!["t".repeat(super::MAX_TAG_CHARS + 1)];
+        assert!(request.validate().is_err());
+
+        let mut request = write_request(MemoryScope::AgentPrivate);
+        request.source = Some("s".repeat(super::MAX_SOURCE_CHARS + 1));
+        assert!(request.validate().is_err());
+
+        let request = PromoteMemoryRequest {
+            memory_id: "mem_1".to_owned(),
+            target_scope: MemoryScope::Org,
+            reason: "r".repeat(super::MAX_REASON_BYTES + 1),
+        };
+        assert!(request.validate().is_err());
     }
 
     #[test]

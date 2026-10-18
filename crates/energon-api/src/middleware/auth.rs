@@ -3,7 +3,7 @@ use energon_core::AgentIdentity;
 
 use crate::{
     errors::ApiError,
-    secrets::hash_api_key,
+    secrets::{constant_time_eq, hash_api_key},
     state::{AppState, StorageBackend},
 };
 
@@ -31,7 +31,7 @@ pub fn require_admin(state: &AppState, headers: &HeaderMap) -> Result<(), ApiErr
 
     let provided_token = required_header(headers, "x-energon-admin-token")?;
 
-    if provided_token != configured_token {
+    if !constant_time_eq(provided_token.as_bytes(), configured_token.as_bytes()) {
         return Err(ApiError::Unauthorized("invalid admin token".to_owned()));
     }
 
@@ -44,7 +44,9 @@ fn identity_from_headers(headers: &HeaderMap) -> Result<AgentIdentity, ApiError>
     let role_id = optional_header(headers, "x-energon-role-id");
     let project_id = optional_header(headers, "x-energon-project-id");
 
-    Ok(AgentIdentity::new(agent_id, org_id, role_id, project_id))
+    let agent = AgentIdentity::new(agent_id, org_id, role_id, project_id);
+    agent.validate()?;
+    Ok(agent)
 }
 
 async fn identity_from_api_key(state: &AppState, api_key: &str) -> Result<AgentIdentity, ApiError> {

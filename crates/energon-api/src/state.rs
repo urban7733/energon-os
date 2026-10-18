@@ -299,6 +299,13 @@ pub fn now_unix_ms() -> u128 {
 }
 
 #[cfg(test)]
+impl AppState {
+    pub(crate) fn for_dream_tests() -> Self {
+        Self::new_with_x402(X402Config::disabled_for_dream_tests(), None)
+    }
+}
+
+#[cfg(test)]
 mod tests {
     use super::{is_production_value, validate_agent_self_registration};
 
@@ -315,12 +322,5 @@ mod tests {
         assert!(validate_agent_self_registration(false, false).is_ok());
         assert!(validate_agent_self_registration(true, true).is_ok());
         assert!(validate_agent_self_registration(true, false).is_err());
-    }
-}
-
-#[cfg(test)]
-impl AppState {
-    pub(crate) fn for_dream_tests() -> Self {
-        Self::new_with_x402(X402Config::disabled_for_dream_tests(), None)
     }
 }

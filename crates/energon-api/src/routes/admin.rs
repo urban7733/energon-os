@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     errors::ApiError,
     middleware::auth::require_admin,
+    routes::orgs::agent_display_name,
     secrets::{generate_api_key, hash_api_key},
     state::{AppState, StorageBackend, now_unix_ms},
 };
@@ -50,10 +51,8 @@ pub async fn create_agent(
         request.role_id.filter(|value| !value.trim().is_empty()),
         request.project_id.filter(|value| !value.trim().is_empty()),
     );
-    let name = request
-        .name
-        .filter(|value| !value.trim().is_empty())
-        .unwrap_or_else(|| agent.agent_id.clone());
+    agent.validate()?;
+    let name = agent_display_name(request.name, &agent.agent_id)?;
     let pepper =
         state.auth.api_key_pepper.as_deref().ok_or_else(|| {
             ApiError::Internal("ENERGON_API_KEY_PEPPER is not configured".to_owned())

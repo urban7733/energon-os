@@ -33,8 +33,18 @@ Without payment, the API responds with `402 Payment Required` and a
 `PAYMENT-REQUIRED` header containing the accepted payment requirements.
 
 All routes are rate limited per API key (or client IP) with a token bucket
-(default 20 rps, burst 40). Exhausted buckets receive `429 Too Many Requests`.
-Request bodies are limited to 1 MiB by default.
+(default 20 rps, burst 40). Each client IP additionally has a budget of 20
+failed authentications (refilling at one per second), which stops API key and
+admin token guessing. Exhausted buckets receive `429 Too Many Requests` with a
+`Retry-After` header. Request bodies are limited to 1 MiB and handlers to 60
+seconds by default.
+
+Client-supplied identifiers (`agent_id`, `org_id`, `role_id`, `project_id`,
+dream ids) must be 1–128 characters of letters, digits, `_`, `-`, `.`, `:` or
+`@`. Memory content is limited to 128 KiB, tags to 32 entries of at most 64
+characters, `source` to 512 characters, and promotion reasons to 2,000 bytes.
+Internal errors return a generic `internal server error`; details stay in the
+server log.
 
 ## Autonomous Agent Registration
 

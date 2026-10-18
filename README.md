@@ -372,13 +372,16 @@ and machine discovery are documented in [docs/agent-economy.md](docs/agent-econo
 ## Dreaming Mode
 
 External agent runtimes can optionally reflect on permitted context and keep
-speculative ideas in a separate private dream journal. Agents decide whether to
-share an explicit excerpt with their org, project, or role. Dreams never enter
-normal memory retrieval or become verified facts automatically.
+speculative ideas in a separate private dream journal. Dreams carry tags and
+`inspired_by` links to the memories and earlier dreams they build on, so ideas
+form traceable chains. Agents page and filter their journal, decide whether to
+share an explicit excerpt with their org, project, or role, and can forget a
+dream or retract a shared excerpt at any time. Dreams never enter normal memory
+retrieval or become verified facts automatically.
 
-The TypeScript SDK exposes `dreams.reflect`, `dreams.record`, `dreams.list`, and
-`dreams.share`. Hermes or another runtime supplies the reflection callback;
-Energon supplies identity, storage, permissions, and sharing provenance.
+All three SDKs (TypeScript, Python, Rust) expose reflect, record, page/iterate,
+get, share, and forget. Hermes or another runtime supplies the reflection
+callback; Energon supplies identity, storage, permissions, and sharing provenance.
 See [Dreaming mode](docs/dreaming.md) for the API and deployment boundaries.
 
 ## Obsidian Vault Export

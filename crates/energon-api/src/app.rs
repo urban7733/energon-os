@@ -1,16 +1,20 @@
-use std::env;
+use std::{env, time::Duration};
 
 use axum::{
     Router,
     extract::DefaultBodyLimit,
     http::{
-        HeaderName, HeaderValue, Method,
-        header::{AUTHORIZATION, CONTENT_TYPE},
+        HeaderName, HeaderValue, Method, StatusCode,
+        header::{
+            AUTHORIZATION, CACHE_CONTROL, CONTENT_SECURITY_POLICY, CONTENT_TYPE, REFERRER_POLICY,
+            STRICT_TRANSPORT_SECURITY, X_CONTENT_TYPE_OPTIONS, X_FRAME_OPTIONS,
+        },
     },
     middleware as axum_middleware,
+    response::Response,
     routing::get,
 };
-use tower_http::cors::CorsLayer;
+use tower_http::{cors::CorsLayer, timeout::TimeoutLayer};
 
 use crate::{
     middleware::rate_limit,
@@ -20,6 +24,7 @@ use crate::{
 };
 
 const DEFAULT_MAX_BODY_BYTES: usize = 1024 * 1024; // 1 MiB
+const DEFAULT_REQUEST_TIMEOUT_SECONDS: u64 = 60;
 
 pub fn router(state: AppState) -> Router {
     Router::new()
@@ -30,8 +35,49 @@ pub fn router(state: AppState) -> Router {
             rate_limit::rate_limit,
         ))
         .layer(DefaultBodyLimit::max(max_body_bytes()))
+        .layer(TimeoutLayer::with_status_code(
+            StatusCode::REQUEST_TIMEOUT,
+            request_timeout(),
+        ))
         .layer(cors_layer())
+        .layer(axum_middleware::map_response(security_headers))
         .with_state(state)
+}
+
+/// Every API response carries agent memory, credentials, or audit data, so
+/// none of it may be cached, sniffed into another content type, framed, or
+/// rendered as an active document by a browser.
+async fn security_headers(mut response: Response) -> Response {
+    let headers = response.headers_mut();
+    headers.insert(X_CONTENT_TYPE_OPTIONS, HeaderValue::from_static("nosniff"));
+    headers.insert(X_FRAME_OPTIONS, HeaderValue::from_static("DENY"));
+    headers.insert(REFERRER_POLICY, HeaderValue::from_static("no-referrer"));
+    headers.insert(
+        CONTENT_SECURITY_POLICY,
+        HeaderValue::from_static("default-src 'none'; frame-ancestors 'none'"),
+    );
+    headers
+        .entry(CACHE_CONTROL)
+        .or_insert(HeaderValue::from_static("no-store"));
+
+    if is_production() {
+        headers.insert(
+            STRICT_TRANSPORT_SECURITY,
+            HeaderValue::from_static("max-age=63072000; includeSubDomains"),
+        );
+    }
+
+    response
+}
+
+fn request_timeout() -> Duration {
+    let seconds = env::var("ENERGON_REQUEST_TIMEOUT_SECONDS")
+        .ok()
+        .and_then(|value| value.trim().parse::<u64>().ok())
+        .filter(|value| *value > 0)
+        .unwrap_or(DEFAULT_REQUEST_TIMEOUT_SECONDS);
+
+    Duration::from_secs(seconds)
 }
 
 fn max_body_bytes() -> usize {

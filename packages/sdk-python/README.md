@@ -30,3 +30,13 @@ or secrets manager—never in browser code.
 
 See [`docs/sdk-python.md`](../../docs/sdk-python.md) for installation and the
 complete API surface.
+
+## Transport security
+
+`base_url` must use `https://`. Plain `http://` is accepted only for loopback
+hosts because it would send the agent API key unencrypted; inside a trusted
+private network pass `allow_insecure_http=True`. The client refuses redirects,
+so the key is never forwarded to another host.
+
+Dreams are available under `energon.dreams` (`record`, `reflect`, `list`,
+`iterate`, `get`, `share`, `forget`); see [docs/dreaming.md](https://github.com/urban7733/energon-os/blob/main/docs/dreaming.md).

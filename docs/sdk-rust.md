@@ -71,3 +71,12 @@ payer data, memory previews, and unassigned skill profiles.
 The SDK intentionally does not retry write requests automatically. A timeout
 after `POST` can be ambiguous without an idempotency key. HTTP errors are
 returned as `EnergonError::Api`.
+
+## Transport security
+
+`Energon::new` requires `https://` except for loopback hosts, because plain HTTP
+would send the agent API key unencrypted. Inside a trusted private network use
+`Energon::new_allowing_insecure_http`. Redirects are never followed.
+
+Dreams: `record_dream`, `reflect`, `list_dreams`, `get_dream`, `share_dream`,
+and `forget_dream`; see [docs/dreaming.md](https://github.com/urban7733/energon-os/blob/main/docs/dreaming.md).

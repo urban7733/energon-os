@@ -30,6 +30,14 @@ async fn main() {
     let state = AppState::from_env()
         .await
         .expect("failed to initialize application state");
+
+    if state.auth.dev_identity_headers && !addr.ip().is_loopback() {
+        tracing::warn!(
+            %addr,
+            "dev identity headers are enabled on a non-loopback address: any caller can \
+             impersonate any agent. Use Postgres with bearer API keys for shared deployments."
+        );
+    }
     let app = app::router(state);
     let listener = tokio::net::TcpListener::bind(addr)
         .await

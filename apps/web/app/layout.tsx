@@ -135,6 +135,18 @@ export const viewport: Viewport = {
   themeColor: "#050607",
 };
 
+/**
+ * JSON-LD is inlined into a <script> element, where a literal `</script>` in
+ * any string would end the element and turn the rest into live HTML.
+ * Escaping `<`, `>` and `&` keeps every value inert JSON.
+ */
+function jsonLd(value: unknown): string {
+  return JSON.stringify(value)
+    .replace(/</g, "\\u003c")
+    .replace(/>/g, "\\u003e")
+    .replace(/&/g, "\\u0026");
+}
+
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   const organizationJsonLd = {
     "@context": "https://schema.org",
@@ -243,23 +255,23 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
       <body>
         <script
           type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationJsonLd) }}
+          dangerouslySetInnerHTML={{ __html: jsonLd(organizationJsonLd) }}
         />
         <script
           type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(softwareJsonLd) }}
+          dangerouslySetInnerHTML={{ __html: jsonLd(softwareJsonLd) }}
         />
         <script
           type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteJsonLd) }}
+          dangerouslySetInnerHTML={{ __html: jsonLd(websiteJsonLd) }}
         />
         <script
           type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(apiJsonLd) }}
+          dangerouslySetInnerHTML={{ __html: jsonLd(apiJsonLd) }}
         />
         <script
           type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(roadmapJsonLd) }}
+          dangerouslySetInnerHTML={{ __html: jsonLd(roadmapJsonLd) }}
         />
         {children}
         <script
