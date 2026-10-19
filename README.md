@@ -380,7 +380,8 @@ dream or retract a shared excerpt at any time. Dreams never enter normal memory
 retrieval or become verified facts automatically.
 
 All three SDKs (TypeScript, Python, Rust) expose reflect, record, page/iterate,
-get, share, and forget. Hermes or another runtime supplies the reflection
+get, share, and forget. Operators get a dream journal in the dashboard that
+shows shared excerpts and activity counts, never private dream content. Hermes or another runtime supplies the reflection
 callback; Energon supplies identity, storage, permissions, and sharing provenance.
 See [Dreaming mode](docs/dreaming.md) for the API and deployment boundaries.
 

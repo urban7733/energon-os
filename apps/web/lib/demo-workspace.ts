@@ -78,3 +78,70 @@ export const demoConflicts = [
   { conflict_id: "conflict-pricing", subject: "enterprise", predicate: "annual_price", status: "contested" as const },
   { conflict_id: "conflict-launch", subject: "launch", predicate: "release_date", status: "contested" as const },
 ];
+
+const demoSharedDreams = [
+  {
+    memory_id: "dream-demo-03",
+    content: "Route renewal objections to the reviewer before sales replies; most churn starts with an unanswered pricing doubt.",
+    scope: "org",
+    tags: ["renewals", "experiment"],
+    created_at_unix_ms: Date.UTC(2026, 9, 18, 21, 40),
+    sharing: { agent_id: "sales-02", reason: "Proposed experiment for next sprint", target_scope: "org" },
+  },
+  {
+    memory_id: "dream-demo-02",
+    content: "Agents that write near-identical private notes could be offered a shared project memory automatically.",
+    scope: "project",
+    tags: ["memory"],
+    created_at_unix_ms: Date.UTC(2026, 9, 18, 3, 12),
+    sharing: { agent_id: "research-01", reason: "Could reduce duplicate memory", target_scope: "project" },
+  },
+  {
+    memory_id: "dream-demo-01",
+    content: "Price plans by context-token budget instead of request count.",
+    scope: "org",
+    tags: ["pricing", "experiment"],
+    created_at_unix_ms: Date.UTC(2026, 9, 17, 23, 5),
+    sharing: { agent_id: "finance-01", reason: "Discuss with billing owners", target_scope: "org" },
+  },
+];
+
+const demoDreamAgents = [
+  { agent_id: "research-01", private_dreams: 14, shared_dreams: 1, last_dream_at_unix_ms: Date.UTC(2026, 9, 18, 23, 2) },
+  { agent_id: "sales-02", private_dreams: 9, shared_dreams: 1, last_dream_at_unix_ms: Date.UTC(2026, 9, 18, 21, 40) },
+  { agent_id: "finance-01", private_dreams: 6, shared_dreams: 1, last_dream_at_unix_ms: Date.UTC(2026, 9, 17, 23, 5) },
+  { agent_id: "eng-04", private_dreams: 4, shared_dreams: 0, last_dream_at_unix_ms: Date.UTC(2026, 9, 16, 4, 30) },
+];
+
+/** Answers the dream journal's API calls from sample data for the public demo. */
+export async function demoDreamRequest(path: string, init?: RequestInit): Promise<unknown> {
+  const url = new URL(path, "https://demo.invalid");
+  if (init?.method === "DELETE") {
+    return { dream_id: decodeURIComponent(url.pathname.split("/").pop() ?? ""), removed: true };
+  }
+  if (url.pathname.endsWith("/dream-stats")) {
+    const tagCounts = new Map<string, number>();
+    for (const dream of demoSharedDreams) {
+      for (const tag of dream.tags) tagCounts.set(tag, (tagCounts.get(tag) ?? 0) + 1);
+    }
+    return {
+      org_id: "demo",
+      stats: {
+        private_dreams: demoDreamAgents.reduce((sum, agent) => sum + agent.private_dreams, 0),
+        shared_dreams: demoSharedDreams.length,
+        agents: demoDreamAgents,
+        shared_tags: [...tagCounts].map(([tag, dreams]) => ({ tag, dreams })).sort((a, b) => b.dreams - a.dreams),
+      },
+    };
+  }
+  const tag = url.searchParams.get("tag");
+  const agent = url.searchParams.get("agent_id");
+  return {
+    org_id: "demo",
+    limit: 20,
+    next_cursor: null,
+    dreams: demoSharedDreams.filter(
+      (dream) => (!tag || dream.tags.includes(tag)) && (!agent || dream.sharing.agent_id === agent),
+    ),
+  };
+}

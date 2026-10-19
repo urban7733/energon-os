@@ -3,10 +3,12 @@
 import dynamic from "next/dynamic";
 import { Activity, Coins, Database, Gauge } from "lucide-react";
 import { AnalyticsDeck } from "../../components/dashboard/analytics-deck";
+import { DreamJournal } from "../../components/dashboard/dream-journal";
 import { DashboardFrame, type DashboardNavItem } from "../../components/dashboard/dashboard-frame";
 import {
   demoAgents,
   demoConflicts,
+  demoDreamRequest,
   demoMemories,
   demoRolePolicies,
   demoScopes,
@@ -18,7 +20,7 @@ const MemoryAtlas = dynamic(() => import("../../components/dashboard/memory-atla
   loading: () => <div className="ax-loading" aria-label="Loading Memory Atlas" />,
 });
 
-type DemoView = "overview" | "graph" | "agents" | "records" | "billing";
+type DemoView = "overview" | "graph" | "agents" | "records" | "dreams" | "billing";
 
 const views: Record<DemoView, { section: string; title: string; subtitle: string }> = {
   overview: {
@@ -41,6 +43,11 @@ const views: Record<DemoView, { section: string; title: string; subtitle: string
     title: "Workspace memory.",
     subtitle: "Private overlays and shared records, by scope.",
   },
+  dreams: {
+    section: "Dreams",
+    title: "What your agents imagine.",
+    subtitle: "Private reflections stay private. Shared excerpts, labelled as speculation.",
+  },
   billing: {
     section: "Billing",
     title: "Usage and settlement.",
@@ -55,6 +62,7 @@ export function DashboardDemo({ view }: { view: DemoView }) {
     { label: "Memory Atlas", href: "/dashboard-demo?view=graph", icon: "atlas", active: view === "graph" },
     { label: "Agents", href: "/dashboard-demo?view=agents", icon: "agents", active: view === "agents" },
     { label: "Memory", href: "/dashboard-demo?view=records", icon: "memory", active: view === "records" },
+    { label: "Dreams", href: "/dashboard-demo?view=dreams", icon: "dreams", active: view === "dreams" },
     { label: "Billing", href: "/dashboard-demo?view=billing", icon: "billing", active: view === "billing" },
   ];
 
@@ -108,6 +116,8 @@ export function DashboardDemo({ view }: { view: DemoView }) {
             ]}
             demo
           />
+        ) : view === "dreams" ? (
+          <DreamJournal orgId="demo" request={demoDreamRequest} />
         ) : view === "graph" ? (
           <MemoryAtlas
             organizationName="Energon Labs"

@@ -39,6 +39,42 @@ jobs:
       - name: Test
         run: cargo test --workspace
 
+  postgres:
+    name: Postgres integration
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg17
+        env:
+          POSTGRES_USER: energon
+          POSTGRES_PASSWORD: energon
+          POSTGRES_DB: energon
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U energon"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgres://energon:energon@localhost:5432/energon
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      # Runs the migrations and the database tests that are ignored offline,
+      # including the check that operators can never read private dreams.
+      - name: Database tests
+        run: cargo test -p energon-db -- --include-ignored
+
   sdks:
     name: SDKs
     runs-on: ubuntu-latest

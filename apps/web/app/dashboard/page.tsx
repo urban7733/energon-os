@@ -34,6 +34,7 @@ export default async function DashboardPage() {
         { label: "Overview", href: "#overview", icon: "overview", active: true },
         { label: "Agents & keys", href: "#org-agents", icon: "agents" },
         { label: "Memory", href: "#org-memories", icon: "memory" },
+        { label: "Dreams", href: "#dreams", icon: "dreams" },
         { label: "Write memory", href: "#memory", icon: "write" },
         { label: "Billing", href: "#billing", icon: "billing" },
         { label: "Advanced", href: "#advanced", icon: "advanced" },

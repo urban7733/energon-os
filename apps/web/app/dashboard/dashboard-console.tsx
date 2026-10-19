@@ -27,6 +27,7 @@ import {
 import { authClient, fetchApiToken } from "../../lib/auth-client";
 import { site } from "../../lib/site";
 import { AnalyticsDeck } from "../../components/dashboard/analytics-deck";
+import { DreamJournal } from "../../components/dashboard/dream-journal";
 import { BillingCheckout } from "./billing-checkout";
 
 const MemoryAtlas = dynamic(() => import("../../components/dashboard/memory-atlas"), {
@@ -1199,6 +1200,8 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
           </div>
         ) : null}
       </section>
+
+      <DreamJournal orgId={orgId} request={managementFetch} />
 
       <section id="conflicts" className="ops-panel wide advanced-panel" aria-labelledby="conflicts-title">
         <div className="panel-title">

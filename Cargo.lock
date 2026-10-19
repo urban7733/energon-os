@@ -520,6 +520,7 @@ name = "energon-db"
 version = "0.1.0"
 dependencies = [
  "energon-core",
+ "serde",
  "serde_json",
  "sha2",
  "sqlx",

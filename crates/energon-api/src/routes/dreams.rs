@@ -3,6 +3,7 @@ use crate::{
     errors::ApiError,
     middleware::auth::identity_from_request,
     payments::{authorize_paid_usage, record_usage},
+    routes::orgs::{authorize_operator, postgres_pool},
     state::{AppState, StorageBackend, now_unix_ms},
     x402::{PaidRoute, attach_payment_response},
 };
@@ -38,32 +39,55 @@ pub struct ListDreams {
 
 impl ListDreams {
     fn into_query(self) -> Result<DreamQuery, ApiError> {
-        let limit = self.limit.unwrap_or(DEFAULT_DREAM_PAGE);
-        if !(1..=MAX_DREAM_PAGE).contains(&limit) {
-            return Err(ApiError::BadRequest(format!(
-                "limit must be between 1 and {MAX_DREAM_PAGE}"
-            )));
-        }
-        let cursor = self
-            .cursor
-            .map(|cursor| {
-                DreamCursor::decode(&cursor)
-                    .ok_or_else(|| ApiError::BadRequest("invalid dream cursor".into()))
-            })
-            .transpose()?;
-        let tag = self
-            .tag
-            .map(|tag| tag.trim().to_owned())
-            .filter(|tag| !tag.is_empty());
-        energon_core::memory::validate_tags(tag.as_slice())?;
-
-        Ok(DreamQuery {
-            view: self.view.unwrap_or_default(),
-            tag,
-            cursor,
-            limit,
-        })
+        page_query(
+            self.limit,
+            self.cursor,
+            self.tag,
+            self.view.unwrap_or_default(),
+        )
     }
+}
+
+/// Validates the shared paging and tag parameters of journal reads.
+fn page_query(
+    limit: Option<usize>,
+    cursor: Option<String>,
+    tag: Option<String>,
+    view: DreamView,
+) -> Result<DreamQuery, ApiError> {
+    let limit = limit.unwrap_or(DEFAULT_DREAM_PAGE);
+    if !(1..=MAX_DREAM_PAGE).contains(&limit) {
+        return Err(ApiError::BadRequest(format!(
+            "limit must be between 1 and {MAX_DREAM_PAGE}"
+        )));
+    }
+    let cursor = cursor
+        .map(|cursor| {
+            DreamCursor::decode(&cursor)
+                .ok_or_else(|| ApiError::BadRequest("invalid dream cursor".into()))
+        })
+        .transpose()?;
+    let tag = tag
+        .map(|tag| tag.trim().to_owned())
+        .filter(|tag| !tag.is_empty());
+    energon_core::memory::validate_tags(tag.as_slice())?;
+
+    Ok(DreamQuery {
+        view,
+        tag,
+        cursor,
+        limit,
+    })
+}
+
+fn next_cursor(dreams: &[DreamRecord], limit: usize) -> Option<String> {
+    (dreams.len() == limit)
+        .then(|| {
+            dreams
+                .last()
+                .map(|dream| DreamCursor::after(dream).encode())
+        })
+        .flatten()
 }
 
 async fn persist(state: &AppState, dream: &DreamRecord) -> Result<(), ApiError> {
@@ -176,17 +200,10 @@ pub async fn list(
         }
         StorageBackend::Postgres(pool) => energon_db::dreams::list(pool, &agent, &query).await?,
     };
-    let next_cursor = (dreams.len() == query.limit)
-        .then(|| {
-            dreams
-                .last()
-                .map(|dream| DreamCursor::after(dream).encode())
-        })
-        .flatten();
     Ok(Json(json!({
+        "next_cursor": next_cursor(&dreams, query.limit),
         "dreams": dreams,
         "limit": query.limit,
-        "next_cursor": next_cursor,
     })))
 }
 
@@ -266,6 +283,79 @@ pub async fn share(
         Json(dream),
         payment.response_header,
     ))
+}
+
+// ─── Operator routes ────────────────────────────────────────────────────────
+// Operators see shared dreams and aggregate activity. Private reflections
+// stay with their agents: these routes never return private content and
+// cannot touch private dreams.
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ListOrgDreams {
+    #[serde(default)]
+    pub limit: Option<usize>,
+    #[serde(default)]
+    pub cursor: Option<String>,
+    #[serde(default)]
+    pub tag: Option<String>,
+    /// Only dreams shared by this agent.
+    #[serde(default)]
+    pub agent_id: Option<String>,
+}
+
+/// `GET /v1/orgs/{org_id}/dreams` — the organization's shared dreams.
+pub async fn list_org(
+    State(state): State<AppState>,
+    Path(org_id): Path<String>,
+    headers: HeaderMap,
+    Query(params): Query<ListOrgDreams>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    authorize_operator(&state, &headers, &org_id).await?;
+    let pool = postgres_pool(&state)?;
+    let shared_by = params
+        .agent_id
+        .map(|agent_id| agent_id.trim().to_owned())
+        .filter(|agent_id| !agent_id.is_empty());
+    if let Some(agent_id) = &shared_by {
+        validate_identifier("agent_id", agent_id)?;
+    }
+    let query = page_query(params.limit, params.cursor, params.tag, DreamView::Shared)?;
+    let dreams =
+        energon_db::dreams::list_shared_in_org(pool, &org_id, &query, shared_by.as_deref()).await?;
+    Ok(Json(json!({
+        "org_id": org_id,
+        "next_cursor": next_cursor(&dreams, query.limit),
+        "dreams": dreams,
+        "limit": query.limit,
+    })))
+}
+
+/// `GET /v1/orgs/{org_id}/dream-stats` — counts per agent and shared tags.
+pub async fn org_stats(
+    State(state): State<AppState>,
+    Path(org_id): Path<String>,
+    headers: HeaderMap,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    authorize_operator(&state, &headers, &org_id).await?;
+    let pool = postgres_pool(&state)?;
+    let stats = energon_db::dreams::org_stats(pool, &org_id).await?;
+    Ok(Json(json!({ "org_id": org_id, "stats": stats })))
+}
+
+/// `DELETE /v1/orgs/{org_id}/dreams/{dream_id}` — moderate a shared dream.
+pub async fn remove_org(
+    State(state): State<AppState>,
+    Path((org_id, dream_id)): Path<(String, String)>,
+    headers: HeaderMap,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    authorize_operator(&state, &headers, &org_id).await?;
+    let pool = postgres_pool(&state)?;
+    validate_identifier("dream_id", &dream_id)?;
+    if !energon_db::dreams::remove_shared_in_org(pool, &org_id, &dream_id).await? {
+        return Err(ApiError::NotFound("shared dream not found".into()));
+    }
+    Ok(Json(json!({ "dream_id": dream_id, "removed": true })))
 }
 
 #[cfg(test)]

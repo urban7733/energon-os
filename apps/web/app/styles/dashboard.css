@@ -1768,3 +1768,155 @@
   color: var(--ex-coral);
   font-size: 12.5px;
 }
+
+/* ─── Dream journal ───────────────────────────────────────────────────────── */
+.dx .dream-privacy-note {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  margin: 0;
+  color: var(--ex-muted);
+  font: 400 12px/1.5 var(--ex-font);
+}
+
+.dx .dream-privacy-note svg {
+  flex: none;
+  margin-top: 3px;
+  color: var(--ex-violet);
+}
+
+.dx .dream-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.dx .dream-stat {
+  display: grid;
+  gap: 6px;
+  border: 1px solid var(--ex-line);
+  border-radius: var(--ex-radius-sm);
+  padding: 12px 14px;
+  background: rgba(183, 166, 255, 0.04);
+}
+
+.dx .dream-stat span {
+  color: var(--ex-muted);
+  font: 500 11px/1.2 var(--ex-mono);
+}
+
+.dx .dream-stat strong {
+  color: var(--ex-ink);
+  font: 500 24px/1 var(--ex-font);
+}
+
+.dx .dream-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 4px 0 12px;
+}
+
+.dx .dream-tags button {
+  border: 1px solid var(--ex-line);
+  border-radius: 999px;
+  padding: 4px 10px;
+  background: transparent;
+  color: var(--ex-text);
+  font: 500 11px/1.2 var(--ex-mono);
+}
+
+.dx .dream-tags button.is-active {
+  border-color: var(--ex-violet);
+  color: var(--ex-ink);
+}
+
+.dx .dream-tags em {
+  color: var(--ex-muted);
+  font-style: normal;
+}
+
+.dx .dream-list {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.dx .dream-list li {
+  display: grid;
+  gap: 8px;
+  border: 1px solid var(--ex-line);
+  border-left: 2px solid var(--ex-violet);
+  border-radius: var(--ex-radius-sm);
+  padding: 14px 16px;
+}
+
+.dx .dream-list li > p {
+  margin: 0;
+  color: var(--ex-ink);
+  font: 400 14px/1.55 var(--ex-font);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.dx .dream-list li > p.dream-reason {
+  color: var(--ex-text);
+  font-size: 12px;
+}
+
+.dx .dream-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  color: var(--ex-muted);
+  font: 500 11px/1.3 var(--ex-mono);
+}
+
+.dx .dream-list li button {
+  justify-self: start;
+}
+
+.dx .dream-empty {
+  margin: 0;
+  color: var(--ex-muted);
+  font-size: 13px;
+}
+
+.dx .dream-more {
+  justify-self: center;
+}
+
+@media (max-width: 720px) {
+  .dx .dream-stats {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px;
+  }
+
+  .dx .dream-stat {
+    padding: 10px;
+  }
+
+  .dx .dream-stat strong {
+    font-size: 20px;
+  }
+
+  /* Generic tables hide secondary columns on phones; the counts are the point here. */
+  .dx .dream-agents .data-table-row {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .dx .dream-agents .data-table-row > strong {
+    grid-column: 1 / -1;
+  }
+
+  .dx .dream-agents .data-table-row > span {
+    display: block;
+    color: var(--ex-muted);
+  }
+
+  .dx .dream-agents .data-table-row > span:last-child {
+    grid-column: 1 / -1;
+  }
+}
