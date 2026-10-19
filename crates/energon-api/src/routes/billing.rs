@@ -47,7 +47,7 @@ async fn authorize_operator(
     headers: &HeaderMap,
     org_id: &str,
 ) -> Result<VerifiedOperator, ApiError> {
-    let operator = operator_from_request(state.jwt.as_ref(), headers).await?;
+    let operator = operator_from_request(state, headers).await?;
     operator.require_org(org_id)?;
     Ok(operator)
 }
@@ -214,12 +214,16 @@ pub async fn complete_checkout(
         ));
     }
 
+    // The wallet signed the hash exactly as submitted; replay protection and
+    // the chain lookup use the canonical lowercase form.
+    let submitted_hash = request.transaction_hash.trim();
+    let transaction_hash = submitted_hash.to_ascii_lowercase();
     let message = checkout_authorization_message(
         &intent.intent_id,
         &intent.org_id,
         &intent.plan_id,
         intent.amount_usdc_micro,
-        request.transaction_hash.trim(),
+        submitted_hash,
     );
     verify_wallet_signature(
         &message,
@@ -228,7 +232,7 @@ pub async fn complete_checkout(
     )?;
     let transfer = config
         .verify_usdc_transfer(
-            request.transaction_hash.trim(),
+            &transaction_hash,
             request.payer_address.trim(),
             intent.amount_usdc_micro,
         )
@@ -239,7 +243,7 @@ pub async fn complete_checkout(
         &org_id,
         &operator.user_id,
         &transfer.payer,
-        request.transaction_hash.trim(),
+        &transaction_hash,
         plan.included_operations,
     )
     .await?;

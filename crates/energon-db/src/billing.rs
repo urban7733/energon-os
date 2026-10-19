@@ -128,7 +128,13 @@ pub async fn complete_checkout_intent(
     .bind(payer)
     .bind(tx_hash)
     .execute(&mut *tx)
-    .await?;
+    .await
+    .map_err(|error| match error {
+        sqlx::Error::Database(ref database) if database.is_unique_violation() => {
+            DbError::PaymentTransactionAlreadyUsed
+        }
+        error => DbError::Sqlx(error),
+    })?;
 
     let row = sqlx::query(
         r#"

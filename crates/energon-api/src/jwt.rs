@@ -9,7 +9,7 @@ use axum::http::HeaderMap;
 use jsonwebtoken::{Algorithm, DecodingKey, Validation, decode, decode_header};
 use serde::Deserialize;
 
-use crate::errors::ApiError;
+use crate::{errors::ApiError, state::AppState};
 
 const DEFAULT_REFRESH_SECONDS: u64 = 300;
 const JWKS_FETCH_TIMEOUT_SECONDS: u64 = 10;
@@ -223,10 +223,10 @@ impl JwtVerifier {
 }
 
 pub async fn operator_from_request(
-    verifier: Option<&JwtVerifier>,
+    state: &AppState,
     headers: &HeaderMap,
 ) -> Result<VerifiedOperator, ApiError> {
-    let verifier = verifier.ok_or_else(|| {
+    let verifier = state.jwt.as_ref().ok_or_else(|| {
         ApiError::Unauthorized(
             "operator JWT auth is not configured (set ENERGON_JWKS_URL)".to_owned(),
         )
@@ -236,7 +236,9 @@ pub async fn operator_from_request(
         ApiError::Unauthorized("missing bearer JWT in Authorization header".to_owned())
     })?;
 
-    verifier.verify(&token).await
+    let operator = verifier.verify(&token).await?;
+    state.rate_limiter.mark_verified(headers);
+    Ok(operator)
 }
 
 fn verify_with_key(

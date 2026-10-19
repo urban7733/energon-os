@@ -1,0 +1,9 @@
+# cargo-audit configuration. Every ignored advisory needs a written reason.
+[advisories]
+ignore = [
+    # Marvin timing attack on RSA private-key operations. `rsa` is only pulled
+    # in by jsonwebtoken's rust_crypto backend; Energon verifies EdDSA operator
+    # JWTs and never decrypts or signs with an RSA private key. No fixed
+    # release exists upstream.
+    "RUSTSEC-2023-0071",
+]

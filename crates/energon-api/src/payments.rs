@@ -16,10 +16,10 @@ pub async fn authorize_paid_usage(
     agent: &AgentIdentity,
     route: PaidRoute,
 ) -> Result<PaymentOutcome, ApiError> {
-    if let StorageBackend::Postgres(pool) = &state.storage {
-        if energon_db::billing::consume_included_operation(pool, &agent.org_id).await? {
-            return Ok(PaymentOutcome::default());
-        }
+    if let StorageBackend::Postgres(pool) = &state.storage
+        && energon_db::billing::consume_included_operation(pool, &agent.org_id).await?
+    {
+        return Ok(PaymentOutcome::default());
     }
 
     state.x402.require_payment(headers, route).await

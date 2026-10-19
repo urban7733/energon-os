@@ -34,6 +34,10 @@ pub fn router() -> Router<AppState> {
         )
         .route("/dreams", get(dreams::list).post(dreams::write))
         .route("/dreams/share", post(dreams::share))
+        .route(
+            "/dreams/{dream_id}",
+            get(dreams::get).delete(dreams::forget),
+        )
         .route("/memory/write", post(memory::write_memory))
         .route("/memory/promote", post(memory::promote_memory))
         .route("/context/build", post(context::build_context))
@@ -62,6 +66,12 @@ pub fn router() -> Router<AppState> {
             get(skills::list_org_skill_profiles).post(skills::create_org_skill_profile),
         )
         .route("/orgs/{org_id}/memory-stats", get(orgs::org_memory_stats))
+        .route("/orgs/{org_id}/dreams", get(dreams::list_org))
+        .route("/orgs/{org_id}/dream-stats", get(dreams::org_stats))
+        .route(
+            "/orgs/{org_id}/dreams/{dream_id}",
+            delete(dreams::remove_org),
+        )
         .route(
             "/orgs/{org_id}/memories/{memory_id}",
             delete(orgs::delete_org_memory),

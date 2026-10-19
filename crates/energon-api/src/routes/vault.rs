@@ -88,7 +88,7 @@ pub async fn export_org_obsidian_vault(
     headers: HeaderMap,
     Query(query): Query<OperatorVaultExportQuery>,
 ) -> Result<Response, ApiError> {
-    let operator = operator_from_request(state.jwt.as_ref(), &headers).await?;
+    let operator = operator_from_request(&state, &headers).await?;
     operator.require_org(&org_id)?;
     let StorageBackend::Postgres(pool) = &state.storage else {
         return Err(ApiError::BadRequest(

@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { headers } from "next/headers";
 import "./globals.css";
 import "./refined.css";
 import "./styles/tokens.css";
@@ -135,7 +136,23 @@ export const viewport: Viewport = {
   themeColor: "#050607",
 };
 
-export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+/**
+ * JSON-LD is inlined into a <script> element, where a literal `</script>` in
+ * any string would end the element and turn the rest into live HTML.
+ * Escaping `<`, `>` and `&` keeps every value inert JSON.
+ */
+function jsonLd(value: unknown): string {
+  return JSON.stringify(value)
+    .replace(/</g, "\\u003c")
+    .replace(/>/g, "\\u003e")
+    .replace(/&/g, "\\u0026");
+}
+
+export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+  // Set per request by middleware.ts; reading it renders every page dynamically,
+  // which a per-response CSP nonce requires.
+  const nonce = (await headers()).get("x-nonce") ?? undefined;
+
   const organizationJsonLd = {
     "@context": "https://schema.org",
     "@type": "Organization",
@@ -243,27 +260,33 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
       <body>
         <script
           type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationJsonLd) }}
+          nonce={nonce}
+          dangerouslySetInnerHTML={{ __html: jsonLd(organizationJsonLd) }}
         />
         <script
           type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(softwareJsonLd) }}
+          nonce={nonce}
+          dangerouslySetInnerHTML={{ __html: jsonLd(softwareJsonLd) }}
         />
         <script
           type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteJsonLd) }}
+          nonce={nonce}
+          dangerouslySetInnerHTML={{ __html: jsonLd(websiteJsonLd) }}
         />
         <script
           type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(apiJsonLd) }}
+          nonce={nonce}
+          dangerouslySetInnerHTML={{ __html: jsonLd(apiJsonLd) }}
         />
         <script
           type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(roadmapJsonLd) }}
+          nonce={nonce}
+          dangerouslySetInnerHTML={{ __html: jsonLd(roadmapJsonLd) }}
         />
         {children}
         <script
           type="module"
+          nonce={nonce}
           src="https://static.cloudflareinsights.com/beacon.min.js"
           data-cf-beacon='{"token":"3acf164ed08040eaa29d0ad92e54cd22"}'
         />

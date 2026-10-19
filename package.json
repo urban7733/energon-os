@@ -16,5 +16,9 @@
     "sdk:test": "bun --cwd=packages/sdk-typescript test",
     "agent:live": "bun tools/live-agent.mjs",
     "check": "cargo fmt --all --check && cargo test --workspace && bun run sdk:check && bun run sdk:test && bun run sdk:build && bun run web:lint && bun run web:build"
+  },
+  "overrides": {
+    "sharp": "^0.35.5",
+    "undici": "^7.29.1"
   }
 }

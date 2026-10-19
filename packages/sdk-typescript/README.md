@@ -69,3 +69,11 @@ safe `GET` requests only, and exposes the original HTTP error through
 
 Keep agent API keys in a server runtime, worker, container secret, or secrets
 manager. Do not expose them in browser code.
+
+## Transport security
+
+`baseUrl` must use `https://`. Plain `http://` is accepted only for loopback
+hosts (`localhost`, `127.0.0.1`, `[::1]`) because it would send the agent API key
+unencrypted. Inside a trusted private network (for example a Docker network),
+opt in explicitly with `allowInsecureHttp: true`. The client never follows
+redirects, so the key cannot be forwarded to another host.

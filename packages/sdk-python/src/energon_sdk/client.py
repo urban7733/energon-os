@@ -2,13 +2,32 @@
 
 from __future__ import annotations
 
+import ipaddress
 import json
-from typing import Any, Mapping
+from typing import Any, Callable, Iterator, Mapping
 from urllib.error import HTTPError, URLError
-from urllib.parse import urlparse
-from urllib.request import Request, urlopen
+from urllib.parse import quote, urlencode, urlparse
+from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 SDK_VERSION = "0.1.0"
+_MAX_DREAM_INSPIRATIONS = 16
+_DREAM_VIEWS = {"all", "private", "shared"}
+_SHARED_SCOPES = {"open", "org", "project", "role"}
+
+
+class _RejectRedirects(HTTPRedirectHandler):
+    """urllib forwards the Authorization header to redirect targets, even on
+    other hosts. The control plane never redirects, so refuse instead."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):  # noqa: ANN001, D102
+        return None
+
+
+_OPENER = build_opener(_RejectRedirects())
+
+
+def urlopen(request: Request, timeout: float):  # noqa: ANN201 -- mirrors urllib.request.urlopen
+    return _OPENER.open(request, timeout=timeout)
 
 
 class EnergonError(Exception):
@@ -116,6 +135,123 @@ class _SkillOperations:
         )
 
 
+class _DreamOperations:
+    """Speculative reflections. Energon stores and gates them; your runtime
+    generates them. Dreams never enter factual context retrieval."""
+
+    def __init__(self, client: Energon) -> None:
+        self._client = client
+
+    def record(
+        self,
+        *,
+        content: str,
+        tags: list[str] | None = None,
+        inspired_by: list[str] | None = None,
+    ) -> Mapping[str, Any]:
+        body: dict[str, object] = {"content": _required_text(content, "content")}
+        if tags is not None:
+            body["tags"] = _normalise_text_list(tags)
+        if inspired_by:
+            body["inspired_by"] = list(dict.fromkeys(_normalise_text_list(inspired_by)))
+        return self._client._request("POST", "/v1/dreams", body)
+
+    def reflect(
+        self,
+        *,
+        task: str,
+        generate: Callable[[Mapping[str, Any]], str | None],
+        project_id: str | None = None,
+        token_budget: int | None = None,
+        tags: list[str] | None = None,
+    ) -> Mapping[str, Any] | None:
+        """Build permitted context, let your runtime dream on it, and store the
+        result privately. Returning None keeps no dream. Never shares."""
+        context = self._client.context.build(
+            task=task, project_id=project_id, token_budget=token_budget
+        )
+        content = generate(context)
+        if content is None:
+            return None
+        items = context.get("items") or []
+        cited = [item["memory_id"] for item in items if isinstance(item, dict) and item.get("memory_id")]
+        return self.record(
+            content=content,
+            tags=tags,
+            inspired_by=cited[:_MAX_DREAM_INSPIRATIONS],
+        )
+
+    def list(
+        self,
+        *,
+        limit: int | None = None,
+        cursor: str | None = None,
+        view: str | None = None,
+        tag: str | None = None,
+    ) -> Mapping[str, Any]:
+        """One newest-first journal page: ``{"dreams": [...], "next_cursor": ...}``."""
+        params: dict[str, str] = {}
+        if limit is not None:
+            if not isinstance(limit, int) or not 1 <= limit <= 100:
+                raise ValueError("limit must be an integer from 1 to 100")
+            params["limit"] = str(limit)
+        if cursor:
+            params["cursor"] = cursor
+        if view is not None:
+            if view not in _DREAM_VIEWS:
+                raise ValueError("view must be all, private, or shared")
+            params["view"] = view
+        if tag is not None and tag.strip():
+            params["tag"] = tag.strip()
+        query = f"?{urlencode(params)}" if params else ""
+        return self._client._request("GET", f"/v1/dreams{query}")
+
+    def iterate(
+        self,
+        *,
+        view: str | None = None,
+        tag: str | None = None,
+        limit: int | None = None,
+    ) -> Iterator[Mapping[str, Any]]:
+        """Walk the whole permitted journal, newest first."""
+        cursor: str | None = None
+        while True:
+            page = self.list(limit=limit, cursor=cursor, view=view, tag=tag)
+            yield from page.get("dreams") or []
+            cursor = page.get("next_cursor")
+            if not cursor:
+                return
+
+    def get(self, dream_id: str) -> Mapping[str, Any]:
+        return self._client._request("GET", f"/v1/dreams/{_path_segment(dream_id, 'dream_id')}")
+
+    def share(
+        self,
+        *,
+        dream_id: str,
+        content: str,
+        target: str,
+        reason: str,
+        tags: list[str] | None = None,
+    ) -> Mapping[str, Any]:
+        """Publish an explicit excerpt. The private body is never copied."""
+        if target not in _SHARED_SCOPES:
+            raise ValueError("target must be open, org, project, or role")
+        body: dict[str, object] = {
+            "dream_id": _required_text(dream_id, "dream_id"),
+            "content": _required_text(content, "content"),
+            "target_scope": target,
+            "reason": _required_text(reason, "reason"),
+        }
+        if tags is not None:
+            body["tags"] = _normalise_text_list(tags)
+        return self._client._request("POST", "/v1/dreams/share", body)
+
+    def forget(self, dream_id: str) -> Mapping[str, Any]:
+        """Hard-delete an own private dream, or retract an excerpt you shared."""
+        return self._client._request("DELETE", f"/v1/dreams/{_path_segment(dream_id, 'dream_id')}")
+
+
 class _OperationalData:
     """Read-only, agent-safe organization telemetry from the dashboard model."""
 
@@ -129,10 +265,22 @@ class _OperationalData:
 class Energon:
     """A server-side client authenticated as exactly one Energon agent."""
 
-    def __init__(self, *, base_url: str, api_key: str, timeout: float = 15.0) -> None:
+    def __init__(
+        self,
+        *,
+        base_url: str,
+        api_key: str,
+        timeout: float = 15.0,
+        allow_insecure_http: bool = False,
+    ) -> None:
         parsed = urlparse(_required_text(base_url, "base_url"))
         if parsed.scheme not in {"http", "https"} or not parsed.netloc:
             raise ValueError("base_url must be an absolute http or https URL")
+        if parsed.scheme == "http" and not allow_insecure_http and not _is_loopback(parsed.hostname):
+            raise ValueError(
+                "base_url must use https; plain http would expose the API key. "
+                "Pass allow_insecure_http=True only for trusted private networks."
+            )
         if not isinstance(timeout, (int, float)) or timeout <= 0:
             raise ValueError("timeout must be a positive number")
         self._base_url = base_url.rstrip("/")
@@ -141,6 +289,7 @@ class Energon:
         self.memory = _MemoryOperations(self)
         self.context = _ContextOperations(self)
         self.skills = _SkillOperations(self)
+        self.dreams = _DreamOperations(self)
         self.operations = _OperationalData(self)
 
     def _request(
@@ -174,6 +323,21 @@ def _required_text(value: str, field: str) -> str:
     if not isinstance(value, str) or not (normalised := value.strip()):
         raise ValueError(f"{field} cannot be empty")
     return normalised
+
+
+def _path_segment(value: str, field: str) -> str:
+    return quote(_required_text(value, field), safe="")
+
+
+def _is_loopback(hostname: str | None) -> bool:
+    if not hostname:
+        return False
+    if hostname == "localhost" or hostname.endswith(".localhost"):
+        return True
+    try:
+        return ipaddress.ip_address(hostname).is_loopback
+    except ValueError:
+        return False
 
 
 def _normalise_text_list(values: list[str] | None) -> list[str]:

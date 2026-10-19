@@ -28,4 +28,11 @@ pub enum EnergonError {
         "user and session memory require a trusted grant and cannot be claimed by an agent request"
     )]
     UntrustedAccessContext,
+    #[error("{0} must be 1-128 characters using only letters, digits, '_', '-', '.', ':' or '@'")]
+    InvalidIdentifier(&'static str),
+    #[error("{field} exceeds the limit of {limit}")]
+    InputTooLarge {
+        field: &'static str,
+        limit: &'static str,
+    },
 }

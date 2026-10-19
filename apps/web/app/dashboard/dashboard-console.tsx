@@ -27,6 +27,7 @@ import {
 import { authClient, fetchApiToken } from "../../lib/auth-client";
 import { site } from "../../lib/site";
 import { AnalyticsDeck } from "../../components/dashboard/analytics-deck";
+import { DreamJournal } from "../../components/dashboard/dream-journal";
 import { BillingCheckout } from "./billing-checkout";
 
 const MemoryAtlas = dynamic(() => import("../../components/dashboard/memory-atlas"), {
@@ -762,7 +763,7 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
   async function readPromotionAudit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     await run("Read promotion audit", async () => {
-      const response = await fetch(`${cleanBaseUrl}/v1/audit/promotion/${promotedMemoryId}`, {
+      const response = await fetch(`${cleanBaseUrl}/v1/audit/promotion/${encodeURIComponent(promotedMemoryId.trim())}`, {
         headers: agentRequestHeaders(agentApiKey),
       });
       const body = await response.json();
@@ -777,7 +778,7 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
   async function readAudit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     await run("Read audit", async () => {
-      const response = await fetch(`${cleanBaseUrl}/v1/audit/context/${requestId}`, {
+      const response = await fetch(`${cleanBaseUrl}/v1/audit/context/${encodeURIComponent(requestId.trim())}`, {
         headers: agentRequestHeaders(agentApiKey),
       });
       const body = await response.json();
@@ -1199,6 +1200,8 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
           </div>
         ) : null}
       </section>
+
+      <DreamJournal orgId={orgId} request={managementFetch} />
 
       <section id="conflicts" className="ops-panel wide advanced-panel" aria-labelledby="conflicts-title">
         <div className="panel-title">

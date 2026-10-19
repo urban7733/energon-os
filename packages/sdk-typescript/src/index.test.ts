@@ -277,3 +277,61 @@ test("failed external dream generation never writes a dream", async () => {
   await expect(client.dreams.reflect({ task: "Reflect", generate: async () => { throw new Error("runtime failed"); } })).rejects.toThrow("runtime failed");
   expect(paths).toEqual(["https://api.energon.test/v1/context/build"]);
 });
+
+test("plain http is refused for remote hosts unless explicitly allowed", () => {
+  const fetch = async () => Response.json({});
+  expect(() => new Energon({ baseUrl: "http://api.energon.test", apiKey: "k", fetch })).toThrow("https");
+  expect(() => new Energon({ baseUrl: "http://127.0.0.1:3001", apiKey: "k", fetch })).not.toThrow();
+  expect(() => new Energon({ baseUrl: "http://localhost:3001", apiKey: "k", fetch })).not.toThrow();
+  expect(() => new Energon({ baseUrl: "http://[::1]:3001", apiKey: "k", fetch })).not.toThrow();
+  expect(() => new Energon({ baseUrl: "http://energon-api:3000", apiKey: "k", fetch, allowInsecureHttp: true })).not.toThrow();
+});
+
+test("requests never follow redirects with the bearer key", async () => {
+  let init: RequestInit | undefined;
+  const client = new Energon({ baseUrl: "https://api.energon.test", apiKey: "k", fetch: async (_url, requestInit) => {
+    init = requestInit;
+    return Response.json({ skills: [] });
+  }});
+  await client.skills.list();
+  expect(init?.redirect).toBe("error");
+});
+
+test("dream journal pages with filters, follows cursors, and forgets", async () => {
+  const urls: string[] = [];
+  const methods: string[] = [];
+  const pages = [
+    { dreams: [{ memory_id: "dream_2" }], next_cursor: "5:dream_2" },
+    { dreams: [{ memory_id: "dream_1" }], next_cursor: null },
+    { dream_id: "dream_2", forgotten: true },
+  ];
+  const client = new Energon({ baseUrl: "https://api.energon.test", apiKey: "k", fetch: async (url, init) => {
+    urls.push(String(url));
+    methods.push(init?.method ?? "GET");
+    return Response.json(pages.shift());
+  }});
+  const ids: string[] = [];
+  for await (const dream of client.dreams.iterate({ view: "private", tag: "growth", limit: 1 })) {
+    ids.push(dream.memory_id);
+  }
+  await client.dreams.forget("dream_2");
+  expect(ids).toEqual(["dream_2", "dream_1"]);
+  expect(urls[0]).toBe("https://api.energon.test/v1/dreams?limit=1&view=private&tag=growth");
+  expect(urls[1]).toContain("cursor=5%3Adream_2");
+  expect(urls[2]).toBe("https://api.energon.test/v1/dreams/dream_2");
+  expect(methods[2]).toBe("DELETE");
+  await expect(client.dreams.page({ limit: 0 })).rejects.toThrow("limit");
+});
+
+test("reflection cites the context it dreamed on and keeps chosen tags", async () => {
+  let recorded: unknown;
+  const client = new Energon({ baseUrl: "https://api.energon.test", apiKey: "k", fetch: async (url, init) => {
+    if (String(url).endsWith("/v1/context/build")) {
+      return Response.json({ context_pack: ["fact"], items: [{ memory_id: "mem_7" }] });
+    }
+    recorded = JSON.parse(String(init?.body));
+    return Response.json({ memory_id: "dream_9", speculative: true });
+  }});
+  await client.dreams.reflect({ task: "Reflect", tags: ["night"], generate: async () => ({ content: "A hypothesis", inspiredBy: ["dream_1"] }) });
+  expect(recorded).toEqual({ content: "A hypothesis", tags: ["night"], inspired_by: ["dream_1", "mem_7"] });
+});

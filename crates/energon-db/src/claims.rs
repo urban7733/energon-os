@@ -170,19 +170,19 @@ pub async fn assert_claim(
     let conflict_id =
         matches!(resolution, ClaimResolution::Contested).then(|| input.conflict_id.clone());
 
-    if matches!(resolution, ClaimResolution::NewClaimWins) {
-        if let Some(existing) = incumbent.as_ref() {
-            sqlx::query(
-                r#"
+    if matches!(resolution, ClaimResolution::NewClaimWins)
+        && let Some(existing) = incumbent.as_ref()
+    {
+        sqlx::query(
+            r#"
                 UPDATE memory_claims
                 SET state = 'superseded', resolved_at = now()
                 WHERE claim_id = $1
                 "#,
-            )
-            .bind(&existing.claim_id)
-            .execute(&mut *tx)
-            .await?;
-        }
+        )
+        .bind(&existing.claim_id)
+        .execute(&mut *tx)
+        .await?;
     }
 
     sqlx::query(

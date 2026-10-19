@@ -113,3 +113,11 @@ bun run sdk:build
 The source package does not make a public registry release by itself. Publish
 only after the package version, changelog, provenance, and npm access policy
 are reviewed.
+
+## Transport security
+
+`baseUrl` must use `https://`. Plain `http://` is accepted only for loopback
+hosts (`localhost`, `127.0.0.1`, `[::1]`) because it would send the agent API key
+unencrypted. Inside a trusted private network (for example a Docker network),
+opt in explicitly with `allowInsecureHttp: true`. The client never follows
+redirects, so the key cannot be forwarded to another host.

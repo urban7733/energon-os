@@ -8,6 +8,7 @@ pub mod identity;
 pub mod memory;
 pub mod permissions;
 pub mod retrieval;
+mod unix_ms;
 
 pub use audit::{AuditRecord, PromotionAuditRecord};
 pub use claims::{ClaimDecision, ClaimResolution, compare_claims};

@@ -75,7 +75,7 @@ pub async fn create_org_skill_profile(
     headers: HeaderMap,
     Json(request): Json<CreateOrgSkillProfileRequest>,
 ) -> Result<Json<SkillProfileResponse>, ApiError> {
-    let operator = operator_from_request(state.jwt.as_ref(), &headers).await?;
+    let operator = operator_from_request(&state, &headers).await?;
     operator.require_org(&org_id)?;
     let pool = postgres_pool(&state)?;
 
@@ -119,7 +119,7 @@ pub async fn list_org_skill_profiles(
     Path(org_id): Path<String>,
     headers: HeaderMap,
 ) -> Result<Json<ListSkillProfilesResponse>, ApiError> {
-    let operator = operator_from_request(state.jwt.as_ref(), &headers).await?;
+    let operator = operator_from_request(&state, &headers).await?;
     operator.require_org(&org_id)?;
     let pool = postgres_pool(&state)?;
     let skills = energon_db::skills::list_org_skill_profiles(pool, &org_id)

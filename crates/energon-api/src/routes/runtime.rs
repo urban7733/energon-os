@@ -20,7 +20,7 @@ pub struct SwarmRuntimeResponse {
     pub swarm_id: String,
     pub agent: RuntimeAgent,
     pub guarantees: RuntimeGuarantees,
-    pub capabilities: [&'static str; 9],
+    pub capabilities: [&'static str; 11],
 }
 
 #[derive(Debug, Serialize)]
@@ -64,6 +64,8 @@ impl From<AgentIdentity> for SwarmRuntimeResponse {
                 "dreams.private.write",
                 "dreams.permissioned.read",
                 "dreams.explicit.share",
+                "dreams.journal.page",
+                "dreams.private.forget",
             ],
         }
     }
