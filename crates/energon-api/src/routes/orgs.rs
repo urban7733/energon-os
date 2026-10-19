@@ -18,17 +18,17 @@ const MAX_PAGE_LIMIT: i64 = 200;
 const DEFAULT_PAGE_LIMIT: i64 = 50;
 const RECENT_RECEIPT_LIMIT: i64 = 25;
 
-async fn authorize_operator(
+pub(crate) async fn authorize_operator(
     state: &AppState,
     headers: &HeaderMap,
     org_id: &str,
 ) -> Result<VerifiedOperator, ApiError> {
-    let operator = operator_from_request(state.jwt.as_ref(), headers).await?;
+    let operator = operator_from_request(state, headers).await?;
     operator.require_org(org_id)?;
     Ok(operator)
 }
 
-fn postgres_pool(state: &AppState) -> Result<&PgPool, ApiError> {
+pub(crate) fn postgres_pool(state: &AppState) -> Result<&PgPool, ApiError> {
     match &state.storage {
         StorageBackend::Postgres(pool) => Ok(pool),
         StorageBackend::Memory(_) => Err(ApiError::BadRequest(

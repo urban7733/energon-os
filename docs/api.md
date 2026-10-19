@@ -35,7 +35,9 @@ Without payment, the API responds with `402 Payment Required` and a
 All routes are rate limited per API key (or client IP) with a token bucket
 (default 20 rps, burst 40). Each client IP additionally has a budget of 20
 failed authentications (refilling at one per second), which stops API key and
-admin token guessing. Exhausted buckets receive `429 Too Many Requests` with a
+admin token guessing. The budget only gates requests that present a credential,
+and a credential that passed authentication in the last 15 minutes is exempt,
+so legitimate agents behind the same NAT keep working while guesses are blocked. Exhausted buckets receive `429 Too Many Requests` with a
 `Retry-After` header. Request bodies are limited to 1 MiB and handlers to 60
 seconds by default.
 

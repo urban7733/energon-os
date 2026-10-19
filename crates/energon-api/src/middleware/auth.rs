@@ -12,7 +12,9 @@ pub async fn identity_from_request(
     headers: &HeaderMap,
 ) -> Result<AgentIdentity, ApiError> {
     if let Some(api_key) = bearer_token(headers) {
-        return identity_from_api_key(state, &api_key).await;
+        let agent = identity_from_api_key(state, &api_key).await?;
+        state.rate_limiter.mark_verified(headers);
+        return Ok(agent);
     }
 
     if state.auth.dev_identity_headers {
@@ -35,6 +37,7 @@ pub fn require_admin(state: &AppState, headers: &HeaderMap) -> Result<(), ApiErr
         return Err(ApiError::Unauthorized("invalid admin token".to_owned()));
     }
 
+    state.rate_limiter.mark_verified(headers);
     Ok(())
 }
 

@@ -1,4 +1,9 @@
-use std::{env, net::SocketAddr, sync::Arc, time::Instant};
+use std::{
+    env,
+    net::SocketAddr,
+    sync::Arc,
+    time::{Duration, Instant},
+};
 
 use axum::{
     extract::{ConnectInfo, Request, State},
@@ -18,6 +23,9 @@ const DEFAULT_BURST: f64 = 40.0;
 const DEFAULT_AUTH_FAILURE_RPS: f64 = 1.0;
 const DEFAULT_AUTH_FAILURE_BURST: f64 = 20.0;
 const DEFAULT_CLIENT_IP_HEADER: &str = "x-forwarded-for";
+/// How long a credential that passed real authentication stays exempt from
+/// its IP's failed-authentication budget.
+const VERIFIED_CREDENTIAL_TTL: Duration = Duration::from_secs(15 * 60);
 /// Above this many tracked keys, stale buckets are evicted opportunistically.
 const CLEANUP_THRESHOLD: usize = 10_000;
 const STALE_BUCKET_SECONDS: f64 = 120.0;
@@ -41,6 +49,8 @@ struct RateLimiterInner {
     auth_failures: DashMap<String, Bucket>,
     auth_failure_rps: f64,
     auth_failure_burst: f64,
+    /// Fingerprints of credentials that recently passed authentication.
+    verified: DashMap<String, Instant>,
     client_ip_header: Option<String>,
 }
 
@@ -75,6 +85,7 @@ impl RateLimiter {
                 auth_failures: DashMap::new(),
                 auth_failure_rps: DEFAULT_AUTH_FAILURE_RPS,
                 auth_failure_burst: DEFAULT_AUTH_FAILURE_BURST,
+                verified: DashMap::new(),
                 client_ip_header,
             }),
         }
@@ -120,7 +131,40 @@ impl RateLimiter {
         );
     }
 
+    /// Called by the authentication layer once a credential was actually
+    /// checked and accepted. Only then may it bypass a throttled IP, so an
+    /// attacker guessing keys behind a shared NAT cannot lock out the real
+    /// agents and operators that share that address.
+    pub fn mark_verified(&self, headers: &HeaderMap) {
+        if let Some(fingerprint) = credential_fingerprint(headers) {
+            self.mark_verified_at(fingerprint, Instant::now());
+        }
+    }
+
+    fn mark_verified_at(&self, fingerprint: String, now: Instant) {
+        self.inner.verified.insert(fingerprint, now);
+    }
+
+    fn is_verified_at(&self, fingerprint: &str, now: Instant) -> bool {
+        self.inner
+            .verified
+            .get(fingerprint)
+            .is_some_and(|verified_at| {
+                now.saturating_duration_since(*verified_at) < VERIFIED_CREDENTIAL_TTL
+            })
+    }
+
+    fn forget_verified(&self, fingerprint: &str) {
+        self.inner.verified.remove(fingerprint);
+    }
+
     fn maybe_cleanup(&self, now: Instant) {
+        if self.inner.verified.len() > CLEANUP_THRESHOLD {
+            self.inner.verified.retain(|_, verified_at| {
+                now.saturating_duration_since(*verified_at) < VERIFIED_CREDENTIAL_TTL
+            });
+        }
+
         if self.inner.buckets.len() <= CLEANUP_THRESHOLD {
             return;
         }
@@ -168,7 +212,9 @@ fn refill(bucket: &mut Bucket, now: Instant, rps: f64, burst: f64) {
 /// Axum middleware enforcing the token bucket per API key or client IP, plus
 /// a per-IP budget for failed authentications. Every random bearer value
 /// gets its own request bucket, so without the failure budget an attacker
-/// could guess API keys at unlimited speed.
+/// could guess API keys at unlimited speed. The budget only gates requests
+/// that present a credential, and credentials verified in the last 15
+/// minutes pass even when their IP is throttled.
 pub async fn rate_limit(State(state): State<AppState>, request: Request, next: Next) -> Response {
     let peer = request
         .extensions()
@@ -180,9 +226,13 @@ pub async fn rate_limit(State(state): State<AppState>, request: Request, next: N
         state.rate_limiter.inner.client_ip_header.as_deref(),
     );
     let key = limiter_key(request.headers(), &client);
+    let credential = credential_fingerprint(request.headers());
     let now = Instant::now();
 
-    if !state.rate_limiter.auth_allowed_at(&client, now) {
+    if let Some(credential) = credential.as_deref()
+        && !state.rate_limiter.is_verified_at(credential, now)
+        && !state.rate_limiter.auth_allowed_at(&client, now)
+    {
         return ApiError::TooManyRequests(
             "too many failed authentication attempts; retry later".to_owned(),
         )
@@ -198,7 +248,11 @@ pub async fn rate_limit(State(state): State<AppState>, request: Request, next: N
 
     let response = next.run(request).await;
 
-    if response.status() == StatusCode::UNAUTHORIZED {
+    if response.status() == StatusCode::UNAUTHORIZED
+        && let Some(credential) = credential.as_deref()
+    {
+        // A revoked or expired credential loses its exemption immediately.
+        state.rate_limiter.forget_verified(credential);
         state
             .rate_limiter
             .record_auth_failure_at(&client, Instant::now());
@@ -252,6 +306,32 @@ fn client_ip_header_setting(value: Option<&str>) -> Option<String> {
         Some(value) if value.eq_ignore_ascii_case("none") => None,
         Some(value) => Some(value.to_ascii_lowercase()),
     }
+}
+
+/// Full SHA-256 of the presented secret (bearer key/JWT or admin token).
+/// Raw credentials are never stored.
+fn credential_fingerprint(headers: &HeaderMap) -> Option<String> {
+    let (kind, secret) = if let Some(token) = bearer_token(headers) {
+        ("bearer", token)
+    } else {
+        let admin = headers.get("x-energon-admin-token")?.to_str().ok()?.trim();
+        if admin.is_empty() {
+            return None;
+        }
+        ("admin", admin)
+    };
+
+    let mut hasher = Sha256::new();
+    hasher.update(kind.as_bytes());
+    hasher.update(b":");
+    hasher.update(secret.as_bytes());
+    Some(
+        hasher
+            .finalize()
+            .iter()
+            .map(|byte| format!("{byte:02x}"))
+            .collect(),
+    )
 }
 
 fn bearer_token(headers: &HeaderMap) -> Option<&str> {
@@ -364,6 +444,48 @@ mod tests {
             Some("x-real-ip")
         );
         assert_eq!(client_ip_header_setting(Some("none")), None);
+    }
+
+    #[test]
+    fn verified_credentials_survive_a_throttled_ip_until_they_expire() {
+        let limiter = RateLimiter::new(100.0, 100.0);
+        let start = Instant::now();
+        for _ in 0..DEFAULT_AUTH_FAILURE_BURST as usize {
+            limiter.record_auth_failure_at("ip:1.2.3.4", start);
+        }
+        assert!(!limiter.auth_allowed_at("ip:1.2.3.4", start));
+
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            axum::http::header::AUTHORIZATION,
+            HeaderValue::from_static("Bearer eos_live_real"),
+        );
+        let fingerprint = credential_fingerprint(&headers).expect("bearer fingerprint");
+        assert!(!fingerprint.contains("eos_live_real"));
+        assert!(!limiter.is_verified_at(&fingerprint, start));
+
+        limiter.mark_verified_at(fingerprint.clone(), start);
+        assert!(limiter.is_verified_at(&fingerprint, start + Duration::from_secs(60)));
+        assert!(!limiter.is_verified_at(&fingerprint, start + VERIFIED_CREDENTIAL_TTL));
+
+        limiter.forget_verified(&fingerprint);
+        assert!(!limiter.is_verified_at(&fingerprint, start));
+    }
+
+    #[test]
+    fn requests_without_credentials_have_no_fingerprint() {
+        assert!(credential_fingerprint(&HeaderMap::new()).is_none());
+        let mut admin = HeaderMap::new();
+        admin.insert("x-energon-admin-token", HeaderValue::from_static("secret"));
+        let mut bearer = HeaderMap::new();
+        bearer.insert(
+            axum::http::header::AUTHORIZATION,
+            HeaderValue::from_static("Bearer secret"),
+        );
+        assert_ne!(
+            credential_fingerprint(&admin),
+            credential_fingerprint(&bearer)
+        );
     }
 
     #[test]

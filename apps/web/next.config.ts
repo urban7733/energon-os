@@ -1,6 +1,7 @@
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { NextConfig } from "next";
+import { API_CONTENT_SECURITY_POLICY } from "./lib/csp";
 
 const appRoot = dirname(fileURLToPath(import.meta.url));
 const workspaceRoot = join(appRoot, "../..");
@@ -16,47 +17,9 @@ const devWatchIgnored = [
 
 const isDev = process.env.NODE_ENV !== "production";
 
-function origin(value: string | undefined): string | undefined {
-  try {
-    return value ? new URL(value).origin : undefined;
-  } catch {
-    return undefined;
-  }
-}
-
-// The browser may only talk to this site, the configured Energon API, the
-// public Base RPCs used by checkout, and Cloudflare Web Analytics. Even if an
-// injected script ran, it could not ship operator tokens anywhere else.
-const connectSources = [
-  "'self'",
-  origin(process.env.NEXT_PUBLIC_ENERGON_API_BASE_URL) ?? "http://127.0.0.1:3001",
-  "https://mainnet.base.org",
-  "https://sepolia.base.org",
-  "https://cloudflareinsights.com",
-  ...(isDev ? ["http://localhost:3001", "http://127.0.0.1:3001", "ws:", "wss:"] : []),
-];
-
-const contentSecurityPolicy = [
-  "default-src 'self'",
-  // Next.js streams inline bootstrap scripts; dev tooling also needs eval.
-  `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""} https://static.cloudflareinsights.com`,
-  "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data: blob:",
-  "font-src 'self' data:",
-  "media-src 'self' blob:",
-  "worker-src 'self' blob:",
-  `connect-src ${[...new Set(connectSources)].join(" ")}`,
-  // The landing page embeds the same-origin dashboard demo.
-  "frame-src 'self'",
-  "object-src 'none'",
-  "base-uri 'self'",
-  "form-action 'self'",
-  "frame-ancestors 'self'",
-  ...(isDev ? [] : ["upgrade-insecure-requests"]),
-].join("; ");
-
+// Page CSPs carry a per-request nonce and are set in middleware.ts. These headers
+// apply to every response, including API routes and static files.
 const securityHeaders = [
-  { key: "Content-Security-Policy", value: contentSecurityPolicy },
   { key: "X-Frame-Options", value: "SAMEORIGIN" },
   { key: "X-Content-Type-Options", value: "nosniff" },
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
@@ -77,7 +40,13 @@ const nextConfig: NextConfig = {
       { source: "/:path*", headers: securityHeaders },
       // Session-bound pages must never be stored by shared caches.
       { source: "/dashboard/:path*", headers: [{ key: "Cache-Control", value: "private, no-store" }] },
-      { source: "/api/auth/:path*", headers: [{ key: "Cache-Control", value: "no-store" }] },
+      {
+        source: "/api/:path*",
+        headers: [
+          { key: "Cache-Control", value: "no-store" },
+          { key: "Content-Security-Policy", value: API_CONTENT_SECURITY_POLICY },
+        ],
+      },
     ];
   },
   images: {

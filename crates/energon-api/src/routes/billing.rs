@@ -47,7 +47,7 @@ async fn authorize_operator(
     headers: &HeaderMap,
     org_id: &str,
 ) -> Result<VerifiedOperator, ApiError> {
-    let operator = operator_from_request(state.jwt.as_ref(), headers).await?;
+    let operator = operator_from_request(state, headers).await?;
     operator.require_org(org_id)?;
     Ok(operator)
 }
