@@ -5,6 +5,7 @@ import {
   CreditCard,
   Database,
   LayoutDashboard,
+  Moon,
   Network,
   PenLine,
   SlidersHorizontal,
@@ -13,6 +14,7 @@ import { EnergonWordmark } from "../brand/energon-mark";
 
 const icons = {
   overview: LayoutDashboard,
+  training: Moon,
   atlas: Network,
   agents: Bot,
   memory: Database,

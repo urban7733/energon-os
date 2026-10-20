@@ -13,5 +13,5 @@ export default async function DashboardDemoPage({
   searchParams: Promise<{ view?: string }>;
 }) {
   const { view } = await searchParams;
-  return <DashboardDemo view={view === "graph" || view === "agents" || view === "records" || view === "billing" ? view : "overview"} />;
+  return <DashboardDemo view={view === "graph" || view === "agents" || view === "records" || view === "billing" || view === "training" ? view : "overview"} />;
 }

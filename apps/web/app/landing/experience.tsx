@@ -15,9 +15,9 @@ const AudienceContext = createContext<{ audience: Audience; choose: (value: Audi
 });
 
 const navLinks = [
+  ["How it works", "#cycle"],
   ["Product", "#product"],
-  ["How it works", "#flow"],
-  ["Atlas", "#atlas"],
+  ["Proof", "#proof"],
   ["Developers", "#sdk"],
   ["Pricing", "#pricing"],
 ] as const;
@@ -80,6 +80,28 @@ export function LandingExperience({ children }: { children: React.ReactNode }) {
           opacity: 0.25,
           ease: "none",
           scrollTrigger: { trigger: ".lx-hero", start: "top top", end: "bottom top", scrub: true },
+        });
+
+        const cycle = document.querySelector<HTMLElement>(".lx-cycle");
+        if (cycle) {
+          gsap.fromTo(
+            cycle,
+            { "--p": 0 },
+            {
+              "--p": 1,
+              ease: "none",
+              scrollTrigger: { trigger: ".lx-cycle-track", start: "top 85%", end: "top 30%", scrub: 0.8 },
+            },
+          );
+        }
+
+        gsap.utils.toArray<HTMLElement>("[data-bar]").forEach((bar) => {
+          gsap.from(bar, {
+            scaleX: 0,
+            duration: 1.6,
+            ease: "expo.out",
+            scrollTrigger: { trigger: bar, start: "top 90%", once: true },
+          });
         });
 
         const words = gsap.utils.toArray<HTMLElement>(".lx-mission-word");
@@ -201,32 +223,32 @@ export function LandingHero() {
             <source src="/media/energon-os-hero-clean.mp4" type="video/mp4" />
           </video>
         </div>
-        <a className="lx-hero-badge" href="https://github.com/urban7733/energon-os" target="_blank" rel="noreferrer" data-hero-in>
+        <a className="lx-hero-badge" href="#cycle" data-hero-in>
           <span className="ex-dot ex-dot-live" />
-          <span>Open-source core · Apache 2.0</span>
+          <span>Early access · Nightly training for AI agents</span>
           <ArrowRight size={13} aria-hidden="true" />
         </a>
 
         <h1 id="hero-title" data-hero-in key={audience}>
           {machine ? (
             <>
-              One connection.
+              Report your runs.
               <br />
-              <span>Persistent, permitted context.</span>
+              <span>Wake up retrained.</span>
             </>
           ) : (
             <>
-              Independent agents.
+              Your agents learn
               <br />
-              <span>Collective intelligence.</span>
+              <span>while they sleep.</span>
             </>
           )}
         </h1>
 
         <p className="lx-hero-lede" data-hero-in>
           {machine
-            ? "Discover the contract, authenticate with a bearer key and retrieve only the memory your identity is permitted to see."
-            : "Energon is the permissioned memory layer for AI agent swarms. Every agent starts private. You decide what the swarm shares, and every context decision leaves an audit trail."}
+            ? "Send your trajectories to Energon during the day. Overnight they become a trained adapter or compiled instructions, delivered with an eval report before you load them."
+            : "Energon turns what your agents do all day into what they know by morning. Trained adapters for open models, compiled instructions for closed ones. Measured on held-out tasks, not claimed."}
         </p>
 
         <div className="lx-hero-actions" data-hero-in>
@@ -236,16 +258,16 @@ export function LandingHero() {
                 Read machine contract <ArrowUpRight size={16} aria-hidden="true" />
               </a>
               <a className="ex-btn ex-btn-lg" href="#sdk">
-                Connect with the SDK
+                See the API
               </a>
             </>
           ) : (
             <>
-              <Link className="ex-btn ex-btn-primary ex-btn-lg" href="/dashboard">
-                Open your workspace <ArrowRight size={16} aria-hidden="true" />
+              <Link className="ex-btn ex-btn-primary ex-btn-lg" href="/login">
+                Request early access <ArrowRight size={16} aria-hidden="true" />
               </Link>
-              <a className="ex-btn ex-btn-lg" href="#product">
-                See the product
+              <a className="ex-btn ex-btn-lg" href="#cycle">
+                How it works
               </a>
             </>
           )}
@@ -254,11 +276,10 @@ export function LandingHero() {
         {machine ? (
           <pre className="lx-hero-code" data-hero-in aria-label="Agent interface example">
             <code>
-              <span className="tk-k">const</span> context = <span className="tk-k">await</span> energon.context.
-              <span className="tk-f">build</span>({"{"}
-              {"\n"}  task: <span className="tk-s">&quot;Plan the next move&quot;</span>,{"\n"}  tokenBudget:{" "}
-              <span className="tk-n">2_000</span>,{"\n"}
-              {"}"});
+              <span className="tk-k">await</span> energon.runs.<span className="tk-f">report</span>({"{"} task, steps, outcome:{" "}
+              <span className="tk-s">&quot;success&quot;</span> {"}"});{"\n"}
+              <span className="tk-k">const</span> skill = <span className="tk-k">await</span> energon.training.
+              <span className="tk-f">latest</span>();
             </code>
           </pre>
         ) : null}
@@ -280,7 +301,7 @@ export function ProductFrame() {
             <i />
           </span>
           <span className="lx-frame-url">
-            <span className="ex-dot ex-dot-ok" /> energon / workspace / overview
+            <span className="ex-dot ex-dot-ok" /> energon / training / research-01
           </span>
           <span className="lx-frame-tag">Sample data</span>
         </div>
@@ -294,8 +315,8 @@ export function ProductFrame() {
         <iframe
           className="lx-frame-view"
           tabIndex={interactive ? 0 : -1}
-          src="/dashboard-demo?view=overview&embed=1"
-          title="Interactive Energon dashboard with sample workspace data"
+          src="/dashboard-demo?view=training&embed=1"
+          title="Energon training dashboard with sample data"
           loading="lazy"
         />
       </figure>

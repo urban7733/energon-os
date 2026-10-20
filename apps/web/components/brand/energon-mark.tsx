@@ -42,9 +42,7 @@ export function EnergonWordmark({ size = 22 }: { size?: number }) {
   return (
     <span className="ex-wordmark">
       <EnergonMark size={size} />
-      <span>
-        Energon<em>OS</em>
-      </span>
+      <span>Energon</span>
     </span>
   );
 }

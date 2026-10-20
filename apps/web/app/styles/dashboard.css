@@ -397,7 +397,7 @@
 
 .dx-kpis {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(168px, 1fr));
   gap: 12px;
 }
 
@@ -1470,10 +1470,6 @@
 
 /* ── Responsive ── */
 @media (max-width: 1280px) {
-  .dx-kpis {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-
   .dx-tab-grid {
     grid-template-columns: 1fr;
   }
@@ -1767,4 +1763,119 @@
   background: rgba(255, 143, 134, 0.06);
   color: var(--ex-coral);
   font-size: 12.5px;
+}
+
+/* ───────────────────────── Training view ───────────────────────── */
+.tv-kpi-accent {
+  border-color: rgba(183, 166, 255, 0.3);
+  background:
+    radial-gradient(120% 90% at 100% 0%, rgba(183, 166, 255, 0.14), transparent 60%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.025), rgba(255, 255, 255, 0.006));
+}
+
+.tv-kpi-accent > strong {
+  color: #e2dbff;
+}
+
+.tv-job {
+  display: grid;
+  gap: 0;
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tv-job li {
+  position: relative;
+  display: grid;
+  grid-template-columns: 44px 1fr;
+  gap: 12px;
+  padding: 0 0 16px;
+}
+
+.tv-job li::before {
+  content: "";
+  position: absolute;
+  left: 52px;
+  top: 6px;
+  bottom: -2px;
+  width: 1px;
+  background: var(--ex-line-2);
+}
+
+.tv-job li:last-child::before {
+  display: none;
+}
+
+.tv-job li::after {
+  content: "";
+  position: absolute;
+  left: 49px;
+  top: 3px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--ex-violet);
+  box-shadow: 0 0 10px rgba(183, 166, 255, 0.7);
+}
+
+.tv-job li:last-child::after {
+  background: var(--ex-mint);
+  box-shadow: 0 0 10px rgba(132, 227, 192, 0.7);
+}
+
+.tv-job time {
+  color: var(--ex-muted);
+  font: 500 11.5px/1.2 var(--ex-mono);
+}
+
+.tv-job span {
+  display: grid;
+  gap: 3px;
+  padding-left: 14px;
+}
+
+.tv-job strong {
+  color: var(--ex-ink);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.tv-job em {
+  color: var(--ex-muted);
+  font-size: 12px;
+  font-style: normal;
+}
+
+.tv-cols {
+  grid-template-columns: 1.4fr 1.2fr 1fr 1fr 1fr;
+}
+
+.tv-lift {
+  color: var(--ex-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.tv-lift.is-up {
+  color: var(--ex-mint);
+}
+
+.dx .dx-pill svg {
+  margin-right: 5px;
+}
+
+.tv-rejected {
+  border-color: rgba(255, 143, 134, 0.25);
+  background: rgba(255, 143, 134, 0.06);
+  color: var(--ex-coral);
+}
+
+.dx-entity-avatar svg {
+  color: #fff;
+}
+
+@media (max-width: 640px) {
+  .tv-cols {
+    grid-template-columns: 1.6fr 1fr !important;
+  }
 }

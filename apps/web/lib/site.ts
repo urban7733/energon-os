@@ -6,9 +6,9 @@ export const site = {
   apiDocumentationUrl: "https://github.com/urban7733/energon-os/blob/main/docs/api.md",
   architectureDocumentationUrl: "https://github.com/urban7733/energon-os/blob/main/docs/architecture.md",
   description:
-    "Private-by-default memory for AI agent swarms. Each agent keeps its own memory until you choose what to share.",
-  shortClaim: "Every agent starts private. You choose what the swarm shares.",
-  category: "AI agent memory infrastructure",
+    "Your agents learn while they sleep. Energon turns your agents' daily runs into nightly training: trained adapters for open models, compiled instructions for closed ones, measured on held-out tasks.",
+  shortClaim: "Your agents learn while they sleep.",
+  category: "AI agent training infrastructure",
   founder: "Urban Herak",
   apiBaseUrl: process.env.NEXT_PUBLIC_ENERGON_API_BASE_URL ?? "http://127.0.0.1:3001",
   longTermGoal:
@@ -25,51 +25,51 @@ export const site = {
 
 export const pricingPlans = [
   {
-    name: "Agent Metered",
-    price: "from $0.003 / context build",
-    settlement: "USDC via x402",
-    audience: "autonomous agents and agent platforms",
+    name: "Free",
+    price: "$0",
+    settlement: "no card required",
+    audience: "developers trying nightly training",
     details: [
-      "$0.001 per memory write",
-      "$0.003 per context build",
-      "$0.0005 per audit read",
-      "paid per request before context delivery",
+      "1 agent",
+      "weekly training run",
+      "compiled instructions for any model",
+      "before/after eval report",
     ],
   },
   {
-    name: "Developer",
-    price: "$99 / month",
-    settlement: "USDC only",
-    audience: "builders integrating the API",
+    name: "Pro",
+    price: "from $99 / agent / month",
+    settlement: "billed monthly",
+    audience: "teams with agents in production",
     details: [
-      "100k included API operations",
-      "shared dashboard access",
-      "private memory and audited sharing",
-      "manual USDC renewal every 30 days",
-    ],
-  },
-  {
-    name: "Team",
-    price: "$499 / month",
-    settlement: "USDC only",
-    audience: "AI-native teams and startups",
-    details: [
-      "1M included API operations",
-      "shared project and role memory",
-      "operator dashboard and audit exports",
-      "manual USDC renewal every 30 days",
+      "nightly training when new runs arrive",
+      "trained LoRA adapters for open models",
+      "compiled instructions for closed models",
+      "held-out evals before every release",
     ],
   },
   {
     name: "Enterprise",
-    price: "from $2,500 / month",
-    settlement: "USDC, annual prepay",
-    audience: "larger autonomous-company deployments",
+    price: "custom",
+    settlement: "annual agreement",
+    audience: "companies running agent fleets",
     details: [
-      "dedicated tenancy or self-hosted core",
-      "custom retrieval and retention limits",
-      "compliance audit support",
-      "custom payment and entitlement bridge",
+      "private cloud or self-hosted core",
+      "dedicated training capacity",
+      "audit exports and data isolation",
+      "SLA and security review",
+    ],
+  },
+  {
+    name: "Agents",
+    price: "pay per night",
+    settlement: "USDC via x402",
+    audience: "autonomous agents with no human attached",
+    details: [
+      "discover, pay and register via API",
+      "pay per training run and per request",
+      "no browser session required",
+      "same evals, same isolation",
     ],
   },
 ] as const;
@@ -77,15 +77,15 @@ export const pricingPlans = [
 export const paymentRails = [
   {
     name: "x402",
-    role: "Primary rail for autonomous agents paying per API request.",
+    role: "Autonomous agents pay per training run and per request, before anything is delivered.",
   },
   {
-    name: "Stablecoin checkout",
-    role: "Human account plan checkout on Base, settled in USDC.",
+    name: "Teams",
+    role: "Operators pay monthly per agent. Training only runs when enough new runs have arrived.",
   },
   {
-    name: "Payment service boundary",
-    role: "Payment execution lives outside Energon OS and grants signed entitlements to the API.",
+    name: "Open-source core",
+    role: "The permissioned memory engine underneath stays Apache 2.0 and self-hostable.",
   },
 ] as const;
 

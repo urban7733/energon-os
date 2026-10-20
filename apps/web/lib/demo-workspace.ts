@@ -78,3 +78,39 @@ export const demoConflicts = [
   { conflict_id: "conflict-pricing", subject: "enterprise", predicate: "annual_price", status: "contested" as const },
   { conflict_id: "conflict-launch", subject: "launch", predicate: "release_date", status: "contested" as const },
 ];
+
+/** Sample nightly-training data for the public demo. Illustrative, not measured. */
+export const demoTraining = {
+  agent: "research-01",
+  model: "Qwen coder 14B + LoRA",
+  runsThisWeek: 1284,
+  nights: [
+    { night: "N1", base: 52, trained: 52 },
+    { night: "N2", base: 52, trained: 55 },
+    { night: "N3", base: 53, trained: 57 },
+    { night: "N4", base: 52, trained: 56 },
+    { night: "N5", base: 52, trained: 61 },
+    { night: "N6", base: 53, trained: 63 },
+    { night: "N7", base: 52, trained: 62 },
+    { night: "N8", base: 52, trained: 66 },
+    { night: "N9", base: 53, trained: 68 },
+    { night: "N10", base: 52, trained: 69 },
+    { night: "N11", base: 52, trained: 71 },
+    { night: "N12", base: 53, trained: 70 },
+    { night: "N13", base: 52, trained: 73 },
+    { night: "N14", base: 52, trained: 74 },
+  ],
+  versions: [
+    { version: "v14", night: "last night", kind: "adapter" as const, lift: 1, status: "live" as const, runs: 412 },
+    { version: "v13", night: "2 nights ago", kind: "adapter" as const, lift: 3, status: "shipped" as const, runs: 388 },
+    { version: "v12", night: "3 nights ago", kind: "compiled" as const, lift: -1, status: "rejected" as const, runs: 305 },
+    { version: "v11", night: "4 nights ago", kind: "adapter" as const, lift: 2, status: "shipped" as const, runs: 351 },
+  ],
+  lastNight: [
+    { time: "23:04", label: "Collected", detail: "412 new runs · 297 successful" },
+    { time: "23:11", label: "Filtered", detail: "permission check · 18 runs excluded" },
+    { time: "23:40", label: "Trained", detail: "LoRA rank 16 · 1 GPU · 26 min" },
+    { time: "05:12", label: "Evaluated", detail: "120 held-out tasks · 5 runs each" },
+    { time: "05:30", label: "Released v14", detail: "+1 pt vs v13 · now live" },
+  ],
+};

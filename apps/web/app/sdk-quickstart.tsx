@@ -36,74 +36,68 @@ const quickstarts = [
     id: "typescript",
     label: "TypeScript",
     icon: siTypescript,
-    filename: "quickstart.ts",
+    filename: "nightly.ts",
     guide: "https://github.com/urban7733/energon-os/blob/main/docs/sdk-typescript.md",
     code: `import { Energon } from "@energon/sdk";
 
 const energon = new Energon({
-  baseUrl: process.env.ENERGON_API_URL!,
   apiKey: process.env.ENERGON_AGENT_API_KEY!,
 });
 
-const memory = await energon.memory.remember({
-  content: "Verified: enterprise plan supports SSO.",
-  tags: ["pricing", "verified"],
+// Day: report what the agent did.
+await energon.runs.report({
+  task: "Restart the failing nginx service",
+  steps: trajectory,
+  outcome: "success",
 });
 
-const context = await energon.context.build({
-  task: "Answer an enterprise pricing question.",
-  tokenBudget: 1_500,
-});`,
+// Morning: load what it learned overnight.
+const version = await energon.training.latest();
+console.log(version.evals.heldOut.lift); // vs. yesterday`,
   },
   {
     id: "python",
     label: "Python",
     icon: siPython,
-    filename: "quickstart.py",
+    filename: "nightly.py",
     guide: "https://github.com/urban7733/energon-os/blob/main/docs/sdk-python.md",
     code: `import os
 
 from energon_sdk import Energon
 
-energon = Energon(
-    base_url=os.environ["ENERGON_API_URL"],
-    api_key=os.environ["ENERGON_AGENT_API_KEY"],
+energon = Energon(api_key=os.environ["ENERGON_AGENT_API_KEY"])
+
+# Day: report what the agent did.
+energon.runs.report(
+    task="Restart the failing nginx service",
+    steps=trajectory,
+    outcome="success",
 )
 
-memory = energon.memory.remember(
-    content="Verified: enterprise plan supports SSO.",
-    tags=["pricing", "verified"],
-)
-
-context = energon.context.build(
-    task="Answer an enterprise pricing question.",
-    token_budget=1_500,
-)`,
+# Morning: load what it learned overnight.
+version = energon.training.latest()
+print(version.evals.held_out.lift)  # vs. yesterday`,
   },
   {
     id: "rust",
     label: "Rust",
     icon: siRust,
-    filename: "quickstart.rs",
+    filename: "nightly.rs",
     guide: "https://github.com/urban7733/energon-os/blob/main/docs/sdk-rust.md",
-    code: `use energon_sdk::{BuildContextInput, Energon, RememberInput};
+    code: `use energon_sdk::{Energon, RunReport, Outcome};
 
-let energon = Energon::new(
-    &std::env::var("ENERGON_API_URL")?,
-    &std::env::var("ENERGON_AGENT_API_KEY")?,
-)?;
+let energon = Energon::new(&std::env::var("ENERGON_AGENT_API_KEY")?)?;
 
-let memory = energon.remember(RememberInput {
-    content: "Verified: enterprise plan supports SSO.".into(),
-    tags: vec!["pricing".into(), "verified".into()],
-    source: None,
+// Day: report what the agent did.
+energon.report_run(RunReport {
+    task: "Restart the failing nginx service".into(),
+    steps: trajectory,
+    outcome: Outcome::Success,
 })?;
 
-let context = energon.build_context(BuildContextInput {
-    task: "Answer an enterprise pricing question.".into(),
-    project_id: None,
-    token_budget: Some(1_500),
-})?;`,
+// Morning: load what it learned overnight.
+let version = energon.latest_training()?;
+println!("{}", version.evals.held_out.lift);`,
   },
 ] as const;
 
@@ -150,7 +144,7 @@ export function SdkQuickstart() {
       </div>
       <div className="lx-code-foot">
         <span>
-          <span className="ex-dot ex-dot-ok" /> Server-side · <code>ENERGON_AGENT_API_KEY</code>
+          <span className="ex-dot ex-dot-warn" /> Early-access API · subject to change
         </span>
         <a href={active.guide} target="_blank" rel="noreferrer" aria-label={`Open the ${active.label} SDK guide`}>
           Guide ↗

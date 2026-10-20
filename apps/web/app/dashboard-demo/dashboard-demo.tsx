@@ -4,12 +4,14 @@ import dynamic from "next/dynamic";
 import { Activity, Coins, Database, Gauge } from "lucide-react";
 import { AnalyticsDeck } from "../../components/dashboard/analytics-deck";
 import { DashboardFrame, type DashboardNavItem } from "../../components/dashboard/dashboard-frame";
+import { TrainingView } from "../../components/dashboard/training-view";
 import {
   demoAgents,
   demoConflicts,
   demoMemories,
   demoRolePolicies,
   demoScopes,
+  demoTraining,
   demoUsage,
 } from "../../lib/demo-workspace";
 
@@ -18,13 +20,18 @@ const MemoryAtlas = dynamic(() => import("../../components/dashboard/memory-atla
   loading: () => <div className="ax-loading" aria-label="Loading Memory Atlas" />,
 });
 
-type DemoView = "overview" | "graph" | "agents" | "records" | "billing";
+type DemoView = "overview" | "training" | "graph" | "agents" | "records" | "billing";
 
 const views: Record<DemoView, { section: string; title: string; subtitle: string }> = {
   overview: {
     section: "Overview",
     title: "Control your autonomous company.",
     subtitle: "Usage, agents and memory in one focused operating view.",
+  },
+  training: {
+    section: "Training",
+    title: "research-01 learned overnight.",
+    subtitle: "Nightly training, held-out evals and every version on record.",
   },
   graph: {
     section: "Memory Atlas",
@@ -51,6 +58,7 @@ const views: Record<DemoView, { section: string; title: string; subtitle: string
 export function DashboardDemo({ view }: { view: DemoView }) {
   const copy = views[view];
   const nav: DashboardNavItem[] = [
+    { label: "Training", href: "/dashboard-demo?view=training", icon: "training", active: view === "training" },
     { label: "Overview", href: "/dashboard-demo?view=overview", icon: "overview", active: view === "overview" },
     { label: "Memory Atlas", href: "/dashboard-demo?view=graph", icon: "atlas", active: view === "graph" },
     { label: "Agents", href: "/dashboard-demo?view=agents", icon: "agents", active: view === "agents" },
@@ -85,7 +93,9 @@ export function DashboardDemo({ view }: { view: DemoView }) {
           </span>
         </div>
 
-        {view === "overview" ? (
+        {view === "training" ? (
+          <TrainingView data={demoTraining} />
+        ) : view === "overview" ? (
           <AnalyticsDeck
             usage={demoUsage}
             scopes={demoScopes}

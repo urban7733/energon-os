@@ -23,8 +23,8 @@ const siteVerification = {
 export const metadata: Metadata = {
   metadataBase: new URL(site.url),
   title: {
-    default: "Energon OS | Permissioned Memory Infrastructure for AI Agents",
-    template: "%s | Energon OS",
+    default: "Energon | Your agents learn while they sleep",
+    template: "%s | Energon",
   },
   description: site.description,
   applicationName: "Energon OS",
@@ -37,6 +37,10 @@ export const metadata: Metadata = {
   classification: "AI agent infrastructure",
   keywords: [
     "Energon OS",
+    "AI agent training",
+    "continual learning for AI agents",
+    "LoRA adapters for agents",
+    "agent evals",
     "AI agent memory",
     "agent swarm memory",
     "autonomous AI company infrastructure",
@@ -71,7 +75,7 @@ export const metadata: Metadata = {
     url: site.url,
     siteName: "Energon OS",
     locale: "en_US",
-    title: "Energon OS | Permissioned Memory Infrastructure for AI Agents",
+    title: "Energon | Your agents learn while they sleep",
     description: site.description,
     images: [
       {
@@ -84,7 +88,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "Energon OS | Permissioned Memory for AI Agents",
+    title: "Energon | Your agents learn while they sleep",
     description: site.description,
     creator: "@urbanherak",
     images: [absoluteUrl("/energonos.png")],
