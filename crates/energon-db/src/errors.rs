@@ -20,6 +20,8 @@ pub enum DbError {
     SkillAssignmentAgentNotFound,
     #[error("skill profile not found: {0}")]
     SkillProfileNotFound(String),
+    #[error("invalid training transition: {0}")]
+    InvalidTrainingTransition(String),
 }
 
 pub fn i64_to_u128(value: i64, field: &'static str) -> Result<u128, DbError> {

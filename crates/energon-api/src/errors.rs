@@ -35,6 +35,9 @@ impl From<energon_db::DbError> for ApiError {
                 ApiError::BadRequest(message)
             }
             energon_db::DbError::InvalidClaimEvidence(message) => ApiError::BadRequest(message),
+            energon_db::DbError::InvalidTrainingTransition(message) => {
+                ApiError::BadRequest(message)
+            }
             energon_db::DbError::SkillAssignmentAgentNotFound => ApiError::BadRequest(
                 "one or more assigned agents do not belong to this organization".to_owned(),
             ),

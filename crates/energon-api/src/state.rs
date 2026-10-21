@@ -12,8 +12,8 @@ use energon_core::{AuditRecord, MemoryRecord, PromotionAuditRecord};
 use sqlx::PgPool;
 
 use crate::{
-    chain::BaseCheckoutConfig, embedding::EmbeddingClient, jwt::JwtVerifier,
-    middleware::rate_limit::RateLimiter, x402::X402Config,
+    artifacts::ArtifactStore, chain::BaseCheckoutConfig, embedding::EmbeddingClient,
+    jwt::JwtVerifier, middleware::rate_limit::RateLimiter, x402::X402Config,
 };
 
 #[derive(Clone)]
@@ -27,6 +27,9 @@ pub struct AppState {
     pub rate_limiter: RateLimiter,
     pub retrieval_candidate_limit: i64,
     pub agent_self_registration: bool,
+    /// Shared with the worker; signs and verifies trainer job tokens.
+    pub trainer_secret: Option<String>,
+    pub artifacts: Option<ArtifactStore>,
     next_memory: Arc<AtomicU64>,
     next_promotion: Arc<AtomicU64>,
     next_request: Arc<AtomicU64>,
@@ -36,6 +39,9 @@ pub struct AppState {
     next_claim: Arc<AtomicU64>,
     next_conflict: Arc<AtomicU64>,
     next_skill: Arc<AtomicU64>,
+    next_run: Arc<AtomicU64>,
+    next_job: Arc<AtomicU64>,
+    next_version: Arc<AtomicU64>,
 }
 
 #[derive(Clone)]
@@ -63,6 +69,7 @@ pub struct UsageCounter {
 #[derive(Clone)]
 pub struct InMemoryStorage {
     pub dreams: Arc<RwLock<Vec<energon_core::dreams::DreamRecord>>>,
+    pub runs: Arc<RwLock<Vec<energon_core::training::RunRecord>>>,
     pub memories: Arc<RwLock<Vec<MemoryRecord>>>,
     pub audits: Arc<RwLock<HashMap<String, AuditRecord>>>,
     pub promotion_audits: Arc<RwLock<HashMap<String, PromotionAuditRecord>>>,
@@ -85,6 +92,8 @@ impl AppState {
             rate_limiter: RateLimiter::from_env(),
             retrieval_candidate_limit: retrieval_candidate_limit(),
             agent_self_registration: env_flag("ENERGON_AGENT_SELF_REGISTRATION_ENABLED"),
+            trainer_secret: trainer_secret(),
+            artifacts: ArtifactStore::from_env(),
             next_memory: Arc::new(AtomicU64::new(1)),
             next_promotion: Arc::new(AtomicU64::new(1)),
             next_request: Arc::new(AtomicU64::new(1)),
@@ -94,6 +103,9 @@ impl AppState {
             next_claim: Arc::new(AtomicU64::new(1)),
             next_conflict: Arc::new(AtomicU64::new(1)),
             next_skill: Arc::new(AtomicU64::new(1)),
+            next_run: Arc::new(AtomicU64::new(1)),
+            next_job: Arc::new(AtomicU64::new(1)),
+            next_version: Arc::new(AtomicU64::new(1)),
         }
     }
 
@@ -143,6 +155,8 @@ impl AppState {
             rate_limiter: RateLimiter::from_env(),
             retrieval_candidate_limit: retrieval_candidate_limit(),
             agent_self_registration: env_flag("ENERGON_AGENT_SELF_REGISTRATION_ENABLED"),
+            trainer_secret: trainer_secret(),
+            artifacts: ArtifactStore::from_env(),
             next_memory: Arc::new(AtomicU64::new(1)),
             next_promotion: Arc::new(AtomicU64::new(1)),
             next_request: Arc::new(AtomicU64::new(1)),
@@ -152,6 +166,9 @@ impl AppState {
             next_claim: Arc::new(AtomicU64::new(1)),
             next_conflict: Arc::new(AtomicU64::new(1)),
             next_skill: Arc::new(AtomicU64::new(1)),
+            next_run: Arc::new(AtomicU64::new(1)),
+            next_job: Arc::new(AtomicU64::new(1)),
+            next_version: Arc::new(AtomicU64::new(1)),
         })
     }
 
@@ -195,10 +212,32 @@ impl AppState {
         format!("conflict_{}_{}", now_unix_ms(), id)
     }
 
+    pub fn next_run_id(&self) -> String {
+        let id = self.next_run.fetch_add(1, Ordering::Relaxed);
+        format!("run_{}_{}", now_unix_ms(), id)
+    }
+
+    pub fn next_job_id(&self) -> String {
+        let id = self.next_job.fetch_add(1, Ordering::Relaxed);
+        format!("job_{}_{}", now_unix_ms(), id)
+    }
+
+    pub fn next_version_id(&self) -> String {
+        let id = self.next_version.fetch_add(1, Ordering::Relaxed);
+        format!("ver_{}_{}", now_unix_ms(), id)
+    }
+
     pub fn next_skill_id(&self) -> String {
         let id = self.next_skill.fetch_add(1, Ordering::Relaxed);
         format!("skill_{}_{}", now_unix_ms(), id)
     }
+}
+
+fn trainer_secret() -> Option<String> {
+    env::var("ENERGON_TRAINER_SECRET")
+        .ok()
+        .map(|value| value.trim().to_owned())
+        .filter(|value| value.len() >= 32)
 }
 
 fn retrieval_candidate_limit() -> i64 {
@@ -283,6 +322,7 @@ impl InMemoryStorage {
     fn new() -> Self {
         Self {
             dreams: Arc::new(RwLock::new(Vec::new())),
+            runs: Arc::new(RwLock::new(Vec::new())),
             memories: Arc::new(RwLock::new(Vec::new())),
             audits: Arc::new(RwLock::new(HashMap::new())),
             promotion_audits: Arc::new(RwLock::new(HashMap::new())),

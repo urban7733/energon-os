@@ -11,6 +11,7 @@ base64 = "0.22"
 dashmap = "6.2.1"
 energon-core = { path = "../energon-core" }
 energon-db = { path = "../energon-db" }
+hmac = "0.12"
 jsonwebtoken = { version = "10.4.0", features = ["rust_crypto"] }
 k256 = "0.13"
 rand = "0.8"

@@ -8,6 +8,7 @@ pub mod memory;
 pub mod payments;
 pub mod pool;
 pub mod skills;
+pub mod training;
 
 pub use errors::DbError;
 pub mod dreams;

@@ -6,6 +6,10 @@ license.workspace = true
 authors.workspace = true
 
 [dependencies]
+hmac = "0.12"
 prost.workspace = true
+regex = "1"
 serde.workspace = true
+serde_json.workspace = true
+sha2 = "0.10"
 thiserror.workspace = true

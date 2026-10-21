@@ -1,4 +1,5 @@
 mod app;
+mod artifacts;
 mod chain;
 mod embedding;
 mod errors;

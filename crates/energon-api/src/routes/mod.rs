@@ -16,8 +16,11 @@ pub mod memory;
 pub mod orgs;
 pub mod overview;
 pub mod registration;
+pub mod runs;
 pub mod runtime;
 pub mod skills;
+pub mod trainer;
+pub mod training;
 pub mod vault;
 
 pub fn router() -> Router<AppState> {
@@ -34,6 +37,12 @@ pub fn router() -> Router<AppState> {
         )
         .route("/dreams", get(dreams::list).post(dreams::write))
         .route("/dreams/share", post(dreams::share))
+        .route("/runs", get(runs::list).post(runs::report))
+        .route("/training/latest", get(training::latest))
+        .route("/training/versions", get(training::versions))
+        .route("/trainer/jobs/{job_id}/dataset", get(trainer::dataset))
+        .route("/trainer/jobs/{job_id}/heartbeat", post(trainer::heartbeat))
+        .route("/trainer/jobs/{job_id}/result", post(trainer::result))
         .route("/memory/write", post(memory::write_memory))
         .route("/memory/promote", post(memory::promote_memory))
         .route("/context/build", post(context::build_context))
@@ -62,6 +71,22 @@ pub fn router() -> Router<AppState> {
             get(skills::list_org_skill_profiles).post(skills::create_org_skill_profile),
         )
         .route("/orgs/{org_id}/memory-stats", get(orgs::org_memory_stats))
+        .route(
+            "/orgs/{org_id}/agents/{agent_id}/training",
+            get(training::overview),
+        )
+        .route(
+            "/orgs/{org_id}/agents/{agent_id}/training/config",
+            put(training::update_config),
+        )
+        .route(
+            "/orgs/{org_id}/agents/{agent_id}/training/jobs",
+            post(training::start_job),
+        )
+        .route(
+            "/orgs/{org_id}/agents/{agent_id}/training/versions/{version_id}/rollback",
+            post(training::rollback),
+        )
         .route(
             "/orgs/{org_id}/memories/{memory_id}",
             delete(orgs::delete_org_memory),

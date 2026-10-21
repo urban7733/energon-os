@@ -39,6 +39,7 @@ pub struct RoutePricing {
     pub claim_assert_micro: u64,
     pub audit_read_micro: u64,
     pub vault_export_micro: u64,
+    pub run_report_micro: u64,
 }
 
 impl Default for RoutePricing {
@@ -51,6 +52,7 @@ impl Default for RoutePricing {
             claim_assert_micro: 1_000,
             audit_read_micro: 500,
             vault_export_micro: 5_000,
+            run_report_micro: 1_000,
         }
     }
 }
@@ -88,6 +90,10 @@ impl RoutePricing {
                 "ENERGON_PRICE_VAULT_EXPORT_MICRO",
                 defaults.vault_export_micro,
             ),
+            run_report_micro: price_env(
+                "ENERGON_PRICE_RUN_REPORT_MICRO",
+                defaults.run_report_micro,
+            ),
         }
     }
 
@@ -100,6 +106,7 @@ impl RoutePricing {
             PaidRoute::ClaimAssert => self.claim_assert_micro,
             PaidRoute::ContextAuditRead | PaidRoute::PromotionAuditRead => self.audit_read_micro,
             PaidRoute::ObsidianVaultExport => self.vault_export_micro,
+            PaidRoute::RunReport => self.run_report_micro,
         }
     }
 }
@@ -156,6 +163,7 @@ pub enum PaidRoute {
     ContextAuditRead,
     PromotionAuditRead,
     ObsidianVaultExport,
+    RunReport,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -327,6 +335,7 @@ impl X402Config {
                 self.payment_required(PaidRoute::ContextAuditRead),
                 self.payment_required(PaidRoute::PromotionAuditRead),
                 self.payment_required(PaidRoute::ObsidianVaultExport),
+                self.payment_required(PaidRoute::RunReport),
             ],
             "note": "Payment execution is external. Energon API enforces x402 before paid memory/context delivery."
         })
@@ -459,6 +468,7 @@ impl PaidRoute {
             PaidRoute::ContextAuditRead => "GET /v1/audit/context/{request_id}",
             PaidRoute::PromotionAuditRead => "GET /v1/audit/promotion/{promoted_memory_id}",
             PaidRoute::ObsidianVaultExport => "GET /v1/vault/obsidian.zip",
+            PaidRoute::RunReport => "POST /v1/runs",
         }
     }
 
@@ -489,6 +499,7 @@ impl PaidRoute {
             PaidRoute::ObsidianVaultExport => {
                 "Export a permission-filtered Obsidian-compatible memory vault."
             }
+            PaidRoute::RunReport => "Report an agent run for nightly training.",
         }
     }
 
@@ -503,6 +514,7 @@ impl PaidRoute {
             PaidRoute::ContextAuditRead => "context_audit_read",
             PaidRoute::PromotionAuditRead => "promotion_audit_read",
             PaidRoute::ObsidianVaultExport => "vault_export",
+            PaidRoute::RunReport => "run_report",
         }
     }
 }
