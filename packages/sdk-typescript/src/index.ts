@@ -281,6 +281,84 @@ export interface EnergonErrorDetails {
   paymentRequired?: unknown;
 }
 
+export type RunOutcome = "success" | "failure" | "unknown";
+
+/** One chat message of a trajectory (OpenAI chat format). Runs in this shape can train adapters. */
+export interface RunMessage {
+  role: "system" | "user" | "assistant" | "tool";
+  content: string;
+}
+
+export interface ReportRunInput {
+  task: string;
+  /** The trajectory. Prefer chat messages; any JSON is accepted and redacted. */
+  steps: RunMessage[] | unknown[] | Record<string, unknown>;
+  outcome: RunOutcome;
+  metadata?: Record<string, unknown>;
+}
+
+export interface RunReceipt {
+  run_id: string;
+  outcome: RunOutcome;
+  /** Secrets replaced before the run was stored. */
+  redactions_applied: number;
+  created_at_unix_ms: number;
+}
+
+export interface AgentRun {
+  run_id: string;
+  org_id: string;
+  agent_id: string;
+  task: string;
+  steps: unknown;
+  outcome: RunOutcome;
+  metadata: Record<string, unknown>;
+  redactions_applied: number;
+  created_at_unix_ms: number;
+}
+
+export type TrainingKind = "adapter" | "compiled";
+
+export interface EvalReport {
+  suite: string;
+  held_out_tasks: number;
+  runs_per_task: number;
+  base_success: number;
+  previous_success: number | null;
+  candidate_success: number;
+  candidate_spread: number;
+}
+
+export interface AdapterArtifact {
+  uri: string;
+  sha256: string;
+  bytes: number;
+}
+
+export interface TrainingVersion {
+  version_id: string;
+  org_id: string;
+  agent_id: string;
+  number: number;
+  kind: TrainingKind;
+  job_id: string;
+  base_model: string;
+  /** Compiled rules to append to the agent's system prompt (compiled versions). */
+  instructions: string | null;
+  adapter: AdapterArtifact | null;
+  eval: EvalReport;
+  lift_pts: number;
+  status: "live" | "shipped" | "rejected";
+  trained_on_runs: number;
+  decision: string;
+  created_at_unix_ms: number;
+  /** Short-lived link to the LoRA adapter (adapter versions, latest only). */
+  adapter_download_url?: string | null;
+  adapter_download_expires_in_s?: number | null;
+}
+
+const RUN_OUTCOMES = new Set<RunOutcome>(["success", "failure", "unknown"]);
+
 export class EnergonError extends Error {
   readonly status: number;
   readonly requestId?: string;
@@ -358,6 +436,20 @@ export class Energon {
   readonly operations: {
     /** Agent-safe organization state and the dashboard's live operational metrics. */
     overview: (options?: RequestOptions) => Promise<AgentOperationalOverview>;
+  };
+
+  readonly runs: {
+    /** Reports a finished run. It stays private to this agent and is redacted before storage. */
+    report: (input: ReportRunInput, options?: RequestOptions) => Promise<RunReceipt>;
+    list: (options?: RequestOptions & { limit?: number }) => Promise<AgentRun[]>;
+  };
+
+  readonly training: {
+    /** The live version for this agent, or null before the first release. */
+    latest: (options?: RequestOptions) => Promise<TrainingVersion | null>;
+    versions: (options?: RequestOptions) => Promise<TrainingVersion[]>;
+    /** `base` plus the live compiled rules, if any. Use it as the agent's system prompt. */
+    systemPrompt: (base: string, options?: RequestOptions) => Promise<string>;
   };
 
   private readonly baseUrl: string;
@@ -439,6 +531,57 @@ export class Energon {
         options: requestOptions,
       }),
     };
+    this.runs = {
+      report: (input, requestOptions) => this.reportRun(input, requestOptions),
+      list: async (requestOptions) => {
+        const limit = requestOptions?.limit;
+        const query = limit === undefined ? "" : `?limit=${Math.max(1, Math.min(200, Math.trunc(limit)))}`;
+        const response = await this.request<{ runs: AgentRun[] }>(`/v1/runs${query}`, {
+          method: "GET",
+          options: requestOptions,
+        });
+        return response.runs;
+      },
+    };
+    this.training = {
+      latest: async (requestOptions) => {
+        const response = await this.request<{ version: TrainingVersion | null }>("/v1/training/latest", {
+          method: "GET",
+          options: requestOptions,
+        });
+        return response.version;
+      },
+      versions: async (requestOptions) => {
+        const response = await this.request<{ versions: TrainingVersion[] }>("/v1/training/versions", {
+          method: "GET",
+          options: requestOptions,
+        });
+        return response.versions;
+      },
+      systemPrompt: async (base, requestOptions) => {
+        const version = await this.training.latest(requestOptions);
+        return version?.kind === "compiled" && version.instructions ? `${base}\n\n${version.instructions}` : base;
+      },
+    };
+  }
+
+  private async reportRun(input: ReportRunInput, options?: RequestOptions): Promise<RunReceipt> {
+    if (!RUN_OUTCOMES.has(input.outcome)) {
+      throw new TypeError("outcome must be success, failure, or unknown.");
+    }
+    if (input.steps === null || input.steps === undefined || typeof input.steps !== "object") {
+      throw new TypeError("steps must be an array or object describing the run.");
+    }
+    return this.request("/v1/runs", {
+      method: "POST",
+      body: {
+        task: requiredText(input.task, "task"),
+        steps: input.steps,
+        outcome: input.outcome,
+        ...(input.metadata ? { metadata: input.metadata } : {}),
+      },
+      options,
+    });
   }
 
   private async remember(input: RememberInput, options?: RequestOptions): Promise<AgentMemory> {

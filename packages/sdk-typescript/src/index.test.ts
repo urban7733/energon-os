@@ -277,3 +277,60 @@ test("failed external dream generation never writes a dream", async () => {
   await expect(client.dreams.reflect({ task: "Reflect", generate: async () => { throw new Error("runtime failed"); } })).rejects.toThrow("runtime failed");
   expect(paths).toEqual(["https://api.energon.test/v1/context/build"]);
 });
+
+test("runs.report sends the trajectory and validates the outcome", async () => {
+  let captured: Request | undefined;
+  const client = new Energon({
+    baseUrl: "https://api.energon.test",
+    apiKey: "eos_live_test",
+    fetch: async (input, init) => {
+      captured = new Request(input, init);
+      return Response.json(
+        { run_id: "run_1", outcome: "success", redactions_applied: 1, created_at_unix_ms: 1 },
+        { status: 201 },
+      );
+    },
+  });
+
+  const receipt = await client.runs.report({
+    task: " restart nginx ",
+    steps: [{ role: "assistant", content: "systemctl restart nginx" }],
+    outcome: "success",
+  });
+
+  expect(receipt.redactions_applied).toBe(1);
+  expect(captured?.url).toBe("https://api.energon.test/v1/runs");
+  expect(await captured?.json()).toEqual({
+    task: "restart nginx",
+    steps: [{ role: "assistant", content: "systemctl restart nginx" }],
+    outcome: "success",
+  });
+  await expect(
+    client.runs.report({ task: "x", steps: [], outcome: "maybe" as never }),
+  ).rejects.toThrow(TypeError);
+});
+
+test("training.systemPrompt appends live compiled rules only", async () => {
+  const version = (kind: "compiled" | "adapter") => ({
+    version: {
+      version_id: "ver_1", org_id: "org_1", agent_id: "agent_1", number: 3, kind, job_id: "job_1",
+      base_model: "qwen", instructions: kind === "compiled" ? "## Learned rules\n- Verify first." : null,
+      adapter: null, lift_pts: 9, status: "live", trained_on_runs: 40, decision: "released", created_at_unix_ms: 1,
+      eval: { suite: "linux_operator", held_out_tasks: 16, runs_per_task: 5, base_success: 0.5, previous_success: null, candidate_success: 0.59, candidate_spread: 0.02 },
+    },
+  });
+  let response: unknown = version("compiled");
+  const client = new Energon({
+    baseUrl: "https://api.energon.test",
+    apiKey: "eos_live_test",
+    fetch: async () => Response.json(response),
+  });
+
+  expect(await client.training.systemPrompt("You are an operator.")).toBe(
+    "You are an operator.\n\n## Learned rules\n- Verify first.",
+  );
+  response = version("adapter");
+  expect(await client.training.systemPrompt("Base")).toBe("Base");
+  response = { version: null };
+  expect(await client.training.latest()).toBeNull();
+});

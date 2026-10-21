@@ -277,6 +277,81 @@ pub struct OperationalEntitlement {
     pub expires_at_unix_ms: i64,
 }
 
+/// How a reported run ended.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RunOutcome {
+    Success,
+    Failure,
+    Unknown,
+}
+
+/// A finished run. Prefer chat messages (`[{"role": "...", "content": "..."}]`) as steps;
+/// any JSON is accepted and secrets are redacted before storage.
+#[derive(Debug, Clone, Serialize)]
+pub struct ReportRunInput {
+    pub task: String,
+    pub steps: serde_json::Value,
+    pub outcome: RunOutcome,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub metadata: Option<serde_json::Value>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct RunReceipt {
+    pub run_id: String,
+    pub outcome: RunOutcome,
+    pub redactions_applied: u32,
+    pub created_at_unix_ms: u128,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct EvalReport {
+    pub suite: String,
+    pub held_out_tasks: u32,
+    pub runs_per_task: u32,
+    pub base_success: f64,
+    pub previous_success: Option<f64>,
+    pub candidate_success: f64,
+    pub candidate_spread: f64,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct AdapterArtifact {
+    pub uri: String,
+    pub sha256: String,
+    pub bytes: u64,
+}
+
+/// A version learned overnight from this agent's runs.
+#[derive(Debug, Clone, Deserialize)]
+pub struct TrainingVersion {
+    pub version_id: String,
+    pub number: u32,
+    /// `adapter` or `compiled`.
+    pub kind: String,
+    pub base_model: String,
+    pub instructions: Option<String>,
+    pub adapter: Option<AdapterArtifact>,
+    pub eval: EvalReport,
+    pub lift_pts: f64,
+    /// `live`, `shipped` or `rejected`.
+    pub status: String,
+    pub decision: String,
+    #[serde(default)]
+    pub adapter_download_url: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct LatestTrainingResponse {
+    version: Option<TrainingVersion>,
+}
+
+#[derive(Debug, Deserialize)]
+struct TrainingVersionsResponse {
+    versions: Vec<TrainingVersion>,
+}
+
 #[derive(Debug, Deserialize)]
 struct SkillsResponse {
     skills: Vec<SkillProfile>,
@@ -360,6 +435,45 @@ impl Energon {
     }
 
     /// Lists only profiles explicitly assigned to this authenticated agent.
+    /// Reports a finished run for nightly training. It stays private to this agent.
+    pub fn report_run(&self, input: ReportRunInput) -> Result<RunReceipt> {
+        if input.steps.is_null() {
+            return Err(EnergonError::InvalidInput("steps are required".to_owned()));
+        }
+        let body = ReportRunInput {
+            task: required_text(&input.task, "task")?,
+            ..input
+        };
+        self.send("POST", "/v1/runs", Some(&body))
+    }
+
+    /// The live training version for this agent, if one has been released.
+    pub fn latest_training(&self) -> Result<Option<TrainingVersion>> {
+        let response: LatestTrainingResponse =
+            self.send::<(), _>("GET", "/v1/training/latest", None)?;
+        Ok(response.version)
+    }
+
+    pub fn training_versions(&self) -> Result<Vec<TrainingVersion>> {
+        let response: TrainingVersionsResponse =
+            self.send::<(), _>("GET", "/v1/training/versions", None)?;
+        Ok(response.versions)
+    }
+
+    /// `base` plus the live compiled rules, if any.
+    pub fn system_prompt(&self, base: &str) -> Result<String> {
+        Ok(match self.latest_training()? {
+            Some(TrainingVersion {
+                kind,
+                instructions: Some(rules),
+                ..
+            }) if kind == "compiled" => {
+                format!("{base}\n\n{rules}")
+            }
+            _ => base.to_owned(),
+        })
+    }
+
     pub fn list_skills(&self) -> Result<Vec<SkillProfile>> {
         let response: SkillsResponse = self.send::<(), _>("GET", "/v1/skills", None)?;
         Ok(response.skills)
@@ -453,7 +567,82 @@ mod tests {
         thread,
     };
 
-    use super::{Energon, RememberInput};
+    use super::{Energon, RememberInput, ReportRunInput, RunOutcome};
+
+    /// Serves one request and returns (request line, body).
+    fn serve_once(response_body: &'static str) -> (String, thread::JoinHandle<(String, String)>) {
+        let listener = TcpListener::bind("127.0.0.1:0").expect("bind local server");
+        let address = listener.local_addr().expect("local address");
+        let handle = thread::spawn(move || {
+            let (mut stream, _) = listener.accept().expect("accept request");
+            let mut reader = BufReader::new(stream.try_clone().expect("clone stream"));
+            let mut request_line = String::new();
+            reader
+                .read_line(&mut request_line)
+                .expect("read request line");
+            let mut content_length = 0;
+            loop {
+                let mut header = String::new();
+                reader.read_line(&mut header).expect("read header");
+                if header == "\r\n" {
+                    break;
+                }
+                if let Some(value) = header.to_ascii_lowercase().strip_prefix("content-length:") {
+                    content_length = value.trim().parse().expect("content length");
+                }
+            }
+            let mut body = vec![0; content_length];
+            reader.read_exact(&mut body).expect("read body");
+            write!(
+                stream,
+                "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+                response_body.len(),
+                response_body
+            )
+            .expect("write response");
+            (request_line, String::from_utf8(body).expect("utf8 body"))
+        });
+        (format!("http://{address}"), handle)
+    }
+
+    #[test]
+    fn report_run_posts_the_trajectory() {
+        let (url, server) = serve_once(
+            r#"{"run_id":"run_1","outcome":"success","redactions_applied":0,"created_at_unix_ms":1}"#,
+        );
+        let client = Energon::new(&url, "eos_live_test").expect("client");
+        let receipt = client
+            .report_run(ReportRunInput {
+                task: " restart nginx ".to_owned(),
+                steps: serde_json::json!([{ "role": "assistant", "content": "systemctl restart nginx" }]),
+                outcome: RunOutcome::Success,
+                metadata: None,
+            })
+            .expect("report run");
+        let (request_line, body) = server.join().expect("server");
+        assert_eq!(receipt.run_id, "run_1");
+        assert_eq!(request_line, "POST /v1/runs HTTP/1.1\r\n");
+        let body: serde_json::Value = serde_json::from_str(&body).expect("json body");
+        assert_eq!(body["task"], "restart nginx");
+        assert_eq!(body["outcome"], "success");
+        assert!(body.get("metadata").is_none());
+    }
+
+    #[test]
+    fn system_prompt_appends_live_compiled_rules() {
+        let (url, server) = serve_once(
+            r###"{"version":{"version_id":"v","number":2,"kind":"compiled","base_model":"q","instructions":"## Learned rules\n- Verify first.","adapter":null,"lift_pts":4.0,"status":"live","decision":"released","eval":{"suite":"s","held_out_tasks":16,"runs_per_task":5,"base_success":0.5,"previous_success":null,"candidate_success":0.54,"candidate_spread":0.01}}}"###,
+        );
+        let client = Energon::new(&url, "eos_live_test").expect("client");
+        let prompt = client
+            .system_prompt("You are an operator.")
+            .expect("prompt");
+        server.join().expect("server");
+        assert_eq!(
+            prompt,
+            "You are an operator.\n\n## Learned rules\n- Verify first."
+        );
+    }
 
     #[test]
     fn remember_sends_private_memory_with_agent_authorization() {

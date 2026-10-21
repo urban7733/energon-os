@@ -41,19 +41,21 @@ const quickstarts = [
     code: `import { Energon } from "@energon/sdk";
 
 const energon = new Energon({
+  baseUrl: process.env.ENERGON_API_URL!,
   apiKey: process.env.ENERGON_AGENT_API_KEY!,
 });
 
-// Day: report what the agent did.
+// Day: report what the agent did (chat messages).
 await energon.runs.report({
   task: "Restart the failing nginx service",
-  steps: trajectory,
+  steps: messages,
   outcome: "success",
 });
 
-// Morning: load what it learned overnight.
+// Morning: start from what it learned overnight.
+const system = await energon.training.systemPrompt(BASE_PROMPT);
 const version = await energon.training.latest();
-console.log(version.evals.heldOut.lift); // vs. yesterday`,
+console.log(version?.lift_pts); // held-out lift, in points`,
   },
   {
     id: "python",
@@ -65,18 +67,22 @@ console.log(version.evals.heldOut.lift); // vs. yesterday`,
 
 from energon_sdk import Energon
 
-energon = Energon(api_key=os.environ["ENERGON_AGENT_API_KEY"])
+energon = Energon(
+    base_url=os.environ["ENERGON_API_URL"],
+    api_key=os.environ["ENERGON_AGENT_API_KEY"],
+)
 
-# Day: report what the agent did.
+# Day: report what the agent did (chat messages).
 energon.runs.report(
     task="Restart the failing nginx service",
-    steps=trajectory,
+    steps=messages,
     outcome="success",
 )
 
-# Morning: load what it learned overnight.
+# Morning: start from what it learned overnight.
+system = energon.training.system_prompt(BASE_PROMPT)
 version = energon.training.latest()
-print(version.evals.held_out.lift)  # vs. yesterday`,
+print(version and version["lift_pts"])  # held-out lift`,
   },
   {
     id: "rust",
@@ -84,20 +90,24 @@ print(version.evals.held_out.lift)  # vs. yesterday`,
     icon: siRust,
     filename: "nightly.rs",
     guide: "https://github.com/urban7733/energon-os/blob/main/docs/sdk-rust.md",
-    code: `use energon_sdk::{Energon, RunReport, Outcome};
+    code: `use energon_sdk::{Energon, ReportRunInput, RunOutcome};
 
-let energon = Energon::new(&std::env::var("ENERGON_AGENT_API_KEY")?)?;
+let energon = Energon::new(
+    &std::env::var("ENERGON_API_URL")?,
+    &std::env::var("ENERGON_AGENT_API_KEY")?,
+)?;
 
-// Day: report what the agent did.
-energon.report_run(RunReport {
+// Day: report what the agent did (chat messages).
+energon.report_run(ReportRunInput {
     task: "Restart the failing nginx service".into(),
-    steps: trajectory,
-    outcome: Outcome::Success,
+    steps: messages,
+    outcome: RunOutcome::Success,
+    metadata: None,
 })?;
 
-// Morning: load what it learned overnight.
-let version = energon.latest_training()?;
-println!("{}", version.evals.held_out.lift);`,
+// Morning: start from what it learned overnight.
+let system = energon.system_prompt(BASE_PROMPT)?;
+let lift = energon.latest_training()?.map(|v| v.lift_pts);`,
   },
 ] as const;
 

@@ -79,5 +79,37 @@ class EnergonClientTests(unittest.TestCase):
             Energon(base_url="https://api.energon.test", api_key=" ")
 
 
+    def test_runs_report_and_validate_outcome(self) -> None:
+        receipt = {"run_id": "run_1", "outcome": "success", "redactions_applied": 0, "created_at_unix_ms": 1}
+        with patch("energon_sdk.client.urlopen", return_value=_Response(receipt)) as urlopen:
+            client = Energon(base_url="https://api.energon.test", api_key="eos_live_test")
+            result = client.runs.report(
+                task=" restart nginx ",
+                steps=[{"role": "assistant", "content": "systemctl restart nginx"}],
+                outcome="success",
+            )
+        request = urlopen.call_args.args[0]
+        self.assertEqual(result["run_id"], "run_1")
+        self.assertEqual(request.full_url, "https://api.energon.test/v1/runs")
+        self.assertEqual(json.loads(request.data), {
+            "task": "restart nginx",
+            "steps": [{"role": "assistant", "content": "systemctl restart nginx"}],
+            "outcome": "success",
+        })
+        with self.assertRaises(ValueError):
+            client.runs.report(task="x", steps=[], outcome="maybe")
+
+    def test_training_system_prompt_appends_live_compiled_rules(self) -> None:
+        compiled = {"version": {"kind": "compiled", "instructions": "## Learned rules\n- Verify first."}}
+        responses = iter([_Response(compiled), _Response({"version": None})])
+        with patch("energon_sdk.client.urlopen", side_effect=responses):
+            client = Energon(base_url="https://api.energon.test", api_key="eos_live_test")
+            self.assertEqual(
+                client.training.system_prompt("You are an operator."),
+                "You are an operator.\n\n## Learned rules\n- Verify first.",
+            )
+            self.assertIsNone(client.training.latest())
+
+
 if __name__ == "__main__":
     unittest.main()

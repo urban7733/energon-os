@@ -126,6 +126,65 @@ class _OperationalData:
         return self._client._request("GET", "/v1/agent/overview")
 
 
+_RUN_OUTCOMES = {"success", "failure", "unknown"}
+
+
+class _RunOperations:
+    """Report finished runs. They stay private to this agent and are redacted before storage."""
+
+    def __init__(self, client: Energon) -> None:
+        self._client = client
+
+    def report(
+        self,
+        *,
+        task: str,
+        steps: list[Any] | Mapping[str, Any],
+        outcome: str,
+        metadata: Mapping[str, Any] | None = None,
+    ) -> Mapping[str, Any]:
+        if outcome not in _RUN_OUTCOMES:
+            raise ValueError("outcome must be success, failure or unknown")
+        if not isinstance(steps, (list, Mapping)):
+            raise ValueError("steps must be a list or mapping describing the run")
+        body: dict[str, object] = {"task": _required_text(task, "task"), "steps": steps, "outcome": outcome}
+        if metadata:
+            body["metadata"] = dict(metadata)
+        return self._client._request("POST", "/v1/runs", body)
+
+    def list(self, *, limit: int | None = None) -> list[Mapping[str, Any]]:
+        query = "" if limit is None else f"?limit={max(1, min(200, int(limit)))}"
+        response = self._client._request("GET", f"/v1/runs{query}")
+        runs = response.get("runs")
+        if not isinstance(runs, list):
+            raise EnergonNetworkError("Energon returned an invalid runs response")
+        return runs
+
+
+class _TrainingOperations:
+    """Versions learned overnight from this agent's runs."""
+
+    def __init__(self, client: Energon) -> None:
+        self._client = client
+
+    def latest(self) -> Mapping[str, Any] | None:
+        version = self._client._request("GET", "/v1/training/latest").get("version")
+        return version if isinstance(version, dict) else None
+
+    def versions(self) -> list[Mapping[str, Any]]:
+        versions = self._client._request("GET", "/v1/training/versions").get("versions")
+        if not isinstance(versions, list):
+            raise EnergonNetworkError("Energon returned an invalid versions response")
+        return versions
+
+    def system_prompt(self, base: str) -> str:
+        """``base`` plus the live compiled rules, if any."""
+        version = self.latest()
+        if version and version.get("kind") == "compiled" and version.get("instructions"):
+            return f"{base}\n\n{version['instructions']}"
+        return base
+
+
 class Energon:
     """A server-side client authenticated as exactly one Energon agent."""
 
@@ -142,6 +201,8 @@ class Energon:
         self.context = _ContextOperations(self)
         self.skills = _SkillOperations(self)
         self.operations = _OperationalData(self)
+        self.runs = _RunOperations(self)
+        self.training = _TrainingOperations(self)
 
     def _request(
         self,
