@@ -143,10 +143,24 @@ export function LandingNav() {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpen(false);
+    };
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = previous;
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
   return (
     <header className={`lx-nav${scrolled ? " is-scrolled" : ""}${open ? " is-open" : ""}`}>
       <div className="lx-nav-inner">
-        <Link href="/" className="lx-nav-brand ex-focus" aria-label="Energon OS home">
+        <Link href="/" className="lx-nav-brand ex-focus" aria-label="Energon home">
           <EnergonWordmark size={24} />
         </Link>
         <nav className="lx-nav-links" aria-label="Main">
@@ -163,7 +177,7 @@ export function LandingNav() {
             href="https://github.com/urban7733/energon-os"
             target="_blank"
             rel="noreferrer"
-            aria-label="Energon OS on GitHub"
+            aria-label="Energon on GitHub"
           >
             <Github size={17} aria-hidden="true" />
           </a>
@@ -175,12 +189,34 @@ export function LandingNav() {
             className="lx-nav-toggle ex-focus"
             aria-label={open ? "Close menu" : "Open menu"}
             aria-expanded={open}
+            aria-controls="lx-nav-sheet"
             onClick={() => setOpen((value) => !value)}
           >
             {open ? <X size={18} aria-hidden="true" /> : <Menu size={18} aria-hidden="true" />}
           </button>
         </div>
       </div>
+      {open ? (
+        <div id="lx-nav-sheet" className="lx-nav-sheet">
+          <nav aria-label="Mobile">
+            {navLinks.map(([label, href]) => (
+              <a key={href} href={href} onClick={() => setOpen(false)}>
+                {label}
+                <ArrowRight size={16} aria-hidden="true" />
+              </a>
+            ))}
+          </nav>
+          <div className="lx-nav-sheet-foot">
+            <AudienceSwitch />
+            <a href="https://github.com/urban7733/energon-os" target="_blank" rel="noreferrer" className="lx-nav-sheet-link">
+              <Github size={16} aria-hidden="true" /> GitHub
+            </a>
+          </div>
+          <Link className="ex-btn ex-btn-primary ex-btn-lg" href="/login" onClick={() => setOpen(false)}>
+            Request early access <ArrowRight size={16} aria-hidden="true" />
+          </Link>
+        </div>
+      ) : null}
     </header>
   );
 }
@@ -219,8 +255,8 @@ export function LandingHero() {
 
       <div className="lx-hero-copy">
         <div className="lx-hero-orb" aria-hidden="true">
-          <video autoPlay loop muted playsInline preload="metadata" poster="/energon-footer-logo-gradient.png">
-            <source src="/media/energon-os-hero-clean.mp4" type="video/mp4" />
+          <video autoPlay muted playsInline preload="auto" poster="/media/energon-hero-poster.jpg">
+            <source src="/media/energon-hero-emblem.mp4" type="video/mp4" />
           </video>
         </div>
         <a className="lx-hero-badge" href="#cycle" data-hero-in>
@@ -301,14 +337,14 @@ export function ProductFrame() {
             <i />
           </span>
           <span className="lx-frame-url">
-            <span className="ex-dot ex-dot-ok" /> energon / training / research-01
+            <span className="ex-dot ex-dot-ok" /> <span className="lx-frame-path">energon / training / research-01</span>
           </span>
           <span className="lx-frame-tag">Sample data</span>
         </div>
         {interactive ? null : (
           <button type="button" className="lx-frame-cover" onClick={() => setInteractive(true)}>
             <span className="ex-btn">
-              Explore the live demo <ArrowRight size={14} aria-hidden="true" />
+              Explore the demo <ArrowRight size={14} aria-hidden="true" />
             </span>
           </button>
         )}

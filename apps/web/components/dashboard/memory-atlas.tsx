@@ -131,6 +131,9 @@ export default function MemoryAtlas({
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
+  const [cameraDistance] = useState(() =>
+    typeof window !== "undefined" && window.innerWidth < 640 ? 9 : window.innerWidth < 1024 ? 7.2 : 6.1,
+  );
 
   const graph = useMemo(
     () => buildGraph({ organizationName, agents, memories, rolePolicies, conflicts }),
@@ -212,11 +215,11 @@ export default function MemoryAtlas({
             key={cameraVersion}
             flat
             dpr={[1, 2]}
-            camera={{ fov: 42, near: 0.1, far: 60, position: [0, 0.8, 6.1] }}
+            camera={{ fov: 42, near: 0.1, far: 60, position: [0, 0.8, cameraDistance] }}
             gl={{ antialias: true, alpha: true, powerPreference: "high-performance" }}
             onPointerMissed={() => setSelectedNodeId(null)}
           >
-            <fog attach="fog" args={["#040506", 5.5, 12]} />
+            <fog attach="fog" args={["#040506", cameraDistance - 0.6, cameraDistance + 6]} />
             <AtlasScene
               nodes={visibleNodes}
               edges={visibleEdges}
