@@ -485,3 +485,67 @@ The dashboard's **Export graph** control invokes this same JWT-protected route.
 The route defaults to 500 nodes per collection and caps at 1,000; exported
 text fields are clipped to 64 KiB, so graph inspection cannot become a bulk
 database dump.
+
+## Nightly Training
+
+See [training-pipeline.md](training-pipeline.md) for the full flow. Training
+routes beyond `POST/GET /v1/runs` require Postgres.
+
+### Report a Run (agent)
+
+`POST /v1/runs` — billed as `run_report` via x402 when enabled. Steps should be
+chat messages; any JSON up to 256 KB is accepted. Secrets are redacted before
+storage and the run stays private to the reporting agent.
+
+```json
+{
+  "task": "Restart the failing nginx service",
+  "steps": [
+    { "role": "user", "content": "nginx returns 502" },
+    { "role": "assistant", "content": "```bash\nsystemctl restart nginx\n```" }
+  ],
+  "outcome": "success",
+  "metadata": { "ticket": "OPS-14" }
+}
+```
+
+Response `201`: `{ "run_id", "outcome", "redactions_applied", "created_at_unix_ms" }`.
+`GET /v1/runs?limit=50` lists the calling agent's own runs.
+
+### Training Versions (agent)
+
+- `GET /v1/training/latest` → `{ "version": TrainingVersion | null }`. Adapter
+  versions include `adapter_download_url` (valid 15 minutes).
+- `GET /v1/training/versions?limit=30` → `{ "versions": [...] }`, newest first.
+
+A version carries `kind` (`compiled` | `adapter`), `instructions` or `adapter`,
+the held-out `eval` (`base_success`, `previous_success`, `candidate_success`,
+`candidate_spread`), `lift_pts`, `status` (`live` | `shipped` | `rejected`) and
+the gate `decision`.
+
+### Training Controls (operator JWT)
+
+- `GET /v1/orgs/{org_id}/agents/{agent_id}/training` — config, run counts, last 20 jobs, last 30 versions.
+- `PUT /v1/orgs/{org_id}/agents/{agent_id}/training/config`
+
+```json
+{
+  "enabled": true,
+  "kind": "compiled",
+  "base_model": "Qwen/Qwen2.5-Coder-7B-Instruct",
+  "suite": "linux_operator",
+  "min_new_runs": 50,
+  "schedule_hour_utc": 2,
+  "min_lift_pts": 2.0
+}
+```
+
+- `POST /v1/orgs/{org_id}/agents/{agent_id}/training/jobs` — train now (one active job per agent).
+- `POST /v1/orgs/{org_id}/agents/{agent_id}/training/versions/{version_id}/rollback` — make a shipped version live.
+
+### Trainer Callbacks (job token)
+
+Used only by the trainer, authenticated with `Authorization: Bearer <job token>`:
+`GET /v1/trainer/jobs/{job_id}/dataset`, `POST …/heartbeat` (`{ "message" }`) and
+`POST …/result` with `{ "status": "succeeded", "result": { "instructions", "adapter", "eval", "trained_on_runs" } }`
+or `{ "status": "failed", "error": "…" }`.

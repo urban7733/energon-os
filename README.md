@@ -1,15 +1,17 @@
-# Energon OS
+# Energon
 
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 [![Rust](https://img.shields.io/badge/rust-2024-orange.svg)](https://www.rust-lang.org/)
 
-**The memory OS for AI agents.** Open source core. Hosted API for production.
+**Your agents learn while they sleep.** Open source core. Hosted API for production.
 
-Energon OS is the permissioned memory and context layer for AI agent swarms. Connect one agent or a distributed swarm — developers control scopes, token budgets, and which agent gets more memory than another.
+Agents report their runs during the day. Each night Energon trains a new version per agent: a LoRA
+adapter for open-weight models or compiled instructions for any model. It measures the candidate on
+held-out tasks and releases it only when it beats the live version. See
+[docs/training-pipeline.md](docs/training-pipeline.md).
 
-It does not run agents, click browsers, execute workflows, make payments, or host agent runtimes. Agents live in other systems. Energon decides what memory each agent is allowed to see for a specific task, retrieves only permitted context, packs it into a token budget, and records an audit trail.
-
-> Energon OS gives every AI agent the right memory, without leaking private memory.
+Underneath sits the permissioned memory engine Energon started as: private-by-default memory, scoped
+sharing, context packs and audit trails, so an agent only ever learns from what it is allowed to see.
 
 ## Links
 
@@ -45,7 +47,8 @@ in-memory storage and dev identity headers for fast demos only.
 crates/energon-core    pure domain logic: memory, scopes, permissions, context, audit
 crates/energon-api     Axum API: auth, memory writes, context builds, audits, x402, vault export
 crates/energon-db      sqlx repositories for Postgres, pgvector, identity, memory, audit
-crates/energon-worker  embedding worker for pending memory chunks
+crates/energon-worker  embeddings, event outbox, training scheduler + RunPod dispatch
+services/trainer       GPU trainer: self-play, LoRA, compiled instructions, held-out evals
 apps/web               Next.js landing page, Better Auth accounts/orgs, operator dashboard
 docs/                  API, architecture, deployment, operations, crypto payments
 policies/              Cedar policy starting point

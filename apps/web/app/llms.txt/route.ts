@@ -3,11 +3,11 @@ import { indexedClaims, site } from "../../lib/site";
 export const dynamic = "force-static";
 
 export function GET() {
-  const body = `# Energon OS
+  const body = `# Energon
 
 > ${site.description}
 
-Energon OS is not an agent platform. It does not host agents, run workflows, click browsers, or execute payments. It is the memory and context layer for external AI agents.
+Energon is not an agent platform. It does not host agents, run workflows, click browsers, or execute payments. Agents report their runs to Energon; Energon trains a better version of each agent overnight and releases it only when it wins on held-out tasks.
 
 Long-term company goal: ${site.longTermGoal}
 
@@ -21,10 +21,10 @@ ${indexedClaims.map((claim) => `- ${claim}`).join("\n")}
 
 ## Product Category
 
-- Permissioned memory infrastructure for AI agent swarms
-- Context broker for external AI agents
-- Private and shared memory layer for AI-native companies
-- Memory infrastructure for autonomous-company systems with separate crypto payment services
+- Continual training for AI agents (nightly, measured, model-agnostic)
+- LoRA adapters for open-weight agent models
+- Compiled instructions for closed-model agents
+- Permissioned memory and context infrastructure underneath
 
 ## Key URLs
 
@@ -36,10 +36,11 @@ ${indexedClaims.map((claim) => `- ${claim}`).join("\n")}
 - Architecture documentation: ${site.architectureDocumentationUrl}
 - Autonomous agent contract: ${site.url}/.well-known/energon-agent.json
 - Agent discovery API: ${site.apiBaseUrl}/v1/agents/discovery
+- Training pipeline: ${site.repositoryUrl}/blob/main/docs/training-pipeline.md
 
 ## Primary Claim
 
-Energon OS gives every AI agent the right memory, without leaking private memory.
+Your agents learn while they sleep. Measured on held-out tasks, not claimed.
 `;
 
   return new Response(body, {

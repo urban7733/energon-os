@@ -3,23 +3,25 @@ import { indexedClaims, site } from "../../lib/site";
 export const dynamic = "force-static";
 
 export function GET() {
-  const body = `# Energon OS Full Context
+  const body = `# Energon Full Context
 
 ${site.description}
 
-## What Energon OS Is
+## What Energon Is
 
-Energon OS is the memory and context infrastructure layer for AI agent swarms. It gives agents long-term memory, short-term memory, permissioned retrieval, private overlays, shared memory, context packing, and audit logs.
+Energon trains AI agents overnight. Agents report runs during the day through POST /v1/runs (secrets are redacted, runs stay private to the agent). Each night Energon trains a new version per agent: a LoRA adapter for open-weight models or compiled instructions for any model. The candidate is measured on held-out tasks against the base model and the live version, and released only if it wins by more than its run-to-run spread. Agents load the live version through GET /v1/training/latest.
 
-## What Energon OS Is Not
+Underneath, Energon is the permissioned memory and context layer it started as: long-term and short-term memory, permissioned retrieval, private overlays, shared memory, context packing and audit logs. Training uses the same permissions, so an agent only learns from what it may see.
 
-Energon OS does not host or run agents. Energon OS does not execute workflows. Energon OS does not click in browsers. Energon OS does not custody wallets or execute payment strategy. Energon OS does not host agent runtimes.
+## What Energon Is Not
+
+Energon does not host or run agents. Energon OS does not execute workflows. Energon OS does not click in browsers. Energon OS does not custody wallets or execute payment strategy. Energon OS does not host agent runtimes.
 
 ## Long-Term Company Goal
 
 ${site.longTermGoal}
 
-Energon OS is the memory core for that larger system. Agent execution, workflow orchestration, marketplaces, and crypto payment execution should be built in separate services or repositories that call Energon OS when they need permissioned memory.
+Energon is the training and memory core for that larger system. Agent execution, workflow orchestration, marketplaces, and crypto payment execution should be built in separate services or repositories that call Energon when they need permissioned memory or better agents.
 
 ## Crypto Payment Roadmap
 

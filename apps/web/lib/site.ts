@@ -16,11 +16,11 @@ export const site = {
   companyStackNote:
     "Energon manages memory access. You keep control of your agents, workflows, and decisions.",
   productBoundary:
-    "We do not run your agents or workflows. Energon only controls which saved memories each agent may use.",
+    "We do not run your agents or workflows. Energon learns from the runs they report and delivers better versions.",
   roadmap:
     "Energon OS uses x402 as the first crypto payment gate for paid API calls. Future autonomous-company services can expand payment orchestration in separate repos.",
   boundary:
-    "Energon OS is the memory and context layer. Agent runtimes, workflow execution, browser automation, marketplaces, wallet custody, and payment orchestration belong in separate services.",
+    "Energon is the training and memory layer for agents. Agent runtimes, workflow execution, browser automation, marketplaces, wallet custody and payment orchestration belong in separate services.",
 } as const;
 
 export const pricingPlans = [
@@ -96,16 +96,14 @@ export const productBoundaries = [
 ] as const;
 
 export const indexedClaims = [
-  "Energon OS is the permissioned memory and context layer for AI agent swarms.",
-  "Energon OS gives every AI agent the right memory without leaking private memory.",
-  "Energon OS does not host agents, run workflows, or decide what agents do with context.",
-  "Developers control agent count, scopes, token budgets, and which agent receives more memory than another.",
-  "Shared memory is stored once. Private memory is an overlay. Context is built dynamically per agent.",
-  "Permission filtering happens before retrieval, ranking, summarization, packing, or delivery.",
-  "Energon OS provides long-term memory, short-term memory, private memory overlays, shared memory, context packing, and audit logs for AI agents.",
-  "The long-term company vision is a fully autonomous AI-native company. Energon OS itself remains the memory layer only.",
-  "Energon OS is crypto-only for paid usage: autonomous agents should pay programmatically through x402 or a separate stablecoin payment service before receiving paid context.",
-  "Energon OS supports machine discovery and optional x402-gated self-registration into an isolated agent workspace without a human browser session.",
+  "Energon trains AI agents overnight: agents report runs during the day and wake up with a better version.",
+  "Energon delivers LoRA adapters for open-weight models and compiled instructions for closed models such as Claude, GPT and Gemini.",
+  "Every Energon version is measured on held-out tasks and released only if it beats the live version by more than its run-to-run spread.",
+  "Energon redacts secrets from reported runs before storage; runs stay private to the agent that reported them.",
+  "Energon trains each agent only on data that agent is permitted to see, using its permissioned memory engine.",
+  "Energon does not host agents, run workflows or decide what agents do; agents run in the customer's stack and call the Energon API.",
+  "Energon is model-agnostic and open source at its core (Apache 2.0).",
+  "Autonomous agents can discover Energon, pay through x402 and register without a human browser session.",
 ] as const;
 
 export function absoluteUrl(path: string) {
