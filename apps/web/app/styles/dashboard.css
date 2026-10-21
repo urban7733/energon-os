@@ -1879,3 +1879,86 @@
     grid-template-columns: 1.6fr 1fr !important;
   }
 }
+
+/* ── Training panel (live dashboard) ── */
+.dx .console-grid > #training { order: 2; grid-column: 1 / -1; }
+.dx .console-grid > #org-agents { order: 3; }
+.dx .console-grid > #memory { order: 4; }
+.dx .console-grid > #org-memories { order: 5; }
+.dx .console-grid > #billing { order: 6; }
+
+.dx .training-toolbar {
+  grid-template-columns: minmax(200px, 320px) 1fr;
+  align-items: end;
+}
+
+.dx .training-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.dx .training-stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+}
+
+.dx .training-stats div {
+  padding: 12px 14px;
+  border: 1px solid var(--ex-line);
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.dx .training-stats dt {
+  color: var(--ex-muted);
+  font-size: 12px;
+}
+
+.dx .training-stats dd {
+  margin: 4px 0 0;
+  color: var(--ex-ink);
+  font-size: 20px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+.dx .training-notice {
+  padding: 10px 12px;
+  border: 1px solid rgba(132, 227, 192, 0.25);
+  border-radius: 10px;
+  background: rgba(132, 227, 192, 0.06);
+  color: var(--ex-mint);
+  font-size: 12.5px;
+}
+
+.dx .training-config {
+  padding-top: 16px;
+  border-top: 1px solid var(--ex-line);
+}
+
+.dx .training-panel code {
+  color: var(--ex-ice-2);
+  font-size: 12px;
+}
+
+.dx .tv-rollback {
+  min-height: 26px !important;
+  padding: 0 10px !important;
+  font-size: 12px !important;
+}
+
+@media (max-width: 760px) {
+  .dx .training-toolbar,
+  .dx .training-stats {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .dx .training-actions {
+    grid-column: 1 / -1;
+    justify-content: flex-start;
+  }
+}

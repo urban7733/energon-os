@@ -4,7 +4,15 @@ import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YA
 import { CheckCircle2, CircleSlash, Moon, PlugZap } from "lucide-react";
 
 type Night = { night: string; base: number; trained: number };
-type Version = { version: string; night: string; kind: "adapter" | "compiled"; lift: number; status: "live" | "shipped" | "rejected"; runs: number };
+type Version = {
+  id?: string;
+  version: string;
+  night: string;
+  kind: "adapter" | "compiled";
+  lift: number;
+  status: "live" | "shipped" | "rejected";
+  runs: number;
+};
 type JobStep = { time: string; label: string; detail: string };
 
 export type TrainingData = {
@@ -14,6 +22,7 @@ export type TrainingData = {
   versions: Version[];
   lastNight: JobStep[];
   runsThisWeek: number;
+  runsLabel?: string;
 };
 
 const tooltipStyle = {
@@ -27,12 +36,26 @@ const tooltipStyle = {
 };
 
 /** Nightly training overview for one agent: lift over time, versions, last night's job. */
-export function TrainingView({ data }: { data: TrainingData }) {
+export function TrainingView({
+  data,
+  onRollback,
+  busy = false,
+}: {
+  data: TrainingData;
+  /** Shown for shipped versions when provided (live dashboard only). */
+  onRollback?: (versionId: string) => void;
+  busy?: boolean;
+}) {
   const first = data.nights[0];
   const latest = data.nights[data.nights.length - 1];
   const lift = latest.trained - first.base;
   const live = data.versions.find((version) => version.status === "live");
   const rejected = data.versions.filter((version) => version.status === "rejected").length;
+  const values = data.nights.flatMap((night) => [night.base, night.trained]);
+  const domain: [number, number] = [
+    Math.max(0, Math.floor((Math.min(...values) - 8) / 10) * 10),
+    Math.min(100, Math.ceil((Math.max(...values) + 8) / 10) * 10),
+  ];
 
   return (
     <section className="dx-analytics" aria-label={`Training for ${data.agent}`}>
@@ -40,7 +63,7 @@ export function TrainingView({ data }: { data: TrainingData }) {
         <Kpi label="Held-out success" value={`${latest.trained}%`} foot={`from ${first.base}% before training`} />
         <Kpi label="Lift" value={`+${lift}`} unit="pts" foot={`across ${data.nights.length} nights`} accent />
         <Kpi label="Live version" value={live?.version ?? "—"} foot={live ? `${live.kind === "adapter" ? "LoRA adapter" : "compiled instructions"}` : "none yet"} />
-        <Kpi label="Runs this week" value={data.runsThisWeek.toLocaleString()} foot="reported via API" />
+        <Kpi label={data.runsLabel ?? "Runs this week"} value={data.runsThisWeek.toLocaleString()} foot="reported via API" />
         <Kpi label="Rejected" value={String(rejected)} foot="versions without lift" />
       </div>
 
@@ -66,7 +89,7 @@ export function TrainingView({ data }: { data: TrainingData }) {
                 </defs>
                 <CartesianGrid stroke="rgba(255,255,255,0.05)" vertical={false} />
                 <XAxis dataKey="night" stroke="#5b636e" tickLine={false} axisLine={false} fontSize={11} />
-                <YAxis domain={[40, 90]} stroke="#5b636e" tickLine={false} axisLine={false} fontSize={11} unit="%" />
+                <YAxis domain={domain} stroke="#5b636e" tickLine={false} axisLine={false} fontSize={11} unit="%" />
                 <Tooltip contentStyle={tooltipStyle} itemStyle={{ color: "#f5f7fa" }} labelStyle={{ color: "#9aa1ab" }} />
                 <Area type="monotone" dataKey="base" name="Base model" stroke="rgba(255,255,255,0.35)" strokeDasharray="4 4" fill="none" strokeWidth={1.5} />
                 <Area type="monotone" dataKey="trained" name="Trained" stroke="#c9bdff" fill="url(#tv-trained)" strokeWidth={2} />
@@ -80,6 +103,7 @@ export function TrainingView({ data }: { data: TrainingData }) {
             <Moon size={16} aria-hidden="true" />
           </span>
           <span className="dx-label">Last night</span>
+          {data.lastNight.length === 0 ? <p className="dx-muted">No training job has run yet.</p> : null}
           <ol className="tv-job">
             {data.lastNight.map((step) => (
               <li key={step.time}>
@@ -124,8 +148,12 @@ export function TrainingView({ data }: { data: TrainingData }) {
                   <span className="dx-pill tv-rejected">
                     <CircleSlash size={11} aria-hidden="true" /> rejected
                   </span>
+                ) : onRollback && version.status === "shipped" && version.id ? (
+                  <button type="button" className="tv-rollback" disabled={busy} onClick={() => onRollback(version.id!)}>
+                    Make live
+                  </button>
                 ) : (
-                  <span className="dx-pill dx-pill-ok">
+                  <span className={version.status === "live" ? "dx-pill dx-pill-ok" : "dx-pill"}>
                     <CheckCircle2 size={11} aria-hidden="true" /> {version.status}
                   </span>
                 )}

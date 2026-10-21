@@ -28,6 +28,7 @@ import { authClient, fetchApiToken } from "../../lib/auth-client";
 import { site } from "../../lib/site";
 import { AnalyticsDeck } from "../../components/dashboard/analytics-deck";
 import { BillingCheckout } from "./billing-checkout";
+import { TrainingPanel } from "./training-panel";
 
 const MemoryAtlas = dynamic(() => import("../../components/dashboard/memory-atlas"), {
   ssr: false,
@@ -956,6 +957,8 @@ export function DashboardConsole({ userEmail }: { userEmail: string }) {
           </p>
         ) : null}
       </details>
+
+      <TrainingPanel orgId={orgId} agents={orgAgents} managementFetch={managementFetch} />
 
       <BillingCheckout apiBaseUrl={cleanBaseUrl} orgId={orgId} />
 

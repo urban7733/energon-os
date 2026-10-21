@@ -32,6 +32,7 @@ export default async function DashboardPage() {
       badge="Live"
       nav={[
         { label: "Overview", href: "#overview", icon: "overview", active: true },
+        { label: "Training", href: "#training", icon: "training" },
         { label: "Agents & keys", href: "#org-agents", icon: "agents" },
         { label: "Memory", href: "#org-memories", icon: "memory" },
         { label: "Write memory", href: "#memory", icon: "write" },
