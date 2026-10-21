@@ -1,0 +1,322 @@
+# Linux Operator eval suite.
+#
+# Every task runs in a fresh, empty working directory. `setup` prepares it,
+# the agent works on `prompt`, and `check` must exit 0 for a success.
+# `solution` is a reference answer: tests prove that it passes the check and
+# that doing nothing fails it. It is never shown to the model.
+# Scripts must stay portable across GNU and BSD userlands.
+
+name = "linux_operator"
+description = "Shell work in a Linux workspace: files, text, archives, config and permissions."
+system_prompt = """You are a careful Linux operator working in a shell. Your working directory \
+is the task workspace; use relative paths. Reply with exactly one bash code block per turn \
+containing the next commands to run. You will see their output. When the task is complete, \
+reply with the single word DONE and no code block."""
+
+[[tasks]]
+id = "mkdir_tree"
+prompt = "Create the directories app/src and app/tests, and an empty file app/README.md."
+setup = ""
+check = '''test -d app/src && test -d app/tests && test -f app/README.md && test ! -s app/README.md'''
+solution = '''mkdir -p app/src app/tests && touch app/README.md'''
+
+[[tasks]]
+id = "count_lines"
+prompt = "Write the number of lines in access.log into count.txt (just the number)."
+setup = '''for i in $(seq 1 37); do echo "GET /page/$i 200" >> access.log; done'''
+check = '''test "$(tr -d ' \n' < count.txt)" = "37"'''
+solution = '''wc -l < access.log | tr -d ' ' > count.txt'''
+
+[[tasks]]
+id = "errors_only"
+prompt = "Write every line of app.log that contains ERROR into errors.log, keeping their order."
+setup = '''printf 'INFO start\nERROR disk full\nWARN slow\nERROR timeout\nINFO done\nERROR retry failed\n' > app.log'''
+check = '''grep ERROR app.log | cmp -s - errors.log'''
+solution = '''grep ERROR app.log > errors.log'''
+
+[[tasks]]
+id = "unique_ips"
+prompt = "access.log starts each line with a client IP. Write the unique IPs, sorted, one per line, to ips.txt."
+setup = '''printf '10.0.0.2 GET /\n10.0.0.1 GET /a\n10.0.0.2 GET /b\n192.168.1.5 GET /\n10.0.0.1 POST /x\n' > access.log'''
+check = '''printf '10.0.0.1\n10.0.0.2\n192.168.1.5\n' | cmp -s - ips.txt'''
+solution = '''awk '{print $1}' access.log | sort -u > ips.txt'''
+
+[[tasks]]
+id = "top_ip"
+prompt = "access.log starts each line with a client IP. Write the single most frequent IP to top.txt."
+setup = '''printf '1.1.1.1 a\n2.2.2.2 b\n2.2.2.2 c\n3.3.3.3 d\n2.2.2.2 e\n1.1.1.1 f\n' > access.log'''
+check = '''test "$(tr -d ' \n' < top.txt)" = "2.2.2.2"'''
+solution = '''awk '{print $1}' access.log | sort | uniq -c | sort -rn | head -1 | awk '{print $2}' > top.txt'''
+
+[[tasks]]
+id = "replace_host"
+prompt = "In config.ini, change host=localhost to host=db.internal. Leave every other line unchanged."
+setup = '''printf '[db]\nhost=localhost\nport=5432\nuser=app\n' > config.ini'''
+check = '''printf '[db]\nhost=db.internal\nport=5432\nuser=app\n' | cmp -s - config.ini'''
+solution = '''perl -pi -e 's/^host=localhost$/host=db.internal/' config.ini'''
+
+[[tasks]]
+id = "make_executable"
+prompt = "Make script.sh executable for its owner."
+setup = '''printf '#!/bin/sh\necho ok\n' > script.sh && chmod 644 script.sh'''
+check = '''test -x script.sh && test "$(./script.sh)" = "ok"'''
+solution = '''chmod u+x script.sh'''
+
+[[tasks]]
+id = "remove_tmp"
+prompt = "Delete every *.tmp file anywhere below the current directory. Keep all other files."
+setup = '''mkdir -p a/b c && touch x.tmp a/y.tmp a/b/z.tmp keep.txt a/keep.md c/data.csv'''
+check = '''test -z "$(find . -name '*.tmp')" && test -f keep.txt && test -f a/keep.md && test -f c/data.csv'''
+solution = '''find . -name '*.tmp' -type f -delete'''
+
+[[tasks]]
+id = "archive_logs"
+prompt = "Create a gzip-compressed tar archive logs.tar.gz that contains the logs directory."
+setup = '''mkdir logs && echo one > logs/a.log && echo two > logs/b.log && echo three > logs/c.log'''
+check = '''list=$(tar -tzf logs.tar.gz) && echo "$list" | grep -q 'logs/a.log' && echo "$list" | grep -q 'logs/b.log' && echo "$list" | grep -q 'logs/c.log' '''
+solution = '''tar -czf logs.tar.gz logs'''
+
+[[tasks]]
+id = "extract_archive"
+prompt = "Extract bundle.tar.gz into the current directory."
+setup = '''mkdir -p src/data && echo payload > src/data/a.txt && (cd src && tar -czf ../bundle.tar.gz data) && rm -rf src'''
+check = '''test "$(cat data/a.txt)" = "payload"'''
+solution = '''tar -xzf bundle.tar.gz'''
+
+[[tasks]]
+id = "symlink_latest"
+prompt = "Create a symbolic link named current that points to releases/v3."
+setup = '''mkdir -p releases/v1 releases/v2 releases/v3'''
+check = '''test -L current && test "$(readlink current | sed 's:/*$::')" = "releases/v3"'''
+solution = '''ln -s releases/v3 current'''
+
+[[tasks]]
+id = "csv_column_sum"
+prompt = "sales.csv has a header row. Write the sum of the amount column to total.txt (just the number)."
+setup = '''printf 'id,product,amount\n1,a,120\n2,b,80\n3,c,45\n4,d,255\n' > sales.csv'''
+check = '''test "$(tr -d ' \n' < total.txt)" = "500"'''
+solution = '''awk -F, 'NR>1 {s+=$3} END {print s}' sales.csv > total.txt'''
+
+[[tasks]]
+id = "csv_filter"
+prompt = "users.csv has columns name,age,city and a header. Write the names of users in Berlin, one per line, in file order, to berlin.txt."
+setup = '''printf 'name,age,city\nAnna,31,Berlin\nBen,25,Hamburg\nCara,40,Berlin\nDan,22,Munich\nEva,35,Berlin\n' > users.csv'''
+check = '''printf 'Anna\nCara\nEva\n' | cmp -s - berlin.txt'''
+solution = '''awk -F, '$3=="Berlin" {print $1}' users.csv > berlin.txt'''
+
+[[tasks]]
+id = "json_field"
+prompt = "Write the value of service.port from config.json to port.txt (just the number)."
+setup = '''printf '{"service": {"name": "api", "port": 8443}, "debug": false}\n' > config.json'''
+check = '''test "$(tr -d ' \n' < port.txt)" = "8443"'''
+solution = '''python3 -c 'import json; print(json.load(open("config.json"))["service"]["port"])' > port.txt'''
+
+[[tasks]]
+id = "json_update"
+prompt = "In settings.json, set debug to true. Keep the file valid JSON and keep all other values."
+setup = '''printf '{"debug": false, "level": "info", "workers": 4}\n' > settings.json'''
+check = '''python3 -c 'import json,sys; d=json.load(open("settings.json")); sys.exit(0 if d=={"debug": True, "level": "info", "workers": 4} else 1)' '''
+solution = '''python3 -c 'import json; d=json.load(open("settings.json")); d["debug"]=True; json.dump(d, open("settings.json","w"))' '''
+
+[[tasks]]
+id = "env_file"
+prompt = "Create a file .env with two lines: APP_ENV=production and PORT=3000."
+setup = ""
+check = '''grep -qx 'APP_ENV=production' .env && grep -qx 'PORT=3000' .env && test "$(grep -c . .env)" = "2"'''
+solution = '''printf 'APP_ENV=production\nPORT=3000\n' > .env'''
+
+[[tasks]]
+id = "rename_ext"
+prompt = "Rename every .jpeg file in photos/ to the same name with a .jpg extension."
+setup = '''mkdir photos && touch photos/a.jpeg photos/b.jpeg photos/c.png'''
+check = '''test -f photos/a.jpg && test -f photos/b.jpg && test -f photos/c.png && test -z "$(ls photos | grep '\.jpeg$')"'''
+solution = '''for f in photos/*.jpeg; do mv "$f" "${f%.jpeg}.jpg"; done'''
+
+[[tasks]]
+id = "largest_file"
+prompt = "Write the file name (without directory) of the largest file in data/ to largest.txt."
+setup = '''mkdir data && head -c 100 /dev/zero > data/small.bin && head -c 5000 /dev/zero > data/big.bin && head -c 900 /dev/zero > data/mid.bin'''
+check = '''test "$(tr -d ' \n' < largest.txt)" = "big.bin"'''
+solution = '''ls -S data | head -1 > largest.txt'''
+
+[[tasks]]
+id = "find_todo"
+prompt = "Write the paths (relative, like src/a.py) of all files under src/ containing TODO, sorted, one per line, to todos.txt."
+setup = '''mkdir -p src/lib && printf 'x = 1  # TODO fix\n' > src/a.py && printf 'ok\n' > src/b.py && printf '// TODO later\n' > src/lib/c.js && printf 'done\n' > src/lib/d.js'''
+check = '''printf 'src/a.py\nsrc/lib/c.js\n' | cmp -s - todos.txt'''
+solution = '''grep -rl TODO src | sort > todos.txt'''
+
+[[tasks]]
+id = "word_freq"
+prompt = "Write the most frequent word in text.txt (lowercase) to word.txt."
+setup = '''printf 'the cat and the dog\nThe bird and the fish\nthe end\n' > text.txt'''
+check = '''test "$(tr -d ' \n' < word.txt)" = "the"'''
+solution = '''tr 'A-Z' 'a-z' < text.txt | tr -s ' ' '\n' | grep -v '^$' | sort | uniq -c | sort -rn | head -1 | awk '{print $2}' > word.txt'''
+
+[[tasks]]
+id = "dedupe_lines"
+prompt = "Write the lines of list.txt to unique.txt with duplicates removed, keeping the first occurrence order."
+setup = '''printf 'b\na\nb\nc\na\nd\n' > list.txt'''
+check = '''printf 'b\na\nc\nd\n' | cmp -s - unique.txt'''
+solution = '''awk '!seen[$0]++' list.txt > unique.txt'''
+
+[[tasks]]
+id = "reverse_lines"
+prompt = "Write the lines of steps.txt in reverse order to reversed.txt."
+setup = '''printf 'one\ntwo\nthree\nfour\n' > steps.txt'''
+check = '''printf 'four\nthree\ntwo\none\n' | cmp -s - reversed.txt'''
+solution = '''awk '{a[NR]=$0} END {for (i=NR; i>0; i--) print a[i]}' steps.txt > reversed.txt'''
+
+[[tasks]]
+id = "trailing_spaces"
+prompt = "Remove trailing spaces and tabs from every line of notes.txt, editing it in place."
+setup = '''printf 'alpha  \nbeta\t\ngamma\ndelta   \t\n' > notes.txt'''
+check = '''printf 'alpha\nbeta\ngamma\ndelta\n' | cmp -s - notes.txt'''
+solution = '''perl -pi -e 's/[ \t]+$//' notes.txt'''
+
+[[tasks]]
+id = "crontab_line"
+prompt = "Write a single crontab line to cron.txt that runs /usr/local/bin/backup.sh every day at 03:30."
+setup = ""
+check = '''test "$(grep -c . cron.txt)" = "1" && awk '{exit !($1=="30" && $2=="3" && $3=="*" && $4=="*" && $5=="*" && $6=="/usr/local/bin/backup.sh")}' cron.txt'''
+solution = '''echo '30 3 * * * /usr/local/bin/backup.sh' > cron.txt'''
+
+[[tasks]]
+id = "systemd_unit"
+prompt = "Create energon.service: a systemd unit with Description=Energon worker in [Unit], ExecStart=/usr/local/bin/energon-worker and Restart=always in [Service], and WantedBy=multi-user.target in [Install]."
+setup = ""
+check = '''python3 - <<'PY'
+import configparser, sys
+c = configparser.ConfigParser(strict=False)
+c.optionxform = str
+c.read("energon.service")
+ok = (c.get("Unit", "Description", fallback="") == "Energon worker"
+      and c.get("Service", "ExecStart", fallback="") == "/usr/local/bin/energon-worker"
+      and c.get("Service", "Restart", fallback="") == "always"
+      and c.get("Install", "WantedBy", fallback="") == "multi-user.target")
+sys.exit(0 if ok else 1)
+PY'''
+solution = '''printf '[Unit]\nDescription=Energon worker\n\n[Service]\nExecStart=/usr/local/bin/energon-worker\nRestart=always\n\n[Install]\nWantedBy=multi-user.target\n' > energon.service'''
+
+[[tasks]]
+id = "nginx_port"
+prompt = "In nginx.conf, change the server from listening on port 80 to port 8080. Change nothing else."
+setup = '''printf 'server {\n    listen 80;\n    server_name example.com;\n    root /var/www;\n}\n' > nginx.conf'''
+check = '''printf 'server {\n    listen 8080;\n    server_name example.com;\n    root /var/www;\n}\n' | cmp -s - nginx.conf'''
+solution = '''perl -pi -e 's/listen 80;/listen 8080;/' nginx.conf'''
+
+[[tasks]]
+id = "permissions_private"
+prompt = "Lock down secrets/: the directory must be mode 700 and every file inside mode 600."
+setup = '''mkdir secrets && echo a > secrets/key.pem && echo b > secrets/token.txt && chmod 755 secrets && chmod 644 secrets/*'''
+check = '''python3 - <<'PY'
+import os, stat, sys
+ok = stat.S_IMODE(os.stat("secrets").st_mode) == 0o700
+for name in os.listdir("secrets"):
+    ok = ok and stat.S_IMODE(os.stat(os.path.join("secrets", name)).st_mode) == 0o600
+sys.exit(0 if ok else 1)
+PY'''
+solution = '''chmod 600 secrets/* && chmod 700 secrets'''
+
+[[tasks]]
+id = "split_file"
+prompt = "Split big.txt (100 lines) into files of 25 lines each named part_aa, part_ab, part_ac and part_ad."
+setup = '''seq 1 100 > big.txt'''
+check = '''test "$(cat part_aa part_ab part_ac part_ad | cmp -s - big.txt && echo same)" = "same" && test "$(wc -l < part_ab | tr -d ' ')" = "25"'''
+solution = '''split -l 25 big.txt part_'''
+
+[[tasks]]
+id = "merge_files"
+prompt = "Concatenate a.txt, b.txt and c.txt, in that order, into all.txt."
+setup = '''echo first > a.txt && echo second > b.txt && echo third > c.txt'''
+check = '''printf 'first\nsecond\nthird\n' | cmp -s - all.txt'''
+solution = '''cat a.txt b.txt c.txt > all.txt'''
+
+[[tasks]]
+id = "line_slice"
+prompt = "Write lines 10 through 20 (inclusive) of numbers.txt to slice.txt."
+setup = '''seq 1 50 > numbers.txt'''
+check = '''seq 10 20 | cmp -s - slice.txt'''
+solution = '''sed -n '10,20p' numbers.txt > slice.txt'''
+
+[[tasks]]
+id = "count_py_files"
+prompt = "Count the .py files anywhere under project/ and write the number to py_count.txt."
+setup = '''mkdir -p project/a/b project/c && touch project/x.py project/a/y.py project/a/b/z.py project/c/w.py project/readme.md project/a/b/q.txt'''
+check = '''test "$(tr -d ' \n' < py_count.txt)" = "4"'''
+solution = '''find project -name '*.py' -type f | wc -l | tr -d ' ' > py_count.txt'''
+
+[[tasks]]
+id = "gzip_keep"
+prompt = "Compress report.txt to report.txt.gz and keep the original file."
+setup = '''seq 1 200 > report.txt'''
+check = '''test -f report.txt && gzip -dc report.txt.gz | cmp -s - report.txt'''
+solution = '''gzip -c report.txt > report.txt.gz'''
+
+[[tasks]]
+id = "checksum"
+prompt = "Write the SHA-256 checksum of payload.bin (just the 64 hex characters) to checksum.txt."
+setup = '''printf 'energon payload\n' > payload.bin'''
+check = '''python3 - <<'PY'
+import hashlib, sys
+want = hashlib.sha256(open("payload.bin", "rb").read()).hexdigest()
+got = open("checksum.txt").read().strip()
+sys.exit(0 if got == want else 1)
+PY'''
+solution = '''python3 -c 'import hashlib; print(hashlib.sha256(open("payload.bin","rb").read()).hexdigest())' > checksum.txt'''
+
+[[tasks]]
+id = "extract_emails"
+prompt = "Write all unique email addresses found in contacts.txt, sorted, one per line, to emails.txt."
+setup = '''printf 'Anna <anna@example.com>\nsupport: help@energon.dev, sales@energon.dev\nagain anna@example.com\nno email here\n' > contacts.txt'''
+check = '''printf 'anna@example.com\nhelp@energon.dev\nsales@energon.dev\n' | cmp -s - emails.txt'''
+solution = '''grep -oE '[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]+' contacts.txt | sort -u > emails.txt'''
+
+[[tasks]]
+id = "kv_to_json"
+prompt = "settings.txt has key=value lines. Write them as a JSON object of strings to settings.json."
+setup = '''printf 'region=eu-west\ntier=pro\nowner=ops\n' > settings.txt'''
+check = '''python3 -c 'import json,sys; sys.exit(0 if json.load(open("settings.json"))=={"region":"eu-west","tier":"pro","owner":"ops"} else 1)' '''
+solution = '''python3 -c 'import json; print(json.dumps(dict(l.strip().split("=",1) for l in open("settings.txt") if "=" in l)))' > settings.json'''
+
+[[tasks]]
+id = "number_lines"
+prompt = "Write poem.txt to numbered.txt with each line prefixed by its line number and a colon and space, like '1: text'."
+setup = '''printf 'roses\nare\nred\n' > poem.txt'''
+check = '''printf '1: roses\n2: are\n3: red\n' | cmp -s - numbered.txt'''
+solution = '''awk '{print NR": "$0}' poem.txt > numbered.txt'''
+
+[[tasks]]
+id = "delete_empty_files"
+prompt = "Delete every empty file under workspace/. Keep non-empty files."
+setup = '''mkdir -p workspace/sub && touch workspace/e1 workspace/sub/e2 && echo data > workspace/full && echo more > workspace/sub/full2'''
+check = '''test -z "$(find workspace -type f -empty)" && test -f workspace/full && test -f workspace/sub/full2'''
+solution = '''find workspace -type f -empty -delete'''
+
+[[tasks]]
+id = "backup_copy"
+prompt = "Copy the config directory recursively to config.bak."
+setup = '''mkdir -p config/nested && echo a > config/app.yml && echo b > config/nested/db.yml'''
+check = '''test "$(cat config.bak/app.yml)" = "a" && test "$(cat config.bak/nested/db.yml)" = "b" && test -f config/app.yml'''
+solution = '''cp -R config config.bak'''
+
+[[tasks]]
+id = "uppercase_headers"
+prompt = "Convert only the first line (the header) of data.csv to uppercase, editing the file in place."
+setup = '''printf 'name,city\nanna,berlin\nben,hamburg\n' > data.csv'''
+check = '''printf 'NAME,CITY\nanna,berlin\nben,hamburg\n' | cmp -s - data.csv'''
+solution = '''perl -pi -e '$_ = uc($_) if $. == 1' data.csv'''
+
+[[tasks]]
+id = "port_in_use_config"
+prompt = "services.txt lists name:port pairs. Write the names of services using a port above 8000, sorted, one per line, to high_ports.txt."
+setup = '''printf 'web:80\napi:8080\ncache:6379\nmetrics:9090\ndb:5432\nadmin:8443\n' > services.txt'''
+check = '''printf 'admin\napi\nmetrics\n' | cmp -s - high_ports.txt'''
+solution = '''awk -F: '$2 > 8000 {print $1}' services.txt | sort > high_ports.txt'''
+
+[[tasks]]
+id = "git_ignore"
+prompt = "Create a .gitignore that ignores node_modules/, .env and all *.log files, one pattern per line."
+setup = ""
+check = '''grep -qx 'node_modules/' .gitignore && grep -qx '.env' .gitignore && grep -qx '\*.log' .gitignore'''
+solution = '''printf 'node_modules/\n.env\n*.log\n' > .gitignore'''

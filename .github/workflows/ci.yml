@@ -46,3 +46,17 @@ jobs:
 
       - name: Build
         run: bun run web:build
+
+  trainer:
+    name: Trainer
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Test (fake backend, GNU userland)
+        working-directory: services/trainer
+        run: uv run --no-project --python 3.12 --with pytest python -m pytest -q
