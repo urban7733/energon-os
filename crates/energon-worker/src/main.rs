@@ -1,4 +1,9 @@
-use std::{env, time::Duration};
+mod training;
+
+use std::{
+    env,
+    time::{Duration, Instant, SystemTime, UNIX_EPOCH},
+};
 
 use async_nats::{HeaderMap, jetstream};
 use energon_db::event_outbox;
@@ -39,9 +44,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         }
     };
 
-    if openai_api_key.is_none() && publisher.is_none() {
+    let training = training::TrainingRuntime::from_env()?;
+    if training.is_none() {
+        tracing::info!(
+            "training is not configured (ENERGON_TRAINER_SECRET, RUNPOD_API_KEY, ENERGON_RUNPOD_ENDPOINT_ID)"
+        );
+    }
+
+    if openai_api_key.is_none() && publisher.is_none() && training.is_none() {
         return Err(config_error(
-            "configure OPENAI_API_KEY and/or ENERGON_NATS_URL for the worker",
+            "configure OPENAI_API_KEY, ENERGON_NATS_URL and/or training for the worker",
         ));
     }
 
@@ -57,8 +69,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         event_batch_size,
         embedding_enabled = openai_api_key.is_some(),
         event_publisher_enabled = publisher.is_some(),
+        training_enabled = training.is_some(),
         "Energon worker started"
     );
+
+    let training_interval = Duration::from_secs(30);
+    let mut last_training_tick: Option<Instant> = None;
 
     loop {
         let embedded = match &openai_api_key {
@@ -72,12 +88,24 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             None => 0,
         };
 
+        let mut trained = 0;
+        if let Some(training) = &training {
+            if run_once || last_training_tick.is_none_or(|tick| tick.elapsed() >= training_interval)
+            {
+                last_training_tick = Some(Instant::now());
+                match training.tick(&pool, now_unix_ms()).await {
+                    Ok(changed) => trained = changed,
+                    Err(error) => tracing::error!(%error, "training tick failed"),
+                }
+            }
+        }
+
         if run_once {
-            tracing::info!(embedded, published, "worker one-shot finished");
+            tracing::info!(embedded, published, trained, "worker one-shot finished");
             break;
         }
 
-        if embedded == 0 && published == 0 {
+        if embedded == 0 && published == 0 && trained == 0 {
             tokio::time::sleep(Duration::from_secs(2)).await;
         }
     }
@@ -255,6 +283,13 @@ async fn process_embedding_batch(
     }
 
     Ok(chunks.len())
+}
+
+fn now_unix_ms() -> u128 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis()
 }
 
 fn required_env(name: &'static str) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
