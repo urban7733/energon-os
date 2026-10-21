@@ -60,3 +60,41 @@ jobs:
       - name: Test (fake backend, GNU userland)
         working-directory: services/trainer
         run: uv run --no-project --python 3.12 --with pytest python -m pytest -q
+
+  training-e2e:
+    name: Training E2E
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: energon
+          POSTGRES_PASSWORD: energon
+          POSTGRES_DB: energon
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U energon"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Build API and worker
+        run: cargo build -p energon-api -p energon-worker
+
+      - name: Run pipeline end to end
+        env:
+          DATABASE_URL: postgres://energon:energon@localhost:5432/energon
+        run: python3 tools/e2e-training.py
