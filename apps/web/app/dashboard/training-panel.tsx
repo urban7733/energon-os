@@ -167,10 +167,6 @@ export function TrainingPanel({
           {overview ? (
             <dl className="training-stats">
               <div>
-                <dt>Runs reported</dt>
-                <dd>{overview.runs_total.toLocaleString()}</dd>
-              </div>
-              <div>
                 <dt>Successful</dt>
                 <dd>{overview.runs_successful.toLocaleString()}</dd>
               </div>

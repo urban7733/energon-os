@@ -1,7 +1,7 @@
 "use client";
 
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { CheckCircle2, CircleSlash, Moon, PlugZap } from "lucide-react";
+import { CheckCircle2, CircleSlash, FileText, Moon, PlugZap } from "lucide-react";
 
 type Night = { night: string; base: number; trained: number };
 type Version = {
@@ -131,7 +131,7 @@ export function TrainingView({
             <div className="dx-table-row tv-cols" role="row" key={version.version}>
               <span role="cell" className="dx-entity">
                 <span className="dx-entity-avatar">
-                  {version.kind === "adapter" ? <PlugZap size={13} aria-hidden="true" /> : "{}"}
+                  {version.kind === "adapter" ? <PlugZap size={13} aria-hidden="true" /> : <FileText size={13} aria-hidden="true" />}
                 </span>
                 <span>
                   <strong>{version.version}</strong>
