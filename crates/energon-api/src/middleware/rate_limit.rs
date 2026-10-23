@@ -22,7 +22,8 @@ const DEFAULT_BURST: f64 = 40.0;
 /// Guessing API keys or admin tokens needs many 401s; real clients need few.
 const DEFAULT_AUTH_FAILURE_RPS: f64 = 1.0;
 const DEFAULT_AUTH_FAILURE_BURST: f64 = 20.0;
-const DEFAULT_CLIENT_IP_HEADER: &str = "x-forwarded-for";
+/// Set by Cloudflare's edge on every request, overwriting client values.
+const DEFAULT_CLIENT_IP_HEADER: &str = "cf-connecting-ip";
 /// How long a credential that passed real authentication stays exempt from
 /// its IP's failed-authentication budget.
 const VERIFIED_CREDENTIAL_TTL: Duration = Duration::from_secs(15 * 60);
@@ -61,9 +62,8 @@ impl RateLimiter {
         let configured_header = env::var("ENERGON_CLIENT_IP_HEADER").ok();
         if configured_header.is_none() && crate::state::is_production() {
             tracing::warn!(
-                "ENERGON_CLIENT_IP_HEADER is not set; trusting the rightmost X-Forwarded-For \
-                 entry. Set it to your proxy's client IP header, or `none` when the API is \
-                 exposed directly."
+                "ENERGON_CLIENT_IP_HEADER is not set; trusting Cloudflare's cf-connecting-ip. \
+                 Set it explicitly, or to `none` if the API is not served through Cloudflare."
             );
         }
         let client_ip_header = client_ip_header_setting(configured_header.as_deref());
@@ -280,7 +280,7 @@ fn limiter_key(headers: &HeaderMap, client: &str) -> String {
 /// Resolve the client IP. Proxies append the address they saw to the right
 /// of `X-Forwarded-For`, while everything to its left is client-controlled,
 /// so only the rightmost entry is trusted. Single-value headers such as
-/// `x-real-ip` or `cf-connecting-ip` resolve the same way. `None` means the
+/// Cloudflare's `cf-connecting-ip` (the default) resolve the same way. `None` means the
 /// API is exposed directly and only the socket peer is trusted.
 fn client_ip(headers: &HeaderMap, peer: Option<SocketAddr>, header: Option<&str>) -> String {
     let forwarded_ip = header
@@ -428,7 +428,7 @@ mod tests {
         );
         assert_eq!(client_ip(&spoofed, Some(peer), None), "ip:9.9.9.9");
         assert_eq!(
-            client_ip(&HeaderMap::new(), Some(peer), Some("x-real-ip")),
+            client_ip(&HeaderMap::new(), Some(peer), Some("cf-connecting-ip")),
             "ip:9.9.9.9"
         );
     }
@@ -437,11 +437,11 @@ mod tests {
     fn client_ip_header_setting_supports_direct_exposure() {
         assert_eq!(
             client_ip_header_setting(None).as_deref(),
-            Some("x-forwarded-for")
+            Some("cf-connecting-ip")
         );
         assert_eq!(
-            client_ip_header_setting(Some("X-Real-IP")).as_deref(),
-            Some("x-real-ip")
+            client_ip_header_setting(Some("X-Forwarded-For")).as_deref(),
+            Some("x-forwarded-for")
         );
         assert_eq!(client_ip_header_setting(Some("none")), None);
     }

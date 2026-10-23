@@ -3,6 +3,7 @@ import { betterAuth } from "better-auth";
 import { nextCookies } from "better-auth/next-js";
 import { jwt, organization } from "better-auth/plugins";
 import { Pool } from "pg";
+import { TRUSTED_IP_HEADERS } from "./client-ip";
 
 const databaseUrl =
   process.env.DATABASE_URL ?? "postgres://energon:energon@localhost:5432/energon";
@@ -91,9 +92,11 @@ export const auth = betterAuth({
     },
   },
   advanced: {
-    // Railway sets this single, edge-controlled client IP header.
+    // Cloudflare-controlled client IP; see lib/client-ip.ts. Without a
+    // resolvable IP, Better Auth would put every visitor into one shared
+    // rate-limit bucket and lock out all sign-ins together.
     ipAddress: {
-      ipAddressHeaders: ["x-real-ip"],
+      ipAddressHeaders: TRUSTED_IP_HEADERS,
     },
   },
   plugins: [
